@@ -2,16 +2,10 @@ name: Backend CI Pipeline (.NET 8)
 
 on:
   push:
-    branches:
-      - main
-      - develop
-      - 'feature/**'
-      - 'release/**'
+    branches: [ main, develop ]
   pull_request:
-    branches:
-      - main
-      - develop
-  workflow_dispatch:
+    branches: [ main, develop ]
+  workflow_dispatch: {}
 
 jobs:
   build-lint-test:
@@ -19,50 +13,42 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: đŸ“¥ Checkout Code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: â™ï¸ Setup .NET 8.0 SDK
+      - name: Setup .NET 8.0 SDK
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
 
-      - name: đŸ“¦ Cache NuGet Packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.sln') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
-
-      - name: đŸ”„ Restore NuGet Dependencies
+      - name: Restore NuGet Dependencies
         run: |
           if compgen -G "*.sln" > /dev/null || compgen -G "*/*.csproj" > /dev/null || compgen -G "src/*/*.csproj" > /dev/null; then
             dotnet restore
           else
-            echo "â„¹ï¸ Solution/projects not yet committed. Ready for code push."
+            echo "No solution/project files committed yet. Environment check OK."
           fi
 
-      - name: đŸ” Code Format & Style Check
+      - name: Code Format & Lint Check
         run: |
           if compgen -G "*.sln" > /dev/null; then
-            dotnet format --verify-no-changes --verbosity normal || echo "::warning::Coding style inconsistencies detected."
+            dotnet format --verify-no-changes --verbosity normal || echo "::warning::Code format check warning."
           else
-            echo "â„¹ï¸ Solution file not yet committed. Format check ready."
+            echo "Solution not yet committed. Format check ready."
           fi
 
-      - name: đŸ”¨ Compile & Build (Release)
+      - name: Compile & Build
         run: |
           if compgen -G "*.sln" > /dev/null || compgen -G "*/*.csproj" > /dev/null || compgen -G "src/*/*.csproj" > /dev/null; then
             dotnet build --no-restore --configuration Release
           else
-            echo "â„¹ï¸ Project files not yet committed. Build check ready."
+            echo "Project not yet committed. Build check ready."
           fi
 
-      - name: đŸ§ª Execute Unit Tests
+      - name: Execute Unit Tests
         run: |
           if [ -d tests ]; then
             dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
           else
-            echo "â„¹ï¸ Unit tests directory not yet committed. Test runner ready."
+            echo "Unit tests directory not yet committed. Test runner ready."
           fi
