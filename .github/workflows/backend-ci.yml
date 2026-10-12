@@ -21,7 +21,34 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Build and Test Check
+      - name: Restore NuGet Dependencies
         run: |
-          dotnet --version
-          echo "Ready for Clean Architecture code"
+          if compgen -G "*.sln" > /dev/null || compgen -G "*/*.csproj" > /dev/null || compgen -G "src/*/*.csproj" > /dev/null; then
+            dotnet restore
+          else
+            echo "No solution/project files committed yet. Environment check OK."
+          fi
+
+      - name: Code Format & Lint Check
+        run: |
+          if compgen -G "*.sln" > /dev/null; then
+            dotnet format --verify-no-changes --verbosity normal || echo "::warning::Code format check warning."
+          else
+            echo "Solution not yet committed. Format check ready."
+          fi
+
+      - name: Compile & Build
+        run: |
+          if compgen -G "*.sln" > /dev/null || compgen -G "*/*.csproj" > /dev/null || compgen -G "src/*/*.csproj" > /dev/null; then
+            dotnet build --no-restore --configuration Release
+          else
+            echo "Project not yet committed. Build check ready."
+          fi
+
+      - name: Execute Unit Tests
+        run: |
+          if [ -d tests ]; then
+            dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
+          else
+            echo "Unit tests directory not yet committed. Test runner ready."
+          fi
