@@ -1,4 +1,4 @@
-# đŸ ModMove - Backend API Service
+# 🚚 ModMove - Backend API Service
 
 [![Backend CI Pipeline (.NET 8)](https://github.com/hoangnm2111/ModMove-backend/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/hoangnm2111/ModMove-backend/actions/workflows/backend-ci.yml)
 
@@ -6,7 +6,7 @@ Core REST API and Real-Time WebSocket backend services for the **ModMove On-Dema
 
 ---
 
-## đŸ›ï¸ Architecture Overview
+## 🏛️ Architecture Overview
 The backend is structured according to **Clean Architecture** and **Domain-Driven Design (DDD)** principles:
 
 - `src/ModMove.Domain`: Core business entities, aggregates, enumerations, domain events, and repository interfaces.
@@ -17,11 +17,11 @@ The backend is structured according to **Clean Architecture** and **Domain-Drive
 
 ---
 
-## đŸ› ï¸ Technology Stack
+## 🛠️ Technology Stack
 - **Framework:** .NET 8.0 (C#)
 - **Database:** MySQL 8.x
 - **ORM:** Entity Framework Core 8
-- **Real-Time Streaming:** ASP.NET Core SignalR / WebSocket (GPS coordinates 5â€“10s interval)
+- **Real-Time Streaming:** ASP.NET Core SignalR / WebSocket (GPS coordinates 5-10s interval)
 - **Authentication:** JWT Bearer tokens + Refresh token rotation + Role-Based Access Control (RBAC)
 - **External Integrations:**
   - Google Maps Geocoding, Distance Matrix & Directions API
@@ -32,7 +32,7 @@ The backend is structured according to **Clean Architecture** and **Domain-Drive
 
 ---
 
-## đŸŒ¿ GitFlow & Contribution Rules
+## 🌿 GitFlow & Contribution Rules
 - `main`: Production-ready branch. Direct push is prohibited. Merges occur only via PR from `develop` or release branches.
 - `develop`: Primary integration branch.
 - `feature/<name>`: Individual feature branch (e.g., `feature/hoang`).
