@@ -30,7 +30,7 @@ jobs:
 
       - name: đŸ”„ Restore NuGet Dependencies
         run: |
-          if ls *.sln 1> /dev/null 2>&1 || ls */*.csproj 1> /dev/null 2>&1 || ls src/*/*.csproj 1> /dev/null 2>&1; then
+          if compgen -G "*.sln" > /dev/null || compgen -G "*/*.csproj" > /dev/null || compgen -G "src/*/*.csproj" > /dev/null; then
             dotnet restore
           else
             echo "â„¹ï¸ No solution or project files detected yet. Skipping restore."
@@ -38,7 +38,7 @@ jobs:
 
       - name: đŸ” Code Format & Style Check
         run: |
-          if ls *.sln 1> /dev/null 2>&1; then
+          if compgen -G "*.sln" > /dev/null; then
             dotnet format --verify-no-changes --verbosity normal || echo "::warning::Coding style inconsistencies detected."
           else
             echo "â„¹ï¸ Solution file not yet committed. Skipping format verification."
@@ -46,7 +46,7 @@ jobs:
 
       - name: đŸ”¨ Compile & Build (Release)
         run: |
-          if ls *.sln 1> /dev/null 2>&1 || ls */*.csproj 1> /dev/null 2>&1 || ls src/*/*.csproj 1> /dev/null 2>&1; then
+          if compgen -G "*.sln" > /dev/null || compgen -G "*/*.csproj" > /dev/null || compgen -G "src/*/*.csproj" > /dev/null; then
             dotnet build --no-restore --configuration Release
           else
             echo "â„¹ï¸ No projects to build yet. Skipping build step."
@@ -54,7 +54,7 @@ jobs:
 
       - name: đŸ§ª Execute Unit Tests
         run: |
-          if [ -d tests ] && [ "\" ]; then
+          if [ -d tests ]; then
             dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
           else
             echo "â„¹ï¸ No tests directory committed yet. Skipping test execution."
