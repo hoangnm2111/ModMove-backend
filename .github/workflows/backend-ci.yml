@@ -7,6 +7,9 @@ on:
     branches: [ main, develop ]
   workflow_dispatch: {}
 
+env:
+  SOLUTION: ModMove.slnx
+
 jobs:
   build-lint-test:
     name: Build, Lint & Unit Tests
@@ -16,39 +19,20 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup .NET 8.0 SDK
+      # Projects target net8.0; SDK 9.0.200+ is required to read the .slnx solution format.
+      - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '9.0.x'
 
       - name: Restore NuGet Dependencies
-        run: |
-          if compgen -G "*.sln" > /dev/null || compgen -G "*/*.csproj" > /dev/null || compgen -G "src/*/*.csproj" > /dev/null; then
-            dotnet restore
-          else
-            echo "No solution/project files committed yet. Environment check OK."
-          fi
+        run: dotnet restore $SOLUTION
 
       - name: Code Format & Lint Check
-        run: |
-          if compgen -G "*.sln" > /dev/null; then
-            dotnet format --verify-no-changes --verbosity normal || echo "::warning::Code format check warning."
-          else
-            echo "Solution not yet committed. Format check ready."
-          fi
+        run: dotnet format $SOLUTION --verify-no-changes --no-restore --verbosity normal || echo "::warning::Code format check warning."
 
       - name: Compile & Build
-        run: |
-          if compgen -G "*.sln" > /dev/null || compgen -G "*/*.csproj" > /dev/null || compgen -G "src/*/*.csproj" > /dev/null; then
-            dotnet build --no-restore --configuration Release
-          else
-            echo "Project not yet committed. Build check ready."
-          fi
+        run: dotnet build $SOLUTION --no-restore --configuration Release
 
-      - name: Execute Unit Tests
-        run: |
-          if [ -d tests ]; then
-            dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
-          else
-            echo "Unit tests directory not yet committed. Test runner ready."
-          fi
+      - name: Execute Tests
+        run: dotnet test $SOLUTION --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage"
