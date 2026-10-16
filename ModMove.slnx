@@ -1,0 +1,20 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/src/ModMove.Domain/">
+    <Project Path="src/ModMove.Domain/ModMove.Domain.csproj" />
+  </Folder>
+  <Folder Name="/src/ModMove.Application/">
+    <Project Path="src/ModMove.Application/ModMove.Application.csproj" />
+  </Folder>
+  <Folder Name="/src/ModMove.Infrastructure/">
+    <Project Path="src/ModMove.Infrastructure/ModMove.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/ModMove.WebApi/">
+    <Project Path="src/ModMove.WebApi/ModMove.WebApi.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ModMove.ArchitectureTests/ModMove.ArchitectureTests.csproj" />
+    <Project Path="tests/ModMove.IntegrationTests/ModMove.IntegrationTests.csproj" />
+    <Project Path="tests/ModMove.UnitTests/ModMove.UnitTests.csproj" />
+  </Folder>
+</Solution>

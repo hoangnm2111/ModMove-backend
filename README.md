@@ -12,8 +12,11 @@ The backend is structured according to **Clean Architecture** and **Domain-Drive
 - `src/ModMove.Domain`: Core business entities, aggregates, enumerations, domain events, and repository interfaces.
 - `src/ModMove.Application`: Use cases, CQRS commands/queries (MediatR), DTOs, FluentValidation validators, and external service interfaces.
 - `src/ModMove.Infrastructure`: MySQL database persistence (Entity Framework Core), Cloudinary media adapter, Google Maps adapter, PayOS gateway client, FCM adapter, and BCrypt password hasher.
-- `src/ModMove.API`: ASP.NET Core Web API controllers, JWT authentication middleware, SignalR/WebSocket hubs for live GPS streaming, and global error handling middleware.
+- `src/ModMove.WebApi`: ASP.NET Core Web API controllers, JWT authentication middleware, SignalR/WebSocket hubs for live GPS streaming, and global error handling middleware.
 - `tests/ModMove.UnitTests`: Unit tests for domain models, application handlers, and business logic.
+- `tests/ModMove.ArchitectureTests`: Enforces layer dependency rules and CQRS read/write separation.
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the folder layout, CQRS conventions and a use-case template.
 
 ---
 
