@@ -1220,6 +1220,7 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnName("email_verified");
 
                     b.Property<int>("FailedLoginCount")
+                        .IsConcurrencyToken()
                         .HasColumnType("int")
                         .HasColumnName("failed_login_count");
 

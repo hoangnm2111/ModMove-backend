@@ -1,6 +1,8 @@
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces.Persistence;
+using MySqlConnector;
 
 namespace ModMove.Infrastructure.Persistence;
 
@@ -33,6 +35,23 @@ public sealed class ApplicationDbContext(DbContextOptions<ApplicationDbContext> 
                     property.SetMaxLength(property.GetMaxLength() ?? DefaultEnumLength);
                 }
             }
+        }
+    }
+
+    /// <summary>Translates EF/MySQL races into the Application's ConflictException (HTTP 409).</summary>
+    public override async Task<int> SaveChangesAsync(bool acceptAllChangesOnSuccess, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            throw new ConflictException();
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is MySqlException { ErrorCode: MySqlErrorCode.DuplicateKeyEntry })
+        {
+            throw new ConflictException("A record with the same unique value already exists.");
         }
     }
 
