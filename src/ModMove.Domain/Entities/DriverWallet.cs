@@ -112,6 +112,9 @@ public sealed class DriverWallet : BaseAuditableEntity, IAggregateRoot
 
     private void EnsurePendingWithdrawal(WalletTransaction tx)
     {
+        if (tx.WalletId != Id)
+            throw new DomainException("The transaction does not belong to this wallet.");
+
         if (tx.TransactionType != WalletTransactionType.WithdrawEarnings || tx.TransactionStatus != WalletTransactionStatus.Pending)
             throw new DomainException("Only a pending withdrawal can be processed.");
     }

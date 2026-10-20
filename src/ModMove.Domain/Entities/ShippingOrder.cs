@@ -128,6 +128,15 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         if (photos.Count < BusinessRules.MinPickupPhotos)
             throw new DomainException($"At least {BusinessRules.MinPickupPhotos} pickup photos are required.");
 
+        // The customer rejected the evidence: the driver re-uploads without a status change.
+        if (OrderStatus == OrderStatus.PickedUp && Proof?.ProofStatus == ProofStatus.Rejected)
+        {
+            Proof.RecordPickup(photos);
+            _statusHistories.Add(OrderStatusHistory.Create(
+                OrderStatus.PickedUp, OrderStatus.PickedUp, ChangedByRole.Driver, driverUserId, "Pickup evidence resubmitted"));
+            return;
+        }
+
         TransitionTo(OrderStatus.PickedUp, ChangedByRole.Driver, driverUserId, null, now);
         Proof ??= ProofOfDelivery.Create();
         Proof.RecordPickup(photos);
