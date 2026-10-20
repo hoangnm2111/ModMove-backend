@@ -24,6 +24,8 @@ src/
 │   ├── Common/                        # BaseEntity, BaseAuditableEntity, IAggregateRoot
 │   ├── Entities/                      # Aggregate + entity (ShippingOrder, Trip, DriverWallet...)
 │   ├── Enums/
+│   ├── Constants/                     # BusinessRules (giới hạn GB-xx)
+│   ├── Services/                      # Domain service (FareCalculator, OrderSettlement)
 │   └── Exceptions/                    # DomainException (vi phạm business rule → 422)
 │
 ├── ModMove.Application/               # Use case + interface (port)
@@ -53,7 +55,7 @@ src/
 │   └── DependencyInjection.cs         # AddInfrastructure()
 │
 └── ModMove.WebApi/                    # Tầng trình bày HTTP/WebSocket
-    ├── Controllers/<Role>/            # Admin, Customer, Driver, Dispatcher, Public
+    ├── Controllers/<Role>/            # Admin, Customer, Driver, Dispatcher, Public, Webhooks (PayOS)
     │   └── ApiControllerBase.cs       # Controller mỏng: HTTP → Sender.Send(...)
     ├── Hubs/                          # SignalR (GPS realtime)
     ├── Middlewares/                   # ExceptionHandlingMiddleware → ProblemDetails

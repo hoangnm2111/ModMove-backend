@@ -27,12 +27,13 @@ Nguồn: Report-3 (SRS) và Report-4 (SDS). Quy tắc kiến trúc ở [ARCHITEC
 |---|---|---|
 | `Features/Auth`, `Features/Users`, `Controllers/Public`, `Controllers/Customer` | Hiếu | Auth dùng chung cho mọi role |
 | `Features/Orders`, `Features/Tracking`, `Features/Ratings` | Hiếu | Đặt/hủy đơn, theo dõi, đánh giá |
-| `Features/Payments` (thanh toán đơn PayOS, COD, coupon, webhook, hoàn tiền chi trả) | Hoàng | Toàn bộ phần thanh toán; Hiếu chỉ gọi qua interface |
+| `Features/Payments` (thanh toán đơn PayOS, COD, coupon, webhook, chi trả hoàn tiền: Command `PayoutRefund` nằm ở `Payments`, gọi sau khi Refund được duyệt) | Hoàng | Toàn bộ phần thanh toán; Hiếu chỉ gọi qua interface |
 | `Features/DriverOnboarding`, `Features/Drivers`, `Features/MasterData`, `Features/Reports`, `Controllers/Admin`, `Controllers/Driver` | Hoàng | |
 | `Features/Pricing` — **cấu hình** giá (entity `FareRule`, CRUD) | Hoàng | |
 | `Domain/Services/FareCalculator` — **tính** giá | Hiếu | Đọc `FareRule` của Hoàng |
 | `Features/Wallets` (ví tài xế, rút tiền, nạp cọc) | Hoàng | Cả phía Driver và Admin |
-| `Features/Incidents`, `Features/Refunds` (phía Dispatcher), `Controllers/Dispatcher` | Huy | |
+| `Features/Incidents`, `Features/Refunds`, `Controllers/Dispatcher` | Huy | **Module dùng chung**: Hiếu thêm use case phía Customer, Hoàng thêm use case duyệt Refund; mỗi người chỉ tạo thư mục UseCase của mình, không sửa use case người khác |
+| `Features/Catalog` | Hoàng | Danh mục loại xe/dịch vụ công khai; `MasterData` là phần cấu hình admin, hai module dùng chung entity |
 | `Features/Matching`, `Features/Trips`, `Infrastructure/BackgroundJobs` (MATCH, ORDER) | Hoàng | Phía Driver |
 | `Controllers/Webhooks`, `BackgroundJobs` (PAY) | Hoàng | |
 | `BackgroundJobs` (GPS) | Hiếu | |
