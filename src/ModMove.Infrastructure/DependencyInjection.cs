@@ -43,12 +43,14 @@ public static class DependencyInjection
         });
         services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ApplicationDbContext>());
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
+        // Aggregate-specific repositories: register each next to its interface (the open generic above cannot Include).
+        services.AddScoped<IUserRepository, UserRepository>();
 
         // Read side (Queries): raw connection for Dapper.
         services.AddSingleton<ISqlConnectionFactory>(new SqlConnectionFactory(connectionString));
 
-        // External adapters (Cloudinary, GoogleMaps, PayOS, Firebase, Email) and
-        // Identity (JWT, password hashing) are registered here as they are implemented.
+        // External adapters (Cloudinary, GoogleMaps, PayOS, Firebase, Email) are registered here
+        // as they are implemented; their ports are in Application/Common/Interfaces/Ports.cs.
 
         return services;
     }

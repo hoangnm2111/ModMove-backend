@@ -35,6 +35,18 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the folder layout, CQRS con
 
 ---
 
+## ▶️ Running the project locally
+1. Install the .NET SDK 9.0.200+ (the projects target `net8.0`) and MySQL 8.
+2. Copy `src/ModMove.WebApi/appsettings.Development.example.json` to `appsettings.Development.json` (git-ignored) and fill in your MySQL password and a random `Jwt:SigningKey` of at least 32 characters. Never commit secrets.
+3. `dotnet run --project src/ModMove.WebApi`. In Development the app applies the EF Core migrations, seeds reference data (vehicle types, settings, coupons, master data) and creates four demo accounts: `admin@`, `dispatcher@`, `customer@`, `driver@modmove.local` (password `ModMove@123`).
+4. Open Swagger at `http://localhost:5133/swagger`, call `POST /api/public/auth/login` and use the returned token as `Authorization: Bearer <token>`.
+5. Before pushing: `dotnet format ModMove.slnx`, `dotnet build ModMove.slnx` (no warnings), `dotnet test ModMove.slnx`.
+
+New migration (always `git pull develop` first, two people creating one at once conflict):
+`dotnet ef migrations add <Name> -p src/ModMove.Infrastructure -s src/ModMove.WebApi -o Persistence/Migrations`
+
+---
+
 ## 🌿 GitFlow & Contribution Rules
 - `main`: Production-ready branch. Direct push is prohibited. Merges occur only via PR from `develop` or release branches.
 - `develop`: Primary integration branch.

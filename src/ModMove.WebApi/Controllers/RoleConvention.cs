@@ -14,6 +14,8 @@ namespace ModMove.WebApi.Controllers;
 /// </summary>
 public sealed class RoleConvention : IControllerModelConvention
 {
+    public const string PlaceholderRoute = "api/[controller]";
+
     private const string Root = "ModMove.WebApi.Controllers.";
 
     private static readonly Dictionary<string, UserRole> RolesByFolder = new(StringComparer.OrdinalIgnoreCase)
@@ -31,7 +33,7 @@ public sealed class RoleConvention : IControllerModelConvention
             return;
 
         var folder = ns[Root.Length..].Split('.')[0];
-        foreach (var selector in controller.Selectors.Where(s => s.AttributeRouteModel is null))
+        foreach (var selector in controller.Selectors.Where(s => s.AttributeRouteModel?.Template is null or PlaceholderRoute))
             selector.AttributeRouteModel = new AttributeRouteModel(new RouteAttribute($"api/{folder.ToLowerInvariant()}/[controller]"));
 
         if (RolesByFolder.TryGetValue(folder, out var role))
