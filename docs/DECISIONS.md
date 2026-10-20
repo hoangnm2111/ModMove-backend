@@ -29,6 +29,7 @@ Mục "Còn cần làm rõ" ở cuối là các chỗ quyết định còn mơ h
 |---|---|---|---|
 | B6 | **Tài xế đăng ký chỉ trên app mobile.** Backend dùng chung endpoint đăng ký với `role = Driver` (email + OTP). `driver_profiles` tạo khi nộp hồ sơ lần đầu (UC-DRV-03); `driver_wallets` tạo khi được duyệt lần đầu | Hiếu, Hoàng | — |
 | B7 | **Dispatcher**: Admin tạo tài khoản và mật khẩu; đó là mật khẩu cố định của Dispatcher (không bắt đổi lần đầu) | Hoàng | — |
+| A-01 | **Đăng nhập** (đã làm): sai email, sai mật khẩu và tài khoản đang bị khóa (GB-02) trả **cùng một** lỗi 401, để không lộ email nào tồn tại. Đánh đổi chấp nhận: ai biết email cũng làm khóa được tài khoản đó 10 phút bằng 5 lần đăng nhập sai. Gửi song song nhiều lần sai có thể nhận 409 (concurrency token trên `failed_login_count`), client cứ thử lại | Hiếu | Chưa có rate limiting cho `api/public/auth/login` |
 | B8 | **Xóa tài khoản**: đặt `account_status = Inactive`, giữ đơn và lịch sử, không xóa dòng | Hiếu | — |
 
 ## 4. Nội dung, hỗ trợ, báo cáo, thông báo

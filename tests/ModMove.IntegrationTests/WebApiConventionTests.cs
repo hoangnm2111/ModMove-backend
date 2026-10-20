@@ -17,6 +17,7 @@ namespace ModMove.WebApi.Controllers.Dispatcher { public sealed class FakeIncide
 namespace ModMove.WebApi.Controllers.Admin { public sealed class FakeUsersController : ApiControllerBase; }
 namespace ModMove.WebApi.Controllers.Public { public sealed class FakeVehicleTypesController : ApiControllerBase; }
 namespace ModMove.WebApi.Controllers.Webhooks { public sealed class FakePayOsController : ApiControllerBase; }
+namespace ModMove.WebApi.Controllers.Drivers { public sealed class FakeTypoController : ApiControllerBase; }
 
 namespace ModMove.IntegrationTests
 {
@@ -91,13 +92,12 @@ namespace ModMove.IntegrationTests
             Assert.Empty(Apply(controller).Filters.OfType<AuthorizeFilter>());
         }
 
-        [Fact]
-        public void Controller_outside_the_controllers_namespace_is_left_alone()
+        [Theory]
+        [InlineData(typeof(WebApi.Controllers.Drivers.FakeTypoController))] // "Drivers" is not a role folder
+        [InlineData(typeof(WebApiConventionTests))]                          // outside Controllers/ entirely
+        public void Controller_in_an_unknown_folder_fails_at_startup_instead_of_going_anonymous(Type controller)
         {
-            var model = Apply(typeof(WebApiConventionTests));
-
-            Assert.Equal(RoleConvention.PlaceholderRoute, model.Selectors[0].AttributeRouteModel!.Template);
-            Assert.Empty(model.Filters);
+            Assert.Throws<InvalidOperationException>(() => Apply(controller));
         }
     }
 }

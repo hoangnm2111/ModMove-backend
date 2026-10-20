@@ -13,23 +13,31 @@ internal sealed class LoginCommandHandler(
     IJwtTokenService tokenService,
     TimeProvider clock) : ICommandHandler<LoginCommand, LoginResponse>
 {
+    // One answer for unknown email, wrong password and locked account (GB-02), so the response
+    // never tells an attacker which emails exist or that a lock was hit.
+    private const string InvalidCredentials = "Invalid email or password, or the account is temporarily locked.";
+
+    // Hash of a random secret: unknown emails still pay for one BCrypt check, so timing does not leak existence.
+    private static string? s_dummyHash;
+
     public async Task<LoginResponse> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
         var user = await users.GetByEmailAsync(request.Email.Trim(), cancellationToken);
+        var passwordOk = passwordHasher.Verify(
+            request.Password, user?.PasswordHash ?? (s_dummyHash ??= passwordHasher.Hash(Guid.NewGuid().ToString())));
 
-        // Same answer for "no such email" and "wrong password": do not reveal which emails exist.
         if (user is null)
-            throw new UnauthorizedException("Invalid email or password.");
+            throw new UnauthorizedException(InvalidCredentials);
 
         var now = clock.GetUtcNow();
         if (user.IsLocked(now))
-            throw new ForbiddenAccessException($"The account is locked until {user.LockedUntil:u}.");
+            throw new UnauthorizedException(InvalidCredentials); // no counting while locked: the lock already blocks guessing
 
-        if (!passwordHasher.Verify(request.Password, user.PasswordHash))
+        if (!passwordOk)
         {
-            user.RegisterFailedLogin(now); // GB-02
-            await unitOfWork.SaveChangesAsync(cancellationToken);
-            throw new UnauthorizedException("Invalid email or password.");
+            user.RegisterFailedLogin(now);
+            await unitOfWork.SaveChangesAsync(cancellationToken); // saved before the 401 so the count sticks
+            throw new UnauthorizedException(InvalidCredentials);
         }
 
         if (user.AccountStatus != AccountStatus.Active)

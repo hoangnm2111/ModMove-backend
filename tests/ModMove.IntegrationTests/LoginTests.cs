@@ -110,12 +110,28 @@ public class LoginTests
     [Fact]
     public async Task Five_failures_lock_the_account_even_for_the_right_password_GB02()
     {
-        var (sender, _) = Build(NewUser());
+        var user = NewUser();
+        var (sender, _) = Build(user);
 
         for (var i = 0; i < 5; i++)
             await Assert.ThrowsAsync<UnauthorizedException>(() => sender.Send(new LoginCommand("a@x.vn", "nope")));
 
-        await Assert.ThrowsAsync<ForbiddenAccessException>(() => sender.Send(new LoginCommand("a@x.vn", "secret")));
+        Assert.True(user.IsLocked(Now));
+        await Assert.ThrowsAsync<UnauthorizedException>(() => sender.Send(new LoginCommand("a@x.vn", "secret")));
+    }
+
+    [Fact]
+    public async Task Locked_account_and_unknown_email_get_the_same_answer()
+    {
+        var user = NewUser();
+        var (sender, _) = Build(user);
+        for (var i = 0; i < 5; i++)
+            await Assert.ThrowsAsync<UnauthorizedException>(() => sender.Send(new LoginCommand("a@x.vn", "nope")));
+
+        var locked = await Assert.ThrowsAsync<UnauthorizedException>(() => sender.Send(new LoginCommand("a@x.vn", "secret")));
+        var unknown = await Assert.ThrowsAsync<UnauthorizedException>(() => sender.Send(new LoginCommand("nobody@x.vn", "secret")));
+
+        Assert.Equal(unknown.Message, locked.Message);
     }
 
     [Fact]
