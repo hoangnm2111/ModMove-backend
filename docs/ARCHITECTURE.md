@@ -21,7 +21,7 @@ Phụ thuộc **chỉ hướng vào trong**. `tests/ModMove.ArchitectureTests` s
 ```
 src/
 ├── ModMove.Domain/                    # Nghiệp vụ thuần, không framework
-│   ├── Common/                        # BaseEntity, BaseAuditableEntity, IAggregateRoot
+│   ├── Common/                        # BaseEntity (Id BIGINT), BaseCreatedEntity, BaseAuditableEntity, IAggregateRoot
 │   ├── Entities/                      # Aggregate + entity (ShippingOrder, Trip, DriverWallet...)
 │   ├── Enums/
 │   ├── Constants/                     # BusinessRules (giới hạn GB-xx)
@@ -47,7 +47,8 @@ src/
 │   │   ├── Configurations/            # IEntityTypeConfiguration<T> cho từng entity
 │   │   ├── Interceptors/              # Tự gán CreatedAt/By, UpdatedAt/By
 │   │   ├── Repositories/              # Repository<T> (+ repo riêng khi cần)
-│   │   ├── Migrations/
+│   │   ├── Migrations/                # Code first: dotnet ef migrations add ...
+│   │   ├── Seed/                      # DatabaseInitializer: migrate + reference data (+ demo accounts in Development)
 │   │   └── SqlConnectionFactory.cs    # Kết nối đọc cho Dapper
 │   ├── Identity/                      # JWT, BCrypt
 │   ├── ExternalServices/              # Cloudinary, GoogleMaps, PayOS, Firebase, Email

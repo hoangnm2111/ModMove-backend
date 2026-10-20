@@ -1,22 +1,19 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
-using ModMove.Application.Common.Interfaces;
 using ModMove.Domain.Common;
 
 namespace ModMove.Infrastructure.Persistence.Interceptors;
 
 /// <summary>
-/// Stamps CreatedAt/By and UpdatedAt/By on every BaseAuditableEntity at SaveChanges.
+/// Stamps created_at on every new BaseCreatedEntity and updated_at on every modified BaseAuditableEntity.
 /// </summary>
-internal sealed class AuditableEntityInterceptor(ICurrentUserService currentUser, TimeProvider timeProvider)
-    : SaveChangesInterceptor
+internal sealed class AuditableEntityInterceptor(TimeProvider timeProvider) : SaveChangesInterceptor
 {
     public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
         DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
     {
         if (eventData.Context is not null)
             Stamp(eventData.Context);
-
         return base.SavingChangesAsync(eventData, result, cancellationToken);
     }
 
@@ -24,27 +21,19 @@ internal sealed class AuditableEntityInterceptor(ICurrentUserService currentUser
     {
         if (eventData.Context is not null)
             Stamp(eventData.Context);
-
         return base.SavingChanges(eventData, result);
     }
 
     private void Stamp(DbContext context)
     {
         var now = timeProvider.GetUtcNow();
-        var userId = currentUser.UserId;
 
-        foreach (var entry in context.ChangeTracker.Entries<BaseAuditableEntity>())
+        foreach (var entry in context.ChangeTracker.Entries<BaseCreatedEntity>())
         {
             if (entry.State == EntityState.Added)
-            {
                 entry.Entity.CreatedAt = now;
-                entry.Entity.CreatedBy = userId;
-            }
-            else if (entry.State == EntityState.Modified)
-            {
-                entry.Entity.UpdatedAt = now;
-                entry.Entity.UpdatedBy = userId;
-            }
+            else if (entry.State == EntityState.Modified && entry.Entity is BaseAuditableEntity auditable)
+                auditable.UpdatedAt = now;
         }
     }
 }

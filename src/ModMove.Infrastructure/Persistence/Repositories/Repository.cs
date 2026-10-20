@@ -10,7 +10,7 @@ public class Repository<TAggregate>(ApplicationDbContext dbContext) : IRepositor
     protected ApplicationDbContext DbContext { get; } = dbContext;
     protected DbSet<TAggregate> Set => DbContext.Set<TAggregate>();
 
-    public virtual Task<TAggregate?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default) =>
+    public virtual Task<TAggregate?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         Set.FirstOrDefaultAsync(e => e.Id == id, cancellationToken);
 
     public void Add(TAggregate aggregate) => Set.Add(aggregate);

@@ -1,6 +1,7 @@
 using ModMove.Application;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Infrastructure;
+using ModMove.Infrastructure.Persistence.Seed;
 using ModMove.WebApi.Middlewares;
 using ModMove.WebApi.Services;
 
@@ -38,6 +39,12 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+}
+
+if (app.Environment.IsDevelopment())
+{
+    // Code first: apply migrations and seed reference data (+ demo accounts) on startup.
+    await DatabaseInitializer.MigrateAndSeedAsync(app.Services, includeDemoData: true);
 }
 
 app.UseHttpsRedirection();
