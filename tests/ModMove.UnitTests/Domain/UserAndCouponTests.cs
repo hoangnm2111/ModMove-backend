@@ -103,4 +103,18 @@ public class UserAndCouponTests
 
         Assert.Throws<DomainException>(() => application.Reject(2, [], Now));
     }
+
+    [Fact]
+    public void Approving_a_newer_version_updates_the_existing_vehicle()
+    {
+        var profile = DriverProfile.Create(1, "id", "lic", "f", "b");
+        profile.Approve(Vehicle.Create(1, 1, "51C-1", 500, "1x1x1", "r", "i", "p"));
+        var original = profile.Vehicle;
+
+        profile.Approve(Vehicle.Create(1, 2, "51C-2", 1000, "2x2x2", "r2", "i2", "p2"));
+
+        Assert.Same(original, profile.Vehicle);
+        Assert.Equal("51C-2", profile.Vehicle!.LicensePlate);
+        Assert.Equal(2, profile.Vehicle.VehicleTypeId);
+    }
 }

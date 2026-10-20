@@ -53,7 +53,12 @@ public sealed class DriverProfile : BaseAuditableEntity, IAggregateRoot
     public void Approve(Vehicle vehicle)
     {
         ApprovalStatus = ApprovalStatus.Approved;
-        Vehicle = vehicle;
+
+        // A newer approved version updates the existing vehicle (one per driver) instead of adding a second row.
+        if (Vehicle is null)
+            Vehicle = vehicle;
+        else
+            Vehicle.UpdateFrom(vehicle);
     }
 
     public void Reject() => ApprovalStatus = ApprovalStatus.Rejected;

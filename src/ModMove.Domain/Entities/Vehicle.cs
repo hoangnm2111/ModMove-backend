@@ -37,4 +37,16 @@ public sealed class Vehicle : BaseAuditableEntity
         };
 
     public void Deactivate() => VehicleStatus = VehicleStatus.Inactive;
+
+    public void UpdateFrom(Vehicle other)
+    {
+        VehicleTypeId = other.VehicleTypeId;
+        LicensePlate = other.LicensePlate;
+        MaxLoadWeightKg = other.MaxLoadWeightKg;
+        CargoBedDimensions = other.CargoBedDimensions;
+        RegistrationCertUrl = other.RegistrationCertUrl;
+        InspectionCertUrl = other.InspectionCertUrl;
+        VehiclePhotoUrl = other.VehiclePhotoUrl;
+        VehicleStatus = VehicleStatus.Active;
+    }
 }

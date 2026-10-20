@@ -134,4 +134,20 @@ public class ShippingOrderTests
         Assert.False(order.IsMatchingExpired(Now.AddMinutes(9)));
         Assert.True(order.IsMatchingExpired(Now.AddMinutes(10)));
     }
+
+    [Fact]
+    public void Driver_can_resubmit_pickup_photos_after_customer_rejects_GB26()
+    {
+        var order = AcceptedOrder();
+        order.ConfirmArrival(9, Now);
+        order.ConfirmPickup(["1.jpg", "2.jpg"], 9, Now);
+        order.RejectPickupEvidence("blurry", customerId: 1);
+
+        order.ConfirmPickup(["3.jpg", "4.jpg"], 9, Now);
+
+        Assert.Equal(OrderStatus.PickedUp, order.OrderStatus);
+        Assert.Equal(ProofStatus.Pending, order.Proof!.ProofStatus);
+        order.ApprovePickupEvidence(1, Now);
+        Assert.Equal(OrderStatus.InTransit, order.OrderStatus);
+    }
 }

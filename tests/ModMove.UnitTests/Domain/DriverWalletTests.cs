@@ -86,4 +86,28 @@ public class DriverWalletTests
         Assert.Throws<DomainException>(() => wallet.CompleteWithdrawal(withdrawal, 2, "FT124", Now));
         Assert.Equal("FT123", withdrawal.ReferenceCode);
     }
+
+    [Fact]
+    public void Withdrawal_of_another_wallet_cannot_be_processed()
+    {
+        var walletA = DriverWallet.Create(1);
+        walletA.CreditTripEarning(10, 100_000, 10_000);
+        var withdrawalOfA = walletA.RequestWithdrawal(50_000);
+
+        var walletB = DriverWallet.Create(2);
+        typeof(DriverWallet).BaseType!.BaseType!.BaseType!
+            .GetProperty("Id")!.SetValue(walletB, 2L);
+
+        Assert.Throws<DomainException>(() => walletB.RejectWithdrawal(withdrawalOfA, 2, Now));
+        Assert.Equal(0m, walletB.EarningsBalance);
+    }
+
+    [Fact]
+    public void Frozen_wallet_rejects_operations()
+    {
+        var wallet = DriverWallet.Create(1);
+        typeof(DriverWallet).GetProperty("WalletStatus")!.SetValue(wallet, WalletStatus.Frozen);
+
+        Assert.Throws<DomainException>(() => wallet.TopUpDeposit(1_000));
+    }
 }
