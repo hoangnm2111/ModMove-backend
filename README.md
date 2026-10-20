@@ -35,6 +35,18 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the folder layout, CQRS con
 
 ---
 
+## 📌 Bắt buộc đọc trước khi code (theo thứ tự)
+1. **README này**: cách chạy dự án (mục bên dưới).
+2. [CLAUDE.md](CLAUDE.md): quy tắc bắt buộc (layer, CQRS, test, commit, review).
+3. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): cấu trúc thư mục, mẫu use case, **quy ước API** (route và quyền theo thư mục, mã lỗi, enum, phân trang).
+4. [docs/BACKEND-GUIDE.md](docs/BACKEND-GUIDE.md): ai sở hữu thư mục nào, việc dùng chung, phụ thuộc giữa các người.
+5. [docs/DECISIONS.md](docs/DECISIONS.md): **quyết định thiết kế nhóm đã chốt**; khác SRS/SDS thì làm theo file này.
+6. [docs/BACKEND-TASKS.md](docs/BACKEND-TASKS.md): checklist việc của từng người theo phase.
+
+Code mẫu để copy: Command `src/ModMove.Application/Features/Auth/Commands/Login`, Query `src/ModMove.Application/Features/Catalog/Queries/GetVehicleTypes`, Controller `src/ModMove.WebApi/Controllers/Public/AuthController.cs`.
+
+---
+
 ## ▶️ Running the project locally
 1. Install the .NET SDK 9.0.200+ (the projects target `net8.0`) and MySQL 8.
 2. Copy `src/ModMove.WebApi/appsettings.Development.example.json` to `appsettings.Development.json` (git-ignored) and fill in your MySQL password and a random `Jwt:SigningKey` of at least 32 characters. Never commit secrets.
