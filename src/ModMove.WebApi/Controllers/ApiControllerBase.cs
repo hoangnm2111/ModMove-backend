@@ -8,7 +8,6 @@ namespace ModMove.WebApi.Controllers;
 /// No business logic and no direct Infrastructure access here.
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
 public abstract class ApiControllerBase : ControllerBase
 {
     private ISender? _sender;

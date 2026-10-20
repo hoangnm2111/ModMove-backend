@@ -40,6 +40,7 @@ public sealed class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Ex
         },
         NotFoundException e => Problem(StatusCodes.Status404NotFound, "Not found", e.Message),
         ForbiddenAccessException e => Problem(StatusCodes.Status403Forbidden, "Forbidden", e.Message),
+        ConflictException e => Problem(StatusCodes.Status409Conflict, "Conflict", e.Message),
         DomainException e => Problem(StatusCodes.Status422UnprocessableEntity, "Business rule violated", e.Message),
         _ => Problem(StatusCodes.Status500InternalServerError, "Server error", "An unexpected error occurred."),
     };

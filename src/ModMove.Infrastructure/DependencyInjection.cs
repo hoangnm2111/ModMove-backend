@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
+using ModMove.Infrastructure.Identity;
 using ModMove.Infrastructure.Persistence;
 using ModMove.Infrastructure.Persistence.Interceptors;
 using ModMove.Infrastructure.Persistence.Repositories;
@@ -15,6 +17,19 @@ public static class DependencyInjection
         var connectionString = configuration.GetConnectionString("DefaultConnection");
         if (string.IsNullOrWhiteSpace(connectionString))
             throw new InvalidOperationException("Connection string 'DefaultConnection' is missing.");
+
+        var jwt = new JwtOptions
+        {
+            Issuer = configuration["Jwt:Issuer"] ?? "ModMove",
+            Audience = configuration["Jwt:Audience"] ?? "ModMove.Clients",
+            SigningKey = configuration["Jwt:SigningKey"] ?? "",
+            AccessTokenMinutes = int.TryParse(configuration["Jwt:AccessTokenMinutes"], out var minutes) ? minutes : 15,
+        };
+        if (jwt.SigningKey.Length < JwtOptions.MinSigningKeyLength)
+            throw new InvalidOperationException($"Jwt:SigningKey must be at least {JwtOptions.MinSigningKeyLength} characters.");
+        services.AddSingleton(jwt);
+        services.AddSingleton<IJwtTokenService, JwtTokenService>();
+        services.AddSingleton<IPasswordHasher, BCryptPasswordHasher>();
 
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<AuditableEntityInterceptor>();

@@ -1,0 +1,99 @@
+using System.Reflection;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.ApplicationModels;
+using Microsoft.AspNetCore.Mvc.Authorization;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using ModMove.Application.Common.Exceptions;
+using ModMove.WebApi.Controllers;
+using ModMove.WebApi.Middlewares;
+
+// Stand-in controllers: the convention only looks at the namespace, so they can live in the test assembly.
+namespace ModMove.WebApi.Controllers.Customer { public sealed class FakeOrdersController : ApiControllerBase; }
+namespace ModMove.WebApi.Controllers.Driver { public sealed class FakeJobsController : ApiControllerBase; }
+namespace ModMove.WebApi.Controllers.Dispatcher { public sealed class FakeIncidentsController : ApiControllerBase; }
+namespace ModMove.WebApi.Controllers.Admin { public sealed class FakeUsersController : ApiControllerBase; }
+namespace ModMove.WebApi.Controllers.Public { public sealed class FakeVehicleTypesController : ApiControllerBase; }
+namespace ModMove.WebApi.Controllers.Webhooks { public sealed class FakePayOsController : ApiControllerBase; }
+
+namespace ModMove.IntegrationTests
+{
+    public class WebApiConventionTests
+    {
+        private static ControllerModel Apply(Type controller)
+        {
+            var model = new ControllerModel(controller.GetTypeInfo(), []);
+            model.Selectors.Add(new SelectorModel());
+            new RoleConvention().Apply(model);
+            return model;
+        }
+
+        private static async Task<bool> IsAllowedAsync(ControllerModel model, params string[] roles)
+        {
+            var policy = model.Filters.OfType<AuthorizeFilter>().Single().Policy!;
+            var principal = new ClaimsPrincipal(new ClaimsIdentity(roles.Select(r => new Claim(ClaimTypes.Role, r)), "test"));
+            var service = new ServiceCollection().AddLogging().AddAuthorization().BuildServiceProvider()
+                .GetRequiredService<IAuthorizationService>();
+
+            return (await service.AuthorizeAsync(principal, null, policy.Requirements)).Succeeded;
+        }
+
+        [Fact]
+        public async Task Conflict_is_mapped_to_409()
+        {
+            var context = new DefaultHttpContext();
+            var middleware = new ExceptionHandlingMiddleware(_ => throw new ConflictException(), NullLogger<ExceptionHandlingMiddleware>.Instance);
+
+            await middleware.InvokeAsync(context);
+
+            Assert.Equal(StatusCodes.Status409Conflict, context.Response.StatusCode);
+        }
+
+        [Theory]
+        [InlineData(typeof(WebApi.Controllers.Customer.FakeOrdersController), "api/customer/[controller]")]
+        [InlineData(typeof(WebApi.Controllers.Driver.FakeJobsController), "api/driver/[controller]")]
+        [InlineData(typeof(WebApi.Controllers.Dispatcher.FakeIncidentsController), "api/dispatcher/[controller]")]
+        [InlineData(typeof(WebApi.Controllers.Admin.FakeUsersController), "api/admin/[controller]")]
+        [InlineData(typeof(WebApi.Controllers.Public.FakeVehicleTypesController), "api/public/[controller]")]
+        [InlineData(typeof(WebApi.Controllers.Webhooks.FakePayOsController), "api/webhooks/[controller]")]
+        public void Route_comes_from_the_role_folder(Type controller, string expected)
+        {
+            Assert.Equal(expected, Apply(controller).Selectors[0].AttributeRouteModel!.Template);
+        }
+
+        [Theory]
+        [InlineData(typeof(WebApi.Controllers.Customer.FakeOrdersController), "Customer")]
+        [InlineData(typeof(WebApi.Controllers.Driver.FakeJobsController), "Driver")]
+        [InlineData(typeof(WebApi.Controllers.Dispatcher.FakeIncidentsController), "Dispatcher")]
+        [InlineData(typeof(WebApi.Controllers.Admin.FakeUsersController), "Administrator")]
+        public async Task Role_folder_allows_only_its_own_role(Type controller, string role)
+        {
+            var model = Apply(controller);
+
+            Assert.True(await IsAllowedAsync(model, role));
+            Assert.False(await IsAllowedAsync(model, "Guest"));
+            Assert.False(await IsAllowedAsync(model)); // signed in without any role
+            foreach (var other in new[] { "Customer", "Driver", "Dispatcher", "Administrator" }.Where(r => r != role))
+                Assert.False(await IsAllowedAsync(model, other));
+        }
+
+        [Theory]
+        [InlineData(typeof(WebApi.Controllers.Public.FakeVehicleTypesController))]
+        [InlineData(typeof(WebApi.Controllers.Webhooks.FakePayOsController))]
+        public void Public_and_webhook_controllers_stay_anonymous(Type controller)
+        {
+            Assert.Empty(Apply(controller).Filters.OfType<AuthorizeFilter>());
+        }
+
+        [Fact]
+        public void Controller_outside_the_controllers_namespace_is_left_alone()
+        {
+            var model = Apply(typeof(WebApiConventionTests));
+
+            Assert.Null(model.Selectors[0].AttributeRouteModel);
+            Assert.Empty(model.Filters);
+        }
+    }
+}
