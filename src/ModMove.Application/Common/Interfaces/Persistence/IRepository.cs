@@ -10,7 +10,7 @@ namespace ModMove.Application.Common.Interfaces.Persistence;
 /// </summary>
 public interface IRepository<TAggregate> where TAggregate : BaseEntity, IAggregateRoot
 {
-    Task<TAggregate?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<TAggregate?> GetByIdAsync(long id, CancellationToken cancellationToken = default);
     void Add(TAggregate aggregate);
     void Update(TAggregate aggregate);
     void Remove(TAggregate aggregate);
