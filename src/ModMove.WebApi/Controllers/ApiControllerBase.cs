@@ -8,7 +8,7 @@ namespace ModMove.WebApi.Controllers;
 /// No business logic and no direct Infrastructure access here.
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[Route(RoleConvention.PlaceholderRoute)] // [ApiController] demands a route before conventions run; RoleConvention rewrites it
 public abstract class ApiControllerBase : ControllerBase
 {
     private ISender? _sender;
