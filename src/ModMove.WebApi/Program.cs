@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using ModMove.Infrastructure.Identity;
@@ -32,7 +33,9 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
         ClockSkew = TimeSpan.FromSeconds(30),
     });
 
-builder.Services.AddControllers(options => options.Conventions.Add(new RoleConvention()));
+// Enums travel as their names ("Pending"), the same form the database stores.
+builder.Services.AddControllers(options => options.Conventions.Add(new RoleConvention()))
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();

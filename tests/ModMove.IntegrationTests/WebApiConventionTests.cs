@@ -24,8 +24,12 @@ namespace ModMove.IntegrationTests
     {
         private static ControllerModel Apply(Type controller)
         {
+            // Same shape MVC builds: the placeholder route inherited from ApiControllerBase.
             var model = new ControllerModel(controller.GetTypeInfo(), []);
-            model.Selectors.Add(new SelectorModel());
+            model.Selectors.Add(new SelectorModel
+            {
+                AttributeRouteModel = new AttributeRouteModel(new Microsoft.AspNetCore.Mvc.RouteAttribute(RoleConvention.PlaceholderRoute)),
+            });
             new RoleConvention().Apply(model);
             return model;
         }
@@ -92,7 +96,7 @@ namespace ModMove.IntegrationTests
         {
             var model = Apply(typeof(WebApiConventionTests));
 
-            Assert.Null(model.Selectors[0].AttributeRouteModel);
+            Assert.Equal(RoleConvention.PlaceholderRoute, model.Selectors[0].AttributeRouteModel!.Template);
             Assert.Empty(model.Filters);
         }
     }
