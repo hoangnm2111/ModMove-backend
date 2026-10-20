@@ -6,6 +6,6 @@ namespace ModMove.Application.Common.Interfaces;
 /// </summary>
 public interface ICurrentUserService
 {
-    Guid? UserId { get; }
+    long? UserId { get; }
     bool IsInRole(string role);
 }
