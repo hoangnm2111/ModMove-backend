@@ -43,8 +43,6 @@ internal static class ReferenceDataSeeder
         [
             ("COMMISSION_RATE", "0.10"),         // GB-14
             ("LOADING_FEE", "100000"),           // UC-GST-12
-            ("PEAK_SURCHARGE", "20000"),         // UC-ADM-12
-            ("BULKY_SURCHARGE", "50000"),        // UC-ADM-12
             ("MIN_COD_DEPOSIT", "200000"),       // GB-16
             ("MATCHING_TIMEOUT_MINUTES", "10"),  // GB-24
             ("PAYOS_SESSION_MINUTES", "10"),     // GB-13
