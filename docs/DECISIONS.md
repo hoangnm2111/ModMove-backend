@@ -27,7 +27,7 @@ Mục "Còn cần làm rõ" ở cuối là các chỗ quyết định còn mơ h
 
 | # | Quyết định | Người làm | Việc phát sinh trong code |
 |---|---|---|---|
-| B6 | **Tài xế đăng ký chỉ trên app mobile.** Backend dùng chung endpoint đăng ký với `role = Driver` (email + OTP). `driver_profiles` tạo khi nộp hồ sơ lần đầu (UC-DRV-03); `driver_wallets` tạo khi được duyệt lần đầu | Hiếu, Hoàng | — |
+| B6 | **Đăng ký theo kênh**: web chỉ có form đăng ký **Customer**; **Driver** chỉ đăng ký trên app mobile (app mobile có cả hai form). Backend có hai endpoint, không nhận `role` từ client: `POST api/public/auth/register` (luôn tạo Customer) và `POST api/public/auth/register-driver` (luôn tạo Driver, chỉ app gọi). Cả hai dùng email + OTP và chung luật GB-01/GB-25. Dispatcher/Admin không tự đăng ký được (B7). `driver_profiles` tạo khi nộp hồ sơ lần đầu (UC-DRV-03); `driver_wallets` tạo khi được duyệt lần đầu | Hiếu (endpoint), Hoàng (hồ sơ tài xế) | Web không có form/link đăng ký tài xế |
 | B7 | **Dispatcher**: Admin tạo tài khoản và mật khẩu; đó là mật khẩu cố định của Dispatcher (không bắt đổi lần đầu) | Hoàng | — |
 | A-01 | **Đăng nhập** (đã làm): sai email, sai mật khẩu và tài khoản đang bị khóa (GB-02) trả **cùng một** lỗi 401, để không lộ email nào tồn tại. Đánh đổi chấp nhận: ai biết email cũng làm khóa được tài khoản đó 10 phút bằng 5 lần đăng nhập sai. Gửi song song nhiều lần sai có thể nhận 409 (concurrency token trên `failed_login_count`), client cứ thử lại | Hiếu | Chưa có rate limiting cho `api/public/auth/login` |
 | B8 | **Xóa tài khoản**: đặt `account_status = Inactive`, giữ đơn và lịch sử, không xóa dòng | Hiếu | — |

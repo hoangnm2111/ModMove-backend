@@ -63,7 +63,7 @@ Huy và Hoàng trong lúc chờ S1/S2 làm domain + test trước (không cần 
 - UC-GST-06..16: **ước tính giá không cần đăng nhập** — `GET/POST api/public/fare-estimate` (địa chỉ → Geocoding, Distance Matrix → `FareCalculator`, GB-10 kiểm tra tải trọng, coupon GB-21 qua `ValidateCoupon` của Hoàng). Draft của Guest lưu ở client; server chỉ tính giá.
 
 **Auth** — `Features/Auth` (dùng chung mọi role)
-- UC-GST-01 đăng ký + OTP (GB-01, GB-25: OTP email, hết hạn 5 phút, gửi lại tối đa 3 lần/15 phút).
+- UC-GST-01 đăng ký + OTP (GB-01, GB-25: OTP email, hết hạn 5 phút, gửi lại tối đa 3 lần/15 phút). Web chỉ đăng ký Customer (`register`); Driver chỉ đăng ký trên app (`register-driver`), xem DECISIONS B6.
 - UC-CUS-01 đăng nhập (GB-02: khóa 10 phút sau 5 lần sai), CUS-02 quên mật khẩu, CUS-03 đăng xuất, CUS-04 đổi mật khẩu.
 - Endpoint đăng nhập dùng chung cho Admin (UC-ADM-01), Dispatcher (UC-DIS-02), Driver (UC-DRV-01); chỉ khác role claim.
 - UC-CUS-05..07 xem/sửa hồ sơ, xóa tài khoản (`Features/Users`).
