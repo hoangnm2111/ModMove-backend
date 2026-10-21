@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using ModMove.Infrastructure.ExternalServices.Email;
 using ModMove.Infrastructure.Identity;
 using ModMove.Application;
 using ModMove.Application.Common.Interfaces;
@@ -22,6 +23,10 @@ builder.Services
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+
+// No SMTP configured on this machine: in Development only, write emails (OTP codes) to the log instead.
+if (builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(builder.Configuration["Email:Host"]))
+    builder.Services.AddSingleton<IEmailSender, LogOnlyEmailSender>();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
 builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme).Configure<JwtOptions>((bearer, jwt) =>
