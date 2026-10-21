@@ -18,6 +18,7 @@ namespace ModMove.WebApi.Controllers.Admin { public sealed class FakeUsersContro
 namespace ModMove.WebApi.Controllers.Public { public sealed class FakeVehicleTypesController : ApiControllerBase; }
 namespace ModMove.WebApi.Controllers.Webhooks { public sealed class FakePayOsController : ApiControllerBase; }
 namespace ModMove.WebApi.Controllers.Drivers { public sealed class FakeTypoController : ApiControllerBase; }
+namespace ModMove.WebApi.Controllers.Account { public sealed class FakeProfileController : ApiControllerBase; }
 
 namespace ModMove.IntegrationTests
 {
@@ -43,6 +44,21 @@ namespace ModMove.IntegrationTests
                 .GetRequiredService<IAuthorizationService>();
 
             return (await service.AuthorizeAsync(principal, null, policy.Requirements)).Succeeded;
+        }
+
+        [Fact]
+        public async Task Account_folder_is_for_any_signed_in_role_but_not_anonymous_D2()
+        {
+            var model = Apply(typeof(WebApi.Controllers.Account.FakeProfileController));
+            var policy = model.Filters.OfType<AuthorizeFilter>().Single().Policy!;
+            var service = new ServiceCollection().AddLogging().AddAuthorization().BuildServiceProvider()
+                .GetRequiredService<IAuthorizationService>();
+            var anonymous = new ClaimsPrincipal(new ClaimsIdentity()); // no authentication type = not signed in
+
+            Assert.Equal("api/account/[controller]", model.Selectors[0].AttributeRouteModel!.Template);
+            foreach (var role in new[] { "Customer", "Driver", "Dispatcher", "Administrator" })
+                Assert.True(await IsAllowedAsync(model, role));
+            Assert.False((await service.AuthorizeAsync(anonymous, null, policy.Requirements)).Succeeded);
         }
 
         [Fact]

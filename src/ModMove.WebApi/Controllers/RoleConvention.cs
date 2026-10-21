@@ -9,7 +9,7 @@ namespace ModMove.WebApi.Controllers;
 
 /// <summary>
 /// One folder = one role (SDS 2.1). For Controllers/Customer/OrdersController this gives the route
-/// api/customer/orders and requires the Customer role. Only Public and Webhooks are anonymous
+/// api/customer/orders and requires the Customer role. Account needs any signed-in user; only Public and Webhooks are anonymous
 /// (the webhook proves itself with the PayOS signature). Any other folder fails at startup, so a typo
 /// can never publish an endpoint without a role check. A controller that declares its own [Route] keeps it.
 /// </summary>
@@ -29,20 +29,25 @@ public sealed class RoleConvention : IControllerModelConvention
 
     private static readonly HashSet<string> AnonymousFolders = new(StringComparer.Ordinal) { "Public", "Webhooks" };
 
+    // Endpoints every signed-in user has (password, profile, logout, FCM token), whatever the role (DECISIONS D2).
+    private const string AnyRoleFolder = "Account";
+
     public void Apply(ControllerModel controller)
     {
         var ns = controller.ControllerType.Namespace ?? "";
         var folder = ns.StartsWith(Root, StringComparison.Ordinal) ? ns[Root.Length..].Split('.')[0] : "";
-        var hasRole = RolesByFolder.TryGetValue(folder, out var role);
 
-        if (!hasRole && !AnonymousFolders.Contains(folder))
-            throw new InvalidOperationException(
-                $"Controller {controller.ControllerType.FullName} must live in Controllers/<Customer|Driver|Dispatcher|Admin|Public|Webhooks>.");
+        AuthorizationPolicy? policy = RolesByFolder.TryGetValue(folder, out var role)
+            ? new AuthorizationPolicyBuilder().RequireRole(role.ToString()).Build()
+            : folder == AnyRoleFolder ? new AuthorizationPolicyBuilder().RequireAuthenticatedUser().Build()
+            : AnonymousFolders.Contains(folder) ? null
+            : throw new InvalidOperationException(
+                $"Controller {controller.ControllerType.FullName} must live in Controllers/<Customer|Driver|Dispatcher|Admin|Account|Public|Webhooks>.");
 
         foreach (var selector in controller.Selectors.Where(s => s.AttributeRouteModel?.Template is null or PlaceholderRoute))
             selector.AttributeRouteModel = new AttributeRouteModel(new RouteAttribute($"api/{folder.ToLowerInvariant()}/[controller]"));
 
-        if (hasRole)
-            controller.Filters.Add(new AuthorizeFilter(new AuthorizationPolicyBuilder().RequireRole(role.ToString()).Build()));
+        if (policy is not null)
+            controller.Filters.Add(new AuthorizeFilter(policy));
     }
 }
