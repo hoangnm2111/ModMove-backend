@@ -26,6 +26,8 @@ internal sealed class ShippingOrderConfiguration : IEntityTypeConfiguration<Ship
         builder.Property(o => o.PaymentMethod).HasMaxLength(10);
         builder.Property(o => o.PayerRole).HasMaxLength(10);
         builder.Property(o => o.CancellationReason).HasMaxLength(500);
+        builder.Property(o => o.CommissionRate).HasPrecision(5, 4);   // e.g. 0.1000
+        builder.Property(o => o.CommissionAmount).HasPrecision(15, 2);
         builder.Property(o => o.RowVersion).IsConcurrencyToken(); // GB-08: first accept wins
 
         builder.HasIndex(o => o.OrderCode).IsUnique();

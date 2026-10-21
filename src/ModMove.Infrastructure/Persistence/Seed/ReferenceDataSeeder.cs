@@ -44,11 +44,10 @@ internal static class ReferenceDataSeeder
             ("COMMISSION_RATE", "0.10"),         // GB-14
             ("LOADING_FEE", "100000"),           // UC-GST-12
             ("MIN_COD_DEPOSIT", "200000"),       // GB-16
-            ("MATCHING_TIMEOUT_MINUTES", "10"),  // GB-24
-            ("PAYOS_SESSION_MINUTES", "10"),     // GB-13
-            ("AUTO_COMPLETE_HOURS", "24"),       // GB-23
-            ("COMPLAINT_WINDOW_HOURS", "24"),    // GB-18
+            ("MATCHING_RADIUS_KM", "5"),         // DECISIONS B5
         ];
+        // Time limits (PayOS session, matching timeout, auto-complete, complaint window) are fixed
+        // in BusinessRules, not settings, so each value has one source (DECISIONS C8).
 
         foreach (var r in rows)
         {

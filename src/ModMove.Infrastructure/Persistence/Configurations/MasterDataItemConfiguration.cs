@@ -12,6 +12,7 @@ internal sealed class MasterDataItemConfiguration : IEntityTypeConfiguration<Mas
         builder.Property(m => m.Category).HasMaxLength(50);
         builder.Property(m => m.Code).HasMaxLength(50);
         builder.Property(m => m.Name).HasMaxLength(100);
+        builder.Property(m => m.Description).HasColumnType("text"); // policy content (DECISIONS B13)
 
         builder.HasIndex(m => new { m.Category, m.Code }).IsUnique();
     }
