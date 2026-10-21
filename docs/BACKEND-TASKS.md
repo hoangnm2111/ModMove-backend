@@ -12,7 +12,7 @@ Quy ước mỗi việc: một use case = một thư mục `Features/<Module>/{C
 
 ## Việc chung (cả nhóm)
 
-- [x] Họp chốt các quyết định thiết kế: xem [DECISIONS.md](DECISIONS.md) (còn 3 câu hỏi ở cuối file)
+- [x] Họp chốt các quyết định thiết kế: xem [DECISIONS.md](DECISIONS.md) (còn 2 câu hỏi ở cuối file)
 - [ ] Hoàng và Huy chạy `git merge develop` (entity đã đổi sang khóa `long`, base class đổi)
 - [ ] Mỗi người chạy được dự án trên máy: `appsettings.Development.json` có connection string và `Jwt:SigningKey` (≥32 ký tự); đăng nhập bằng 4 tài khoản demo (mật khẩu `ModMove@123`)
 - [ ] Mỗi người viết danh sách endpoint của role mình vào `docs/api/<role>.md` (method, route, role, request/response tóm tắt) trước khi sang Phase 1
@@ -36,7 +36,7 @@ Quy ước mỗi việc: một use case = một thư mục `Features/<Module>/{C
 
 - [ ] **Auth** (Features/Auth): đăng ký + OTP email (UC-GST-01; GB-01 duy nhất, GB-25 OTP 5 phút, gửi tối đa 3 lần/15 phút); đăng nhập (CUS-01; GB-02 khóa 10 phút sau 5 lần sai); quên mật khẩu (CUS-02); đổi mật khẩu (CUS-04); đăng xuất (CUS-03). Đăng ký cho cả `role=Driver`
 - [ ] **Users** (Features/Users): xem/sửa hồ sơ (CUS-05, 06); xóa tài khoản = đặt `Inactive` (CUS-07)
-- [ ] **Public** (Controllers/Public): giới thiệu, chính sách (GST-03, 04); gửi yêu cầu hỗ trợ (GST-05, bảng `support_requests`, B14). Loại xe (GST-02) đã có
+- [ ] **Public** (Controllers/Public): giới thiệu, chính sách (GST-03, 04); gửi yêu cầu hỗ trợ (GST-05, bảng `support_requests` **đã có**, B14). Loại xe (GST-02) đã có
 - [ ] Adapter: Gmail SMTP (`IEmailSender`), Google Maps (Geocoding, Distance Matrix), Cloudinary (`IFileStorage`)
 - [ ] **Ước tính giá** `api/public/fare-estimate` (GST-06..16): `FareCalculator` theo công thức B1 (không giờ cao điểm), kiểm tra tải trọng (GB-10), coupon qua `ValidateCoupon` của Hoàng (GB-21)
 - [ ] **Orders**: tạo đơn (GST-17; GB-05, 06, 07, 28), sửa đơn trước khi có tài xế nhận (CUS-28), danh sách/tìm/chi tiết/lịch sử (CUS-08..10, 20)
@@ -62,8 +62,8 @@ Quy ước mỗi việc: một use case = một thư mục `Features/<Module>/{C
 
 ### Phase 1
 
-- [ ] **MasterData** (ADM-14..16): danh sách, thêm/sửa, bật/tắt; thêm cột `description` cho nội dung chính sách (B13)
-- [ ] **Pricing** (ADM-10..13): giá theo xe (`vehicle_types`), phí bốc xếp và hoa hồng (`platform_settings`, không giờ cao điểm, B2); thêm `commission_rate`/`commission_amount` vào `shipping_orders` (B4)
+- [ ] **MasterData** (ADM-14..16): danh sách, thêm/sửa, bật/tắt; cột `description` **đã có** (B13)
+- [ ] **Pricing** (ADM-10..13): giá theo xe (`vehicle_types`), phí bốc xếp và hoa hồng (`platform_settings`, không giờ cao điểm, B2); cột hoa hồng trên đơn **đã có** (B4), không tạo migration cho phần này
 - [ ] **Users admin** (ADM-04..07): danh sách, chi tiết, khóa/mở khóa, tạo Dispatcher (mật khẩu cố định, B7); hồ sơ/đổi mật khẩu dùng lại Auth (ADM-01..03)
 - [ ] **DriverOnboarding** — phía Driver (DRV-01..07): upload giấy tờ, xem trạng thái, nộp lại tạo version mới, hồ sơ/xe (GB-03, GB-04)
 - [ ] **DriverOnboarding** — phía Admin (ADM-08, 09): xem hồ sơ chờ duyệt, duyệt hoặc từ chối kèm lý do từng mục

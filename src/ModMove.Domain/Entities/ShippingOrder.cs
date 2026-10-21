@@ -58,6 +58,12 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     public DateTimeOffset? DeliveredAt { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
 
+    /// <summary>Rate applied when the order completed (DECISIONS B4); null until then.</summary>
+    public decimal? CommissionRate { get; private set; }
+
+    /// <summary>VND taken by the platform, rounded to the dong; null until completion.</summary>
+    public decimal? CommissionAmount { get; private set; }
+
     /// <summary>Optimistic lock: the first driver to accept wins (GB-08).</summary>
     public int RowVersion { get; private set; }
 
@@ -173,10 +179,19 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         DeliveredAt = now;
     }
 
-    public void Complete(ChangedByRole by, long? userId, DateTimeOffset now)
+    /// <summary>
+    /// GB-14 / DECISIONS B4: the commission is fixed at completion and never changes afterwards.
+    /// The platform funds the coupon, so commission is on distance + service fee, before the discount.
+    /// </summary>
+    public void Complete(decimal commissionRate, ChangedByRole by, long? userId, DateTimeOffset now)
     {
+        if (commissionRate is < 0 or > 1)
+            throw new DomainException("The commission rate must be between 0 and 1.");
+
         TransitionTo(OrderStatus.Completed, by, userId, null, now);
         CompletedAt = now;
+        CommissionRate = commissionRate;
+        CommissionAmount = Math.Round(commissionRate * (DistanceFee + ServiceFee), 0, MidpointRounding.AwayFromZero);
     }
 
     public void Cancel(string reason, ChangedByRole by, long? userId, DateTimeOffset now)

@@ -17,6 +17,7 @@ namespace ModMove.Infrastructure.Persistence.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
+                .UseCollation("utf8mb4_unicode_ci")
                 .HasAnnotation("ProductVersion", "8.0.10")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
@@ -545,6 +546,10 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetime(6)")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("Description")
+                        .HasColumnType("text")
+                        .HasColumnName("description");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("tinyint(1)")
                         .HasColumnName("is_active");
@@ -877,8 +882,8 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("order_id");
 
-                    b.Property<int>("RatingStars")
-                        .HasColumnType("int")
+                    b.Property<sbyte>("RatingStars")
+                        .HasColumnType("tinyint")
                         .HasColumnName("rating_stars");
 
                     b.Property<string>("ReviewComment")
@@ -1019,6 +1024,16 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("varchar(500)")
                         .HasColumnName("cancellation_reason");
+
+                    b.Property<decimal?>("CommissionAmount")
+                        .HasPrecision(15, 2)
+                        .HasColumnType("decimal(15,2)")
+                        .HasColumnName("commission_amount");
+
+                    b.Property<decimal?>("CommissionRate")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("decimal(5,4)")
+                        .HasColumnName("commission_rate");
 
                     b.Property<DateTimeOffset?>("CompletedAt")
                         .HasColumnType("datetime(6)")
@@ -1183,6 +1198,54 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                     b.HasIndex("VehicleTypeId");
 
                     b.ToTable("shipping_orders", (string)null);
+                });
+
+            modelBuilder.Entity("ModMove.Domain.Entities.SupportRequest", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Contact")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("contact");
+
+                    b.Property<string>("Content")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)")
+                        .HasColumnName("content");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("full_name");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("varchar(20)")
+                        .HasColumnName("status");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("support_requests", (string)null);
                 });
 
             modelBuilder.Entity("ModMove.Domain.Entities.User", b =>

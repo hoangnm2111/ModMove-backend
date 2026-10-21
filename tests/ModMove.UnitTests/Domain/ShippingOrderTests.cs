@@ -8,16 +8,17 @@ public class ShippingOrderTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 20, 8, 0, 0, TimeSpan.Zero);
 
-    private static ShippingOrder NewOrder(PaymentMethod method = PaymentMethod.PayOS, PayerRole? payer = null) =>
+    private static ShippingOrder NewOrder(
+        PaymentMethod method = PaymentMethod.PayOS, PayerRole? payer = null, decimal distanceFee = 200_000, decimal serviceFee = 0) =>
         ShippingOrder.Create(
             "MM20261020001", customerId: 1, vehicleTypeId: 1, couponId: null,
             "A", 10.1m, 106.1m, "B", 10.2m, 106.2m, "Receiver", "0900000009",
-            12.5m, 30, hasLoadingService: false, distanceFee: 200_000, serviceFee: 0, discountAmount: 20_000,
+            12.5m, 30, hasLoadingService: serviceFee > 0, distanceFee, serviceFee, discountAmount: 20_000,
             method, payer, CargoDetail.Create("FURNITURE", 1, 50, 100, 50, 50, ["a.jpg"], null), Now);
 
-    private static ShippingOrder AcceptedOrder()
+    private static ShippingOrder AcceptedOrder(decimal distanceFee = 200_000, decimal serviceFee = 0)
     {
-        var order = NewOrder();
+        var order = NewOrder(distanceFee: distanceFee, serviceFee: serviceFee);
         order.Accept(driverProfileId: 5, driverUserId: 9, Now);
         return order;
     }
@@ -149,5 +150,47 @@ public class ShippingOrderTests
         Assert.Equal(ProofStatus.Pending, order.Proof!.ProofStatus);
         order.ApprovePickupEvidence(1, Now);
         Assert.Equal(OrderStatus.InTransit, order.OrderStatus);
+    }
+
+    private static ShippingOrder DeliveredOrder(decimal distanceFee = 200_000, decimal serviceFee = 0)
+    {
+        var order = AcceptedOrder(distanceFee, serviceFee);
+        order.ConfirmArrival(9, Now);
+        order.ConfirmPickup(["1.jpg", "2.jpg"], 9, Now);
+        order.ApprovePickupEvidence(1, Now);
+        order.Deliver("pod.jpg", 9, Now);
+        return order;
+    }
+
+    [Fact]
+    public void Completion_fixes_commission_on_fees_before_the_coupon_B4()
+    {
+        var order = DeliveredOrder(); // distance 200,000 + service 0, coupon 20,000 (platform pays it)
+
+        order.Complete(0.10m, ChangedByRole.System, null, Now);
+
+        Assert.Equal(OrderStatus.Completed, order.OrderStatus);
+        Assert.Equal(0.10m, order.CommissionRate);
+        Assert.Equal(20_000m, order.CommissionAmount);
+    }
+
+    [Fact]
+    public void Completion_rejects_a_commission_rate_outside_0_to_1()
+    {
+        var order = DeliveredOrder();
+
+        Assert.Throws<DomainException>(() => order.Complete(1.5m, ChangedByRole.System, null, Now));
+        Assert.Equal(OrderStatus.Delivered, order.OrderStatus);
+    }
+
+    [Fact]
+    public void Commission_includes_the_loading_fee_and_rounds_half_away_from_zero_B4()
+    {
+        // (155,545 + 100,000) × 0.10 = 25,554.5 → 25,555 (banker's rounding would give 25,554)
+        var order = DeliveredOrder(distanceFee: 155_545, serviceFee: 100_000);
+
+        order.Complete(0.10m, ChangedByRole.System, null, Now);
+
+        Assert.Equal(25_555m, order.CommissionAmount);
     }
 }
