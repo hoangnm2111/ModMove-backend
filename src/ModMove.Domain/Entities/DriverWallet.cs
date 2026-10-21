@@ -1,5 +1,4 @@
 using ModMove.Domain.Common;
-using ModMove.Domain.Constants;
 using ModMove.Domain.Enums;
 using ModMove.Domain.Exceptions;
 
@@ -29,7 +28,8 @@ public sealed class DriverWallet : BaseAuditableEntity, IAggregateRoot
 
     public static DriverWallet Create(long driverProfileId) => new() { DriverProfileId = driverProfileId };
 
-    public bool CanReceiveCod => WalletStatus == WalletStatus.Active && DepositBalance >= BusinessRules.MinCodDepositBalance;
+    /// <summary>GB-16: <paramref name="minDeposit"/> is the MIN_COD_DEPOSIT platform setting (Admin can change it).</summary>
+    public bool CanReceiveCod(decimal minDeposit) => WalletStatus == WalletStatus.Active && DepositBalance >= minDeposit;
 
     public WalletTransaction TopUpDeposit(decimal amount)
     {
