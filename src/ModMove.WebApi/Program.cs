@@ -1,7 +1,13 @@
+using System.Text;
+using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using ModMove.Infrastructure.Identity;
 using ModMove.Application;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Infrastructure;
 using ModMove.Infrastructure.Persistence.Seed;
+using ModMove.WebApi.Controllers;
 using ModMove.WebApi.Middlewares;
 using ModMove.WebApi.Services;
 
@@ -17,7 +23,19 @@ builder.Services
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
-builder.Services.AddControllers();
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
+builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme).Configure<JwtOptions>((bearer, jwt) =>
+    bearer.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidIssuer = jwt.Issuer,
+        ValidAudience = jwt.Audience,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),
+        ClockSkew = TimeSpan.FromSeconds(30),
+    });
+
+// Enums travel as their names ("Pending"), the same form the database stores.
+builder.Services.AddControllers(options => options.Conventions.Add(new RoleConvention()))
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
@@ -49,7 +67,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseCors(ClientCorsPolicy);
-// Add app.UseAuthentication() here once JWT auth is registered (Infrastructure/Identity).
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

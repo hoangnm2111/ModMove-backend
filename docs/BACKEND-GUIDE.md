@@ -29,8 +29,8 @@ Nguồn: Report-3 (SRS) và Report-4 (SDS). Quy tắc kiến trúc ở [ARCHITEC
 | `Features/Orders`, `Features/Tracking`, `Features/Ratings` | Hiếu | Đặt/hủy đơn, theo dõi, đánh giá |
 | `Features/Payments` (thanh toán đơn PayOS, COD, coupon, webhook, chi trả hoàn tiền: Command `PayoutRefund` nằm ở `Payments`, gọi sau khi Refund được duyệt) | Hoàng | Toàn bộ phần thanh toán; Hiếu chỉ gọi qua interface |
 | `Features/DriverOnboarding`, `Features/Drivers`, `Features/MasterData`, `Features/Reports`, `Controllers/Admin`, `Controllers/Driver` | Hoàng | |
-| `Features/Pricing` — **cấu hình** giá (entity `FareRule`, CRUD) | Hoàng | |
-| `Domain/Services/FareCalculator` — **tính** giá | Hiếu | Đọc `FareRule` của Hoàng |
+| `Features/Pricing` — **cấu hình** giá (`VehicleType` và `PlatformSetting`, CRUD) | Hoàng | |
+| `Domain/Services/FareCalculator` — **tính** giá | Hiếu | Đọc `VehicleType` + `PlatformSetting` của Hoàng |
 | `Features/Wallets` (ví tài xế, rút tiền, nạp cọc) | Hoàng | Cả phía Driver và Admin |
 | `Features/Incidents`, `Features/Refunds`, `Controllers/Dispatcher` | Huy | **Module dùng chung**: Hiếu thêm use case phía Customer, Hoàng thêm use case duyệt Refund; mỗi người chỉ tạo thư mục UseCase của mình, không sửa use case người khác |
 | `Features/Catalog` | Hoàng | Danh mục loại xe/dịch vụ công khai; `MasterData` là phần cấu hình admin, hai module dùng chung entity |
@@ -46,7 +46,7 @@ Làm tuần đầu, mỗi mục một PR nhỏ, merge vào `develop` trước kh
 | # | Việc | Người làm | Ai phụ thuộc |
 |---|---|---|---|
 | S1 | JWT + role claim (`Customer`, `Driver`, `Dispatcher`, `Admin`), `UseAuthentication`, `[Authorize(Roles=…)]` trong `ApiControllerBase` cho từng nhóm controller, `JwtTokenService`, `BCryptPasswordHasher`, `ICurrentUserService` đọc userId/role | Hiếu | Tất cả |
-| S2 | Entity lõi theo ERD (SRS mục 3): `User`, `ShippingOrder` + `OrderStatus` (Pending, Accepted, Arrived, PickedUp, InTransit, Delivered, Completed, Cancelled), `Incident`, `Refund` (SourceType: Cancellation/Incident/Complaint), `DriverWallet`, `FareRule`… | Mỗi người tự tạo entity của module mình; entity dùng chéo (`ShippingOrder`, `User`) do Hiếu tạo | Tất cả |
+| S2 | Entity lõi theo ERD (SRS mục 3): `User`, `ShippingOrder` + `OrderStatus` (Pending, Accepted, Arrived, PickedUp, InTransit, Delivered, Completed, Cancelled), `Incident`, `Refund` (SourceType: Cancellation/Incident/Complaint), `DriverWallet`… | Mỗi người tự tạo entity của module mình; entity dùng chéo (`ShippingOrder`, `User`) do Hiếu tạo | Tất cả |
 | S3 | **Một người** gộp migration: trước khi tạo migration mới, `git pull develop`; nếu trùng, xóa migration của mình và tạo lại | Quy ước cả nhóm | — |
 | S4 | `IRealtimeNotifier` + `TrackingHub` (SignalR) | Hiếu | Huy (gửi quyết định sự cố), Driver |
 | S5 | `IFileStorage` (Cloudinary), `IEmailSender` (SMTP/OTP), `IPushNotificationService` (FCM) — chỉ interface ở Application, adapter ở `Infrastructure/ExternalServices/<Provider>` | Hiếu làm Cloudinary + Email; Hoàng làm FCM | Hoàng (ảnh hồ sơ), Huy (thông báo) |
@@ -110,14 +110,14 @@ Huy và Hoàng trong lúc chờ S1/S2 làm domain + test trước (không cần 
 
 - **Tài khoản (Users):** UC-ADM-04..07 danh sách/chi tiết/khóa-mở khóa/tạo tài khoản Dispatcher. Đăng nhập, hồ sơ, đổi mật khẩu (ADM-01..03) dùng lại Auth của Hiếu, chỉ thêm endpoint hồ sơ riêng nếu cần.
 - **DriverOnboarding:** UC-ADM-08, 09 xem hồ sơ chờ duyệt, duyệt hoặc từ chối kèm lý do **từng mục**. Nộp lại hồ sơ tạo *version mới* (UC-DRV-05), nên entity `DriverApplication` có version. GB-03: tài xế chỉ Online khi Approved; GB-04 biển số duy nhất.
-- **Pricing (cấu hình):** UC-ADM-10..13 giá cơ bản theo km, phụ phí (bốc xếp, giờ cao điểm, hàng cồng kềnh), tỷ lệ hoa hồng. GB-14 hoa hồng 10%; **hoa hồng mới chỉ áp cho đơn hoàn tất sau khi đổi** → lưu lịch sử có `EffectiveFrom`, không sửa bản ghi cũ (quy tắc "Driver earnings immutability"). Hiếu cần entity `FareRule` sớm: chốt hình dạng entity với Hiếu ngay đầu tuần.
+- **Pricing (cấu hình):** UC-ADM-10..13 giá cơ bản theo km, phí bốc xếp (không có giờ cao điểm hay phụ phí cồng kềnh, DECISIONS B1/B2), tỷ lệ hoa hồng. GB-14 hoa hồng 10%; **hoa hồng mới chỉ áp cho đơn hoàn tất sau khi đổi** → lưu `commission_rate` và `commission_amount` vào đơn khi hoàn tất, không sửa đơn cũ ("Driver earnings immutability"); xem DECISIONS B4. Giá nằm ở `vehicle_types` và `platform_settings`, không có entity `FareRule`.
 - **MasterData:** UC-ADM-14..16 danh sách, thêm/sửa, bật/tắt (loại xe, chính sách…). Public endpoints của Hiếu đọc từ đây.
 - **Refunds / Complaints:** UC-ADM-17, 18 xem khiếu nại; duyệt hoặc từ chối đề xuất hoàn tiền của Dispatcher (GB-19), nhập mã tham chiếu ngân hàng khi chi trả thủ công (GB-27, trong 3 ngày làm việc). Dùng entity `Refund` mà Huy đề xuất, không tạo song song.
 - **Ratings / Incident history:** UC-ADM-19, 20 (chỉ Query).
 - **Reports:** UC-ADM-21..23 doanh thu nền tảng theo ngày/tuần/tháng, dashboard, xuất báo cáo (Query Dapper; xuất file cần hỏi nhóm trước khi thêm package).
 - **Wallets:** UC-ADM-24 duyệt yêu cầu rút tiền của tài xế: Paid (kèm mã tham chiếu) hoặc Rejected.
 
-**Thứ tự gợi ý:** MasterData → Pricing (chốt `FareRule`) → Users → DriverOnboarding (Admin + Driver) → Matching → Trips → Wallets → Refunds duyệt → Reports/Dashboard. Phần Driver nên làm sớm vì Customer và Dispatcher cần đơn có tài xế để test.
+**Thứ tự gợi ý:** MasterData → Pricing (`VehicleType`, `PlatformSetting`) → Users → DriverOnboarding (Admin + Driver) → Matching → Trips → Wallets → Refunds duyệt → Reports/Dashboard. Phần Driver nên làm sớm vì Customer và Dispatcher cần đơn có tài xế để test.
 
 ### 4.3 Huy — Dispatcher
 
@@ -162,7 +162,7 @@ Job là `BackgroundService` đặt trong `Infrastructure/BackgroundJobs`, chỉ 
 ```
 Hiếu: S1 Auth/JWT ─┬─> Hoàng: Users, DriverOnboarding, mọi Admin và Driver endpoint
                    └─> Huy:   mọi Dispatcher endpoint
-Hiếu: ShippingOrder, FareCalculator <─ Hoàng: FareRule, Payments (IPaymentService, ValidateCoupon)
+Hiếu: ShippingOrder, FareCalculator <─ Hoàng: VehicleType/PlatformSetting, Payments (IPaymentService, ValidateCoupon)
 Hiếu: Incident/Refund Customer  ──(cùng chốt entity)──  Huy: Incident/Refund xử lý ──> Hoàng: duyệt Refund
 Hiếu: IRealtimeNotifier/TrackingHub ──> Huy: gửi quyết định sự cố; Hoàng: GPS tài xế
 Hoàng: Matching/Trips (đơn có tài xế) ──> Huy: Reassign, Incident; Hiếu: Tracking, hoàn tất đơn

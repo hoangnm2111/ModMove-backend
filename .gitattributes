@@ -1,0 +1,5 @@
+# One line ending in the repo; dotnet format on Linux CI checks LF.
+* text=auto eol=lf
+*.docx binary
+*.png binary
+*.jpg binary
