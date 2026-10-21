@@ -22,7 +22,7 @@ internal sealed class LoginCommandHandler(
 
     public async Task<LoginResponse> Handle(LoginCommand request, CancellationToken cancellationToken)
     {
-        var user = await users.GetByEmailAsync(request.Email.Trim(), cancellationToken);
+        var user = await users.GetByEmailAsync(AuthRules.Normalize(request.Email), cancellationToken);
         var passwordOk = passwordHasher.Verify(
             request.Password, user?.PasswordHash ?? (s_dummyHash ??= passwordHasher.Hash(Guid.NewGuid().ToString())));
 
@@ -41,7 +41,11 @@ internal sealed class LoginCommandHandler(
         }
 
         if (user.AccountStatus != AccountStatus.Active)
-            throw new ForbiddenAccessException("The account is not active.");
+            throw new ForbiddenAccessException("The account is not active.", "ACCOUNT_INACTIVE");
+
+        // D1: only after the right password, so this never reveals which emails are registered.
+        if (!user.EmailVerified)
+            throw new ForbiddenAccessException("Verify your email with the code we sent before signing in.", "EMAIL_NOT_VERIFIED");
 
         user.RegisterSuccessfulLogin();
         await unitOfWork.SaveChangesAsync(cancellationToken);
