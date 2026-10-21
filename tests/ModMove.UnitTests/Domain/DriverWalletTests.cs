@@ -11,14 +11,15 @@ public class DriverWalletTests
     [Fact]
     public void Cod_needs_a_deposit_of_at_least_200000_GB16()
     {
+        const decimal minDeposit = 200_000; // seeded MIN_COD_DEPOSIT
         var wallet = DriverWallet.Create(1);
-        Assert.False(wallet.CanReceiveCod);
+        Assert.False(wallet.CanReceiveCod(minDeposit));
 
         wallet.TopUpDeposit(199_999);
-        Assert.False(wallet.CanReceiveCod);
+        Assert.False(wallet.CanReceiveCod(minDeposit));
 
         wallet.TopUpDeposit(1);
-        Assert.True(wallet.CanReceiveCod);
+        Assert.True(wallet.CanReceiveCod(minDeposit));
     }
 
     [Fact]
