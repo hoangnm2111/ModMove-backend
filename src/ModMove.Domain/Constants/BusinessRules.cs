@@ -9,6 +9,7 @@ public static class BusinessRules
     public static readonly TimeSpan OtpLifetime = TimeSpan.FromMinutes(5);  // GB-25
     public static readonly TimeSpan OtpResendWindow = TimeSpan.FromMinutes(15);
     public const int OtpMaxSendsPerWindow = 3;
+    public const int OtpMaxFailedAttempts = 5; // wrong guesses before a code stops working
 
     public const int MaxCargoPhotos = 5;                                    // GB-06
     public const int MaxPhotoSizeMb = 5;

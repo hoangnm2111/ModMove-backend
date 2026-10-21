@@ -39,13 +39,30 @@ public class UserAndCouponTests
     public void Otp_can_be_sent_three_times_per_15_minutes_GB25()
     {
         var otp = OtpVerification.Issue("a@x.vn", OtpPurpose.Register, "h1", Now);
-        otp.Resend("h2", Now.AddMinutes(1));
-        otp.Resend("h3", Now.AddMinutes(2));
+        Assert.True(otp.TryResend("h2", Now.AddMinutes(1)));
+        Assert.True(otp.TryResend("h3", Now.AddMinutes(2)));
 
-        Assert.Throws<DomainException>(() => otp.Resend("h4", Now.AddMinutes(3)));
+        Assert.False(otp.TryResend("h4", Now.AddMinutes(3)));
+        Assert.Equal("h3", otp.CodeHash); // a refused resend leaves the current code alone
 
-        otp.Resend("h4", Now.AddMinutes(16)); // new window
+        Assert.True(otp.TryResend("h4", Now.AddMinutes(16))); // new window
         Assert.Equal(1, otp.SendCount);
+    }
+
+    [Fact]
+    public void Otp_stops_working_after_five_wrong_guesses()
+    {
+        var otp = OtpVerification.Issue("a@x.vn", OtpPurpose.ResetPassword, "h1", Now);
+
+        for (var i = 0; i < 4; i++)
+            otp.RegisterFailedAttempt();
+        Assert.True(otp.IsUsable(Now));
+
+        otp.RegisterFailedAttempt();
+        Assert.False(otp.IsUsable(Now));
+
+        otp.TryResend("h2", Now.AddMinutes(1)); // a new code starts a fresh count
+        Assert.True(otp.IsUsable(Now.AddMinutes(1)));
     }
 
     [Fact]

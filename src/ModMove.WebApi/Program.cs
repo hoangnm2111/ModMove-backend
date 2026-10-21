@@ -9,6 +9,7 @@ using ModMove.Application.Common.Interfaces;
 using ModMove.Infrastructure;
 using ModMove.Infrastructure.Persistence.Seed;
 using ModMove.WebApi.Controllers;
+using ModMove.WebApi.Controllers.Public;
 using ModMove.WebApi.Middlewares;
 using ModMove.WebApi.Services;
 
@@ -28,6 +29,7 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 if (builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(builder.Configuration["Email:Host"]))
     builder.Services.AddSingleton<IEmailSender, LogOnlyEmailSender>();
 
+builder.Services.AddAuthRateLimit();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
 builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme).Configure<JwtOptions>((bearer, jwt) =>
     bearer.TokenValidationParameters = new TokenValidationParameters
@@ -74,6 +76,7 @@ app.UseHttpsRedirection();
 app.UseCors(ClientCorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
 app.MapHealthChecks("/health");

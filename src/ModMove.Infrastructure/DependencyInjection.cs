@@ -47,6 +47,7 @@ public static class DependencyInjection
         // Aggregate-specific repositories: register each next to its interface (the open generic above cannot Include).
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ICouponRepository, CouponRepository>();
+        services.AddScoped<IOtpRepository, OtpRepository>();
 
         // Read side (Queries): raw connection for Dapper.
         services.AddSingleton<ISqlConnectionFactory>(new SqlConnectionFactory(connectionString));

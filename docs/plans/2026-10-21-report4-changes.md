@@ -8,6 +8,14 @@
 - Thêm một câu: "Default values are declared in the migrations as database DEFAULTs; the application also sets every value on insert."
 - Số bảng: **21** thay vì 20 (thêm `support_requests`). Sửa cả dòng Change log "database design (20 tables)" nếu muốn khớp.
 
+## 3.2 `otp_verifications`
+
+Thêm một dòng sau `send_count`:
+
+| Column | Type | Constraints | Notes |
+|---|---|---|---|
+| failed_attempts | INT | NOT NULL, DEFAULT 0 | Wrong guesses against the current code; the code stops working at 5 (brute-force guard) |
+
 ## 3.8 `platform_settings`
 
 - Cột `setting_key`, ghi chú ví dụ: đổi `e.g. COMMISSION_RATE, LOADING_FEE, PEAK_SURCHARGE, MIN_COD_DEPOSIT` thành `e.g. COMMISSION_RATE, LOADING_FEE, MIN_COD_DEPOSIT, MATCHING_RADIUS_KM`. Không còn phụ phí giờ cao điểm (DECISIONS B2).

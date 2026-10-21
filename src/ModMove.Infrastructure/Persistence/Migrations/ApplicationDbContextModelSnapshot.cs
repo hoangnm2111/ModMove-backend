@@ -653,6 +653,11 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetime(6)")
                         .HasColumnName("expires_at");
 
+                    b.Property<int>("FailedAttempts")
+                        .IsConcurrencyToken()
+                        .HasColumnType("int")
+                        .HasColumnName("failed_attempts");
+
                     b.Property<string>("Purpose")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -664,6 +669,7 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnName("send_count");
 
                     b.Property<DateTimeOffset?>("VerifiedAt")
+                        .IsConcurrencyToken()
                         .HasColumnType("datetime(6)")
                         .HasColumnName("verified_at");
 
