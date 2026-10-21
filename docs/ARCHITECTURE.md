@@ -84,14 +84,24 @@ Query handler **không được** inject `IRepository`/`IUnitOfWork`; architectu
 
 Backend chỉ cung cấp REST (`/api/...`) + SignalR + `/health`. WebApp và Mobile (Flutter/React Native) là các ứng dụng deploy riêng:
 - Origin được phép cấu hình trong `Cors:AllowedOrigins` (appsettings), không hardcode.
-- Mọi lỗi trả về cùng một format **RFC 7807 ProblemDetails** (`400` validation, `404`, `403`, `422` domain, `500`).
+- Mọi lỗi trả về cùng một format **RFC 7807 ProblemDetails** (`400` validation, `401` sai thông tin đăng nhập, `403`, `404`, `409` xung đột, `422` domain, `500`) kèm trường `code` ổn định để client rẽ nhánh: `VALIDATION`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `BUSINESS_RULE`, `SERVER_ERROR`. Muốn mã riêng (vd `MSG67` trong SRS): `throw new DomainException("...", "MSG67")`.
+
+### Quy ước API (cả nhóm theo)
+
+- **Route và quyền theo thư mục**: `Controllers/Customer/OrdersController` → `api/customer/orders`, chỉ role `Customer`. `Admin` → role `Administrator`. `Public` và `Webhooks` không cần đăng nhập. Không tự gắn `[Route]`/`[Authorize]` trừ khi có lý do (`RoleConvention` lo).
+- **Xác thực**: `Authorization: Bearer <JWT>`; lấy token ở `POST api/public/auth/login`. Token chứa `NameIdentifier` (id) và `Role`; trong code dùng `ICurrentUserService`.
+- **Id** là số nguyên (`long`). **Enum** trả và nhận dạng chuỗi (`"Pending"`), giống giá trị lưu trong DB. **Tiền** là `decimal` VND. **Ngày giờ** ISO 8601, UTC.
+- **Phân trang** (query): `?page=1&pageSize=20`; trả `PagedResult<T>` (`items`, `pageNumber`, `pageSize`, `totalCount`).
+- **Use case mẫu để copy**: Command: `Features/Auth/Commands/Login`. Query: `Features/Catalog/Queries/GetVehicleTypes`. Controller: `Controllers/Public/AuthController`.
+- **Port ra ngoài** (`IFileStorage`, `IEmailSender`, `IPushNotificationService`, `IPaymentGateway`, `IMapService`, `IRealtimeNotifier`) khai báo ở `Application/Common/Interfaces/Ports.cs`; adapter ở `Infrastructure/ExternalServices/<Provider>`. Người sở hữu adapter được sửa chữ ký cho vừa dịch vụ thật.
+- **Repository riêng cho aggregate** khi cần `Include` hay truy vấn riêng: interface ở `Application/Common/Interfaces/Persistence`, class ở `Infrastructure/Persistence/Repositories`, đăng ký trong `DependencyInjection.cs` (mẫu: `IUserRepository`).
 
 ## 6. Mẫu thêm một use case
 
 `Application/Features/Orders/Commands/CreateOrder/`
 
 ```csharp
-public sealed record CreateOrderCommand(string PickupAddress, string DropoffAddress) : ICommand<Guid>;
+public sealed record CreateOrderCommand(string PickupAddress, string DropoffAddress) : ICommand<long>;
 
 internal sealed class CreateOrderCommandValidator : AbstractValidator<CreateOrderCommand>
 {
@@ -103,9 +113,9 @@ internal sealed class CreateOrderCommandValidator : AbstractValidator<CreateOrde
 }
 
 internal sealed class CreateOrderCommandHandler(IRepository<ShippingOrder> orders, IUnitOfWork unitOfWork)
-    : ICommandHandler<CreateOrderCommand, Guid>
+    : ICommandHandler<CreateOrderCommand, long>
 {
-    public async Task<Guid> Handle(CreateOrderCommand request, CancellationToken ct)
+    public async Task<long> Handle(CreateOrderCommand request, CancellationToken ct)
     {
         var order = ShippingOrder.Create(request.PickupAddress, request.DropoffAddress);
         orders.Add(order);
@@ -118,9 +128,9 @@ internal sealed class CreateOrderCommandHandler(IRepository<ShippingOrder> order
 `Application/Features/Orders/Queries/GetOrderById/`
 
 ```csharp
-public sealed record GetOrderByIdQuery(Guid Id) : IQuery<OrderResponse>;
+public sealed record GetOrderByIdQuery(long Id) : IQuery<OrderResponse>;
 
-public sealed record OrderResponse(Guid Id, string PickupAddress, string DropoffAddress, string Status);
+public sealed record OrderResponse(long Id, string PickupAddress, string DropoffAddress, string Status);
 
 internal sealed class GetOrderByIdQueryHandler(ISqlConnectionFactory db)
     : IQueryHandler<GetOrderByIdQuery, OrderResponse>
@@ -150,7 +160,7 @@ public sealed class OrdersController : ApiControllerBase
     }
 
     [HttpGet("{id:guid}")]
-    public async Task<OrderResponse> GetById(Guid id, CancellationToken ct) =>
+    public async Task<OrderResponse> GetById(long id, CancellationToken ct) =>
         await Sender.Send(new GetOrderByIdQuery(id), ct);
 }
 ```
