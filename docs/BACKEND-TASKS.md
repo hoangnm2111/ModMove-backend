@@ -25,7 +25,7 @@ Quy ước mỗi việc: một use case = một thư mục `Features/<Module>/{C
 
 ### Phase 0: Nền móng (chặn Hoàng và Huy)
 
-- [ ] Push các commit trên `feature/hieu`, mở PR vào `develop`
+- [x] Push các commit trên `feature/hieu`, mở PR vào `develop` (PR #18 đã merge)
 - [x] `POST api/public/auth/login` (trả JWT) — Hoàng, Huy cần để test
 - [x] Use case mẫu: `GET api/public/vehicletypes` (Query Dapper + Controller + test) và một Command mẫu
 - [x] Cấu hình API chung: enum dạng chuỗi (`JsonStringEnumConverter`), trường `code` mã MSGxx trong ProblemDetails, quy ước phân trang `PagedResult<T>`
@@ -34,7 +34,9 @@ Quy ước mỗi việc: một use case = một thư mục `Features/<Module>/{C
 
 ### Phase 1
 
-- [ ] **Auth** (Features/Auth): đăng ký + OTP email (UC-GST-01; GB-01 duy nhất, GB-25 OTP 5 phút, gửi tối đa 3 lần/15 phút); đăng nhập (CUS-01; GB-02 khóa 10 phút sau 5 lần sai); quên mật khẩu (CUS-02); đổi mật khẩu (CUS-04); đăng xuất (CUS-03). Đăng ký cho cả `role=Driver`
+Plan chi tiết, thứ tự và các quyết định D1–D8: [plans/2026-10-22-hieu-phase1.md](plans/2026-10-22-hieu-phase1.md)
+
+- [ ] **Auth** (Features/Auth): đăng ký + OTP email (UC-GST-01; GB-01 duy nhất, GB-25 OTP 5 phút, gửi tối đa 3 lần/15 phút); đăng nhập (CUS-01; GB-02 khóa 10 phút sau 5 lần sai); quên mật khẩu (CUS-02); đổi mật khẩu (CUS-04); đăng xuất (CUS-03). Web chỉ đăng ký Customer, Driver đăng ký trên app (`register-driver`, B6).
 - [ ] **Users** (Features/Users): xem/sửa hồ sơ (CUS-05, 06); xóa tài khoản = đặt `Inactive` (CUS-07)
 - [ ] **Public** (Controllers/Public): giới thiệu, chính sách (GST-03, 04); gửi yêu cầu hỗ trợ (GST-05, bảng `support_requests` **đã có**, B14). Loại xe (GST-02) đã có
 - [ ] Adapter: Gmail SMTP (`IEmailSender`), Google Maps (Geocoding, Distance Matrix), Cloudinary (`IFileStorage`)
