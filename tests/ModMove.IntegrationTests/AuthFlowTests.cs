@@ -183,7 +183,7 @@ public class AuthFlowTests
     public async Task Change_password_needs_the_current_one()
     {
         var user = User.Create("A", "0900000001", "a@x.vn", "h:old12345", UserRole.Dispatcher, emailVerified: true);
-        var app = new TestApp(signedInUserId: user.Id, user);
+        var app = TestApp.SignedInAs(user);
 
         var wrong = await Assert.ThrowsAsync<DomainException>(() => app.Sender.Send(new ChangePasswordCommand("nope1234", "new12345")));
         Assert.Equal("WRONG_PASSWORD", wrong.Code);
@@ -205,7 +205,7 @@ public class AuthFlowTests
     {
         var user = User.Create("A", "0900000001", "a@x.vn", "h:x", UserRole.Driver, emailVerified: true);
         user.SetFcmToken("device-token");
-        var app = new TestApp(signedInUserId: user.Id, user);
+        var app = TestApp.SignedInAs(user);
 
         await app.Sender.Send(new LogoutCommand());
 
@@ -266,7 +266,7 @@ public class AuthFlowTests
     public async Task New_password_must_differ_from_the_current_one()
     {
         var user = User.Create("A", "0900000001", "a@x.vn", "h:old12345", UserRole.Customer, emailVerified: true);
-        var app = new TestApp(signedInUserId: user.Id, user);
+        var app = TestApp.SignedInAs(user);
 
         await Assert.ThrowsAsync<ValidationException>(() => app.Sender.Send(new ChangePasswordCommand("old12345", "old12345")));
     }

@@ -80,6 +80,10 @@ internal static class ReferenceDataSeeder
             ("POLICY", "REFUND", "Chính sách hoàn tiền"),
             ("POLICY", "TERMS_OF_USE", "Điều khoản sử dụng"),
             ("POLICY", "PRIVACY", "Chính sách bảo mật"),
+            // UC-GST-03 (D6): content goes in `description`, filled by the Administrator (UC-ADM-15).
+            ("SERVICE_INFO", "ABOUT", "Giới thiệu ModMove"),
+            ("SERVICE_INFO", "COVERAGE_AREA", "Khu vực phục vụ"),
+            ("SERVICE_INFO", "BENEFITS", "Lợi ích khi sử dụng"),
         ];
 
         foreach (var r in rows)

@@ -1,3 +1,4 @@
+using ModMove.Application.Common;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
@@ -13,7 +14,7 @@ internal sealed class ChangePasswordCommandHandler(
 {
     public async Task Handle(ChangePasswordCommand request, CancellationToken cancellationToken)
     {
-        var user = await CurrentUser.LoadAsync(currentUser, users, cancellationToken);
+        var user = await currentUser.LoadUserAsync(users, cancellationToken);
 
         // 422, not 401: a 401 would make the client think the token expired and sign the user out.
         if (!passwordHasher.Verify(request.CurrentPassword, user.PasswordHash))

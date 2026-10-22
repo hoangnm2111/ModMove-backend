@@ -48,6 +48,7 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ICouponRepository, CouponRepository>();
         services.AddScoped<IOtpRepository, OtpRepository>();
+        services.AddScoped<IShippingOrderRepository, ShippingOrderRepository>();
 
         // Read side (Queries): raw connection for Dapper.
         services.AddSingleton<ISqlConnectionFactory>(new SqlConnectionFactory(connectionString));

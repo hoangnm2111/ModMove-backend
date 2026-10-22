@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using ModMove.Infrastructure.ExternalServices.Email;
 using ModMove.Infrastructure.Identity;
@@ -42,7 +43,14 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
 
 // Enums travel as their names ("Pending"), the same form the database stores.
 builder.Services.AddControllers(options => options.Conventions.Add(new RoleConvention()))
-    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
+    // Malformed JSON is rejected by MVC before our pipeline; give it the same shape as every other 400.
+    .ConfigureApiBehaviorOptions(options => options.InvalidModelStateResponseFactory = context =>
+    {
+        var problem = new ValidationProblemDetails(context.ModelState) { Status = StatusCodes.Status400BadRequest, Title = "Validation failed" };
+        problem.Extensions["code"] = "VALIDATION";
+        return new BadRequestObjectResult(problem) { ContentTypes = { "application/problem+json" } };
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
