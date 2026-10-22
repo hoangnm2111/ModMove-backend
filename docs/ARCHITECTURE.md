@@ -88,8 +88,8 @@ Backend chỉ cung cấp REST (`/api/...`) + SignalR + `/health`. WebApp và Mob
 
 ### Quy ước API (cả nhóm theo)
 
-- **Route và quyền theo thư mục**: `Controllers/Customer/OrdersController` → `api/customer/orders`, chỉ role `Customer`. `Admin` → role `Administrator`. `Public` và `Webhooks` không cần đăng nhập. Không tự gắn `[Route]`/`[Authorize]` trừ khi có lý do (`RoleConvention` lo).
-- **Xác thực**: `Authorization: Bearer <JWT>`; lấy token ở `POST api/public/auth/login`. Token chứa `NameIdentifier` (id) và `Role`; trong code dùng `ICurrentUserService`.
+- **Route và quyền theo thư mục**: `Controllers/Customer/OrdersController` → `api/customer/orders`, chỉ role `Customer`. `Admin` → role `Administrator`. `Account` cần đăng nhập, mọi role (hồ sơ, mật khẩu, đăng xuất). `Public` và `Webhooks` không cần đăng nhập. Thư mục khác 7 thư mục này làm app báo lỗi lúc khởi động. Không tự gắn `[Route]`/`[Authorize]` trừ khi có lý do (`RoleConvention` lo).
+- **Xác thực**: `Authorization: Bearer <accessToken>`, lấy ở `POST api/public/auth/login` (15 phút); gia hạn bằng `POST api/public/auth/refresh` với refresh token (30 ngày, dùng một lần). Token chứa `NameIdentifier` (id) và `Role`; trong code dùng `ICurrentUserService` và `currentUser.LoadUserAsync(users, ct)` (từ chối tài khoản không còn Active). Đổi mật khẩu, khóa hay xóa tài khoản phải gọi `IRefreshTokenRepository.RevokeAllForUserAsync`.
 - **Id** là số nguyên (`long`). **Enum** trả và nhận dạng chuỗi (`"Pending"`), giống giá trị lưu trong DB. **Tiền** là `decimal` VND. **Ngày giờ** ISO 8601, UTC.
 - **Phân trang** (query): `?page=1&pageSize=20`; trả `PagedResult<T>` (`items`, `pageNumber`, `pageSize`, `totalCount`).
 - **Use case mẫu để copy**: Command: `Features/Auth/Commands/Login`. Query: `Features/Catalog/Queries/GetVehicleTypes`. Controller: `Controllers/Public/AuthController`.

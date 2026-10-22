@@ -13,6 +13,9 @@ public sealed class ProofOfDelivery : BaseAuditableEntity
     /// <summary>At least 2 photos (GB-11).</summary>
     public List<string>? PickupPhotoUrls { get; private set; }
 
+    /// <summary>How many times pickup photos were sent; at most 5 (DECISIONS 6.3).</summary>
+    public int PickupSubmissionCount { get; private set; }
+
     public ProofStatus ProofStatus { get; private set; } = ProofStatus.Pending;
     public string? RejectionReason { get; private set; }
     public string? DeliveryPhotoUrl { get; private set; }
@@ -23,6 +26,7 @@ public sealed class ProofOfDelivery : BaseAuditableEntity
     internal void RecordPickup(IEnumerable<string> photoUrls)
     {
         PickupPhotoUrls = [.. photoUrls];
+        PickupSubmissionCount++;
         ProofStatus = ProofStatus.Pending;
         RejectionReason = null;
     }

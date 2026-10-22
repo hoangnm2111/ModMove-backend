@@ -1,3 +1,4 @@
+using ModMove.Application.Common.Interfaces;
 using Microsoft.EntityFrameworkCore;
 using ModMove.Domain.Entities;
 
@@ -41,10 +42,10 @@ internal static class ReferenceDataSeeder
     {
         (string Key, string Value)[] rows =
         [
-            ("COMMISSION_RATE", "0.10"),         // GB-14
-            ("LOADING_FEE", "100000"),           // UC-GST-12
-            ("MIN_COD_DEPOSIT", "200000"),       // GB-16
-            ("MATCHING_RADIUS_KM", "5"),         // DECISIONS B5
+            (SettingKeys.CommissionRate, "0.10"),   // GB-14
+            (SettingKeys.LoadingFee, "100000"),    // UC-GST-12
+            (SettingKeys.MinCodDeposit, "200000"), // GB-16
+            (SettingKeys.MatchingRadiusKm, "5"),   // DECISIONS B5
         ];
         // Time limits (PayOS session, matching timeout, auto-complete, complaint window) are fixed
         // in BusinessRules, not settings, so each value has one source (DECISIONS C8).
@@ -79,6 +80,10 @@ internal static class ReferenceDataSeeder
             ("POLICY", "REFUND", "Chính sách hoàn tiền"),
             ("POLICY", "TERMS_OF_USE", "Điều khoản sử dụng"),
             ("POLICY", "PRIVACY", "Chính sách bảo mật"),
+            // UC-GST-03 (D6): content goes in `description`, filled by the Administrator (UC-ADM-15).
+            ("SERVICE_INFO", "ABOUT", "Giới thiệu ModMove"),
+            ("SERVICE_INFO", "COVERAGE_AREA", "Khu vực phục vụ"),
+            ("SERVICE_INFO", "BENEFITS", "Lợi ích khi sử dụng"),
         ];
 
         foreach (var r in rows)
