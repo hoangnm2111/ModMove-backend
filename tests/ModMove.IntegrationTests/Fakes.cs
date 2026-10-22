@@ -11,20 +11,48 @@ namespace ModMove.IntegrationTests;
 
 // In-memory stand-ins for the ports, so handler tests run the real MediatR pipeline without a database (DECISIONS C2).
 
-internal sealed class InMemoryUsers(params User[] seed) : IUserRepository
+/// <summary>Gives entities ids the way the database would (1, 2, 3...), so tests can tell users apart.</summary>
+internal static class TestIds
 {
-    public List<User> Items { get; } = [.. seed];
+    private static readonly System.Reflection.PropertyInfo IdProperty = typeof(ModMove.Domain.Common.BaseEntity).GetProperty("Id")!;
 
+    public static void Set(ModMove.Domain.Common.BaseEntity entity, long id) => IdProperty.SetValue(entity, id);
+}
+
+internal sealed class InMemoryUsers : IUserRepository
+{
+    public InMemoryUsers(params User[] seed)
+    {
+        foreach (var user in seed)
+            Add(user);
+    }
+
+    public List<User> Items { get; } = [];
     public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(u => u.Email == email));
 
     public Task<bool> IsEmailOrPhoneTakenAsync(string email, string phoneNumber, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.Any(u => u.Email == email || u.PhoneNumber == phoneNumber));
 
+    public Task<bool> IsPhoneTakenByAnotherAsync(string phoneNumber, long userId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Any(u => u.PhoneNumber == phoneNumber && u.Id != userId));
+
+    public Task ReleaseFcmTokenAsync(string token, long keepForUserId, CancellationToken cancellationToken = default)
+    {
+        foreach (var user in Items.Where(u => u.FcmToken == token && u.Id != keepForUserId))
+            user.SetFcmToken(null);
+        return Task.CompletedTask;
+    }
+
     public Task<User?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(u => u.Id == id));
 
-    public void Add(User aggregate) => Items.Add(aggregate);
+    public void Add(User aggregate)
+    {
+        if (aggregate.Id == 0)
+            TestIds.Set(aggregate, Items.Count + 1);
+        Items.Add(aggregate);
+    }
     public void Update(User aggregate) { }
     public void Remove(User aggregate) => Items.Remove(aggregate);
 }
@@ -42,6 +70,30 @@ internal sealed class InMemoryOtps : IOtpRepository
     public void Add(OtpVerification aggregate) => Items.Add(aggregate);
     public void Update(OtpVerification aggregate) { }
     public void Remove(OtpVerification aggregate) => Items.Remove(aggregate);
+}
+
+internal sealed class InMemoryOrders : IShippingOrderRepository
+{
+    /// <summary>Customers that still have an order neither Completed nor Cancelled.</summary>
+    public HashSet<long> CustomersWithOpenOrders { get; } = [];
+
+    public Task<bool> HasOpenOrdersForCustomerAsync(long customerId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(CustomersWithOpenOrders.Contains(customerId));
+
+    public Task<ShippingOrder?> GetByIdAsync(long id, CancellationToken cancellationToken = default) => Task.FromResult<ShippingOrder?>(null);
+    public void Add(ShippingOrder aggregate) { }
+    public void Update(ShippingOrder aggregate) { }
+    public void Remove(ShippingOrder aggregate) { }
+}
+
+internal sealed class InMemoryRepository<T> : IRepository<T> where T : ModMove.Domain.Common.BaseEntity, ModMove.Domain.Common.IAggregateRoot
+{
+    public List<T> Items { get; } = [];
+
+    public Task<T?> GetByIdAsync(long id, CancellationToken cancellationToken = default) => Task.FromResult(Items.FirstOrDefault(i => i.Id == id));
+    public void Add(T aggregate) => Items.Add(aggregate);
+    public void Update(T aggregate) { }
+    public void Remove(T aggregate) => Items.Remove(aggregate);
 }
 
 internal sealed class CountingUnitOfWork : IUnitOfWork
@@ -102,19 +154,32 @@ internal sealed class TestApp
 
     public InMemoryUsers Users { get; }
     public InMemoryOtps Otps { get; } = new();
+    public InMemoryOrders Orders { get; } = new();
+    public InMemoryRepository<SupportRequest> SupportRequests { get; } = new();
     public CountingUnitOfWork UnitOfWork { get; } = new();
     public CapturingEmailSender Email { get; } = new();
     public MutableTime Time { get; } = new(Start);
     public ISender Sender { get; }
 
-    public TestApp(long? signedInUserId = null, params User[] users)
+    /// <summary>App where <paramref name="user"/> is the signed-in caller; ids are assigned first, like a saved row.</summary>
+    public static TestApp SignedInAs(User user, params User[] others)
     {
-        Users = new InMemoryUsers(users);
+        var users = new InMemoryUsers([user, .. others]);
+        return new TestApp(user.Id, users);
+    }
+
+    public TestApp(long? signedInUserId = null, params User[] users) : this(signedInUserId, new InMemoryUsers(users)) { }
+
+    private TestApp(long? signedInUserId, InMemoryUsers users)
+    {
+        Users = users;
         Sender = new ServiceCollection()
             .AddLogging()
             .AddApplication()
             .AddSingleton<IUserRepository>(Users)
             .AddSingleton<IOtpRepository>(Otps)
+            .AddSingleton<IShippingOrderRepository>(Orders)
+            .AddSingleton<IRepository<SupportRequest>>(SupportRequests)
             .AddSingleton<IUnitOfWork>(UnitOfWork)
             .AddSingleton<IPasswordHasher>(new FakeHasher())
             .AddSingleton<IJwtTokenService>(new FakeTokens())

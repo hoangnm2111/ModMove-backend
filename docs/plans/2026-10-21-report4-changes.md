@@ -1,6 +1,6 @@
 # Chỗ cần sửa trong Report-4 (Software Design Specification), mục I.3 Database Design
 
-Để Report-4 khớp với code sau migration `AlignSchemaWithSds` và [DECISIONS.md](../DECISIONS.md). Hiếu tự sửa file Word; danh sách này chỉ nói sửa gì, ở đâu.
+Report-4 là bản thiết kế ban đầu; schema thật là migration trong code. File này gom các chỗ code đã khác Report-4, để cập nhật file Word khi nộp. Ai đổi schema thì ghi thêm vào đây. Danh sách chỉ nói sửa gì, ở đâu.
 
 ## Phần mở đầu mục 3 (đoạn "The database runs on MySQL 8…")
 

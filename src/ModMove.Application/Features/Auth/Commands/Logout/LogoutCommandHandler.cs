@@ -1,3 +1,4 @@
+using ModMove.Application.Common;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
@@ -11,7 +12,11 @@ internal sealed class LogoutCommandHandler(
 {
     public async Task Handle(LogoutCommand request, CancellationToken cancellationToken)
     {
-        var user = await CurrentUser.LoadAsync(currentUser, users, cancellationToken);
+        // Signing out must always work, even for a deactivated or locked account: no active-status check here.
+        var user = await users.GetByIdAsync(currentUser.RequireUserId(), cancellationToken);
+        if (user is null)
+            return;
+
         user.SetFcmToken(null);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }

@@ -2,6 +2,8 @@
 
 Nhóm đã thảo luận các điểm SRS/SDS chưa rõ và chốt như dưới đây. Khi code mà quyết định ở đây khác SRS/SDS, **làm theo file này**. Muốn đổi một quyết định: sửa file này trong một PR riêng, cả nhóm duyệt.
 
+**Thiết kế DB:** Report-4 (SDS) mục 3 là **bản thiết kế ban đầu**, không phải ràng buộc cứng; schema được chỉnh trong quá trình làm. Nguồn sự thật của schema là **migration trong code** cùng các quyết định ở file này. Khi schema đổi, ghi thêm vào [plans/2026-10-21-report4-changes.md](plans/2026-10-21-report4-changes.md) để cập nhật Report-4 vào lúc nộp.
+
 Mục "Còn cần làm rõ" ở cuối là các chỗ quyết định còn mơ hồ; đừng tự đoán, hỏi nhóm trước khi code phần đó.
 
 ## 1. Giá, hủy đơn, hoàn tiền
@@ -53,7 +55,7 @@ Mục "Còn cần làm rõ" ở cuối là các chỗ quyết định còn mơ h
 | C5 | API: `?page=1&pageSize=20` → `PagedResult<T>`; thời gian ISO 8601 UTC; tiền là số VND; enum là chuỗi (đã cấu hình) |
 | C7 | Chưa triển khai production; migration tự chạy ở Development là đủ |
 | C8 | **Tham số: setting hay hằng số.** Admin sửa được, đọc từ `platform_settings`: `COMMISSION_RATE`, `LOADING_FEE`, `MIN_COD_DEPOSIT`, `MATCHING_RADIUS_KM` (domain nhận giá trị qua tham số, vd `DriverWallet.CanReceiveCod(minDeposit)`). Cố định trong `Domain/Constants/BusinessRules.cs`: mốc thời gian (PayOS 10 phút, ghép đơn 10 phút, tự hoàn tất 24h, khiếu nại 24h, GPS 30 ngày) và giới hạn OTP/đăng nhập/ảnh. Không để cùng một giá trị ở cả hai chỗ |
-| C9 | **DB khớp Report-4**: collation `utf8mb4_unicode_ci`; DEFAULT ở mức DB khai báo bằng SQL trong migration, **không** dùng `HasDefaultValue` trong model (EF sẽ bỏ qua `false`/`0` khi INSERT). Ai thêm cột có DEFAULT thì làm theo mẫu trong migration `AlignSchemaWithSds`. **Ai sửa (AlterColumn) một cột đang có DEFAULT** phải `SET DEFAULT` lại trong cùng migration: EF sinh `MODIFY COLUMN` không kèm DEFAULT nên sẽ xóa mất. Dọn DB local đã seed trước 21/10: `DELETE FROM platform_settings WHERE setting_key IN ('PEAK_SURCHARGE','BULKY_SURCHARGE','MATCHING_TIMEOUT_MINUTES','PAYOS_SESSION_MINUTES','AUTO_COMPLETE_HOURS','COMPLAINT_WINDOW_HOURS');` |
+| C9 | **Quy ước DB** (bám Report-4 khi hợp lý): collation `utf8mb4_unicode_ci`; DEFAULT ở mức DB khai báo bằng SQL trong migration, **không** dùng `HasDefaultValue` trong model (EF sẽ bỏ qua `false`/`0` khi INSERT). Ai thêm cột có DEFAULT thì làm theo mẫu trong migration `AlignSchemaWithSds`. **Ai sửa (AlterColumn) một cột đang có DEFAULT** phải `SET DEFAULT` lại trong cùng migration: EF sinh `MODIFY COLUMN` không kèm DEFAULT nên sẽ xóa mất. Dọn DB local đã seed trước 21/10: `DELETE FROM platform_settings WHERE setting_key IN ('PEAK_SURCHARGE','BULKY_SURCHARGE','MATCHING_TIMEOUT_MINUTES','PAYOS_SESSION_MINUTES','AUTO_COMPLETE_HOURS','COMPLAINT_WINDOW_HOURS');` |
 
 ## Còn cần làm rõ (hỏi nhóm trước khi code phần này)
 
