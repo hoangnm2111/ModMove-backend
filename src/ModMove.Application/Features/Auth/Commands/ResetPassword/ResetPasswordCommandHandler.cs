@@ -10,6 +10,7 @@ internal sealed class ResetPasswordCommandHandler(
     IOtpRepository otps,
     IUnitOfWork unitOfWork,
     IPasswordHasher passwordHasher,
+    IRefreshTokenRepository refreshTokens,
     TimeProvider clock) : ICommandHandler<ResetPasswordCommand>
 {
     public async Task Handle(ResetPasswordCommand request, CancellationToken cancellationToken)
@@ -23,6 +24,7 @@ internal sealed class ResetPasswordCommandHandler(
         user.ChangePassword(passwordHasher.Hash(request.NewPassword));
         user.VerifyEmail();            // the code just proved the user owns this email
         user.RegisterSuccessfulLogin(); // lift a GB-02 lock: the owner has proven who they are
+        await refreshTokens.RevokeAllForUserAsync(user.Id, clock.GetUtcNow(), cancellationToken); // 9.1
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

@@ -55,6 +55,10 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
 
     public DateTimeOffset WarrantyAcceptedAt { get; private set; }
     public DateTimeOffset? AcceptedAt { get; private set; }
+
+    /// <summary>When the PayOS payment was confirmed; the matching timer of a PayOS order starts here (DECISIONS 3.2).</summary>
+    public DateTimeOffset? PaidAt { get; private set; }
+
     public DateTimeOffset? DeliveredAt { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
 
@@ -113,7 +117,13 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         return order;
     }
 
-    public void MarkPaid() => PaymentStatus = PaymentStatus.Paid;
+    public void MarkPaid(DateTimeOffset now)
+    {
+        if (OrderStatus == OrderStatus.Cancelled)
+            throw new DomainException("A cancelled order cannot be paid; refund the payment instead.", "ORDER_CANCELLED");
+        PaymentStatus = PaymentStatus.Paid;
+        PaidAt ??= now;
+    }
 
     /// <summary>GB-08: the first driver to accept is assigned; a stale RowVersion makes the save fail for the others.</summary>
     public void Accept(long driverProfileId, long driverUserId, DateTimeOffset now)
@@ -134,9 +144,15 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         if (photos.Count < BusinessRules.MinPickupPhotos)
             throw new DomainException($"At least {BusinessRules.MinPickupPhotos} pickup photos are required.");
 
-        // The customer rejected the evidence: the driver re-uploads without a status change.
+        // The customer rejected the evidence: the driver re-uploads without a status change,
+        // at most 5 submissions in all (DECISIONS 6.3); after that the driver reports an incident.
         if (OrderStatus == OrderStatus.PickedUp && Proof?.ProofStatus == ProofStatus.Rejected)
         {
+            if (Proof.PickupSubmissionCount >= BusinessRules.MaxPickupSubmissions)
+                throw new DomainException(
+                    $"Pickup photos were sent {BusinessRules.MaxPickupSubmissions} times. Report an incident instead.",
+                    "PICKUP_PHOTO_LIMIT");
+
             Proof.RecordPickup(photos);
             _statusHistories.Add(OrderStatusHistory.Create(
                 OrderStatus.PickedUp, OrderStatus.PickedUp, ChangedByRole.Driver, driverUserId, "Pickup evidence resubmitted"));
@@ -180,8 +196,9 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     }
 
     /// <summary>
-    /// GB-14 / DECISIONS B4: the commission is fixed at completion and never changes afterwards.
-    /// The platform funds the coupon, so commission is on distance + service fee, before the discount.
+    /// GB-14 / DECISIONS B4, M1, M2: the commission is fixed at completion and never changes afterwards.
+    /// The driver bears the coupon: commission = rate × total_fee (already after the discount),
+    /// and the driver keeps total_fee − commission.
     /// </summary>
     public void Complete(decimal commissionRate, ChangedByRole by, long? userId, DateTimeOffset now)
     {
@@ -191,14 +208,46 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         TransitionTo(OrderStatus.Completed, by, userId, null, now);
         CompletedAt = now;
         CommissionRate = commissionRate;
-        CommissionAmount = Math.Round(commissionRate * (DistanceFee + ServiceFee), 0, MidpointRounding.AwayFromZero);
+        CommissionAmount = Math.Round(commissionRate * TotalFee, 0, MidpointRounding.AwayFromZero);
     }
 
+    /// <summary>What the driver earns for this order (DECISIONS M1): total_fee minus the commission.</summary>
+    public decimal DriverEarning => TotalFee - (CommissionAmount ?? 0);
+
+    /// <summary>
+    /// Cancellation by a Dispatcher (incident, GB-17) or by the System (jobs). A customer uses
+    /// <see cref="CancelByCustomer"/>, which has its own limits.
+    /// </summary>
     public void Cancel(string reason, ChangedByRole by, long? userId, DateTimeOffset now)
     {
         TransitionTo(OrderStatus.Cancelled, by, userId, reason, now);
         CancellationReason = reason;
     }
+
+    /// <summary>
+    /// DECISIONS B3, 2.1, 2.2: a customer may cancel only while the order is Pending or Accepted, free and with a
+    /// full refund of what was paid online. From Arrived on, the goods are with the driver: the customer reports an
+    /// incident and a Dispatcher decides (no refund). Returns the amount to refund (0 for unpaid or cash orders).
+    /// </summary>
+    public decimal CancelByCustomer(long customerId, string reason, DateTimeOffset now)
+    {
+        if (customerId != CustomerId)
+            throw new DomainException("Only the customer who placed the order can cancel it.", "ORDER_NOT_YOURS");
+        if (OrderStatus is not (OrderStatus.Pending or OrderStatus.Accepted))
+            throw new DomainException(
+                "The driver has already arrived. Report an incident so a dispatcher can handle it.", "ORDER_NOT_CANCELLABLE");
+
+        Cancel(reason, ChangedByRole.Customer, customerId, now);
+        return PaymentStatus == PaymentStatus.Paid ? TotalFee : 0;
+    }
+
+    /// <summary>
+    /// DECISIONS 7.3 / GB-18: a complaint is accepted only while the order is Delivered and within 24 hours
+    /// of delivery; after that the order completes on its own and no complaint is taken.
+    /// </summary>
+    public bool CanReceiveComplaint(DateTimeOffset now) =>
+        OrderStatus == OrderStatus.Delivered && DeliveredAt is not null &&
+        now - DeliveredAt < BusinessRules.ComplaintWindow;
 
     /// <summary>GB-17: dispatcher hands the order to another driver; the order goes back to Accepted.</summary>
     public void ReassignDriver(long newDriverProfileId, long dispatcherId, string? note)
@@ -217,8 +266,18 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         OrderStatus == OrderStatus.Delivered && DeliveredAt is not null &&
         now - DeliveredAt >= BusinessRules.AutoCompleteAfterDelivery;
 
-    public bool IsMatchingExpired(DateTimeOffset now) =>
-        OrderStatus == OrderStatus.Pending && now - CreatedAt >= BusinessRules.MatchingTimeout;
+    /// <summary>
+    /// GB-24 / DECISIONS 3.2: a cash order waits for a driver from creation; a PayOS order only from payment,
+    /// because drivers cannot see it before that (B10). An unpaid PayOS order never expires here.
+    /// </summary>
+    public bool IsMatchingExpired(DateTimeOffset now)
+    {
+        if (OrderStatus != OrderStatus.Pending)
+            return false;
+
+        var start = PaymentMethod == PaymentMethod.PayOS ? PaidAt : CreatedAt;
+        return start is not null && now - start >= BusinessRules.MatchingTimeout;
+    }
 
     private void TransitionTo(OrderStatus to, ChangedByRole by, long? userId, string? note, DateTimeOffset _)
     {

@@ -10,7 +10,9 @@ internal sealed class ChangePasswordCommandHandler(
     ICurrentUserService currentUser,
     IUserRepository users,
     IUnitOfWork unitOfWork,
-    IPasswordHasher passwordHasher) : ICommandHandler<ChangePasswordCommand>
+    IPasswordHasher passwordHasher,
+    IRefreshTokenRepository refreshTokens,
+    TimeProvider clock) : ICommandHandler<ChangePasswordCommand>
 {
     public async Task Handle(ChangePasswordCommand request, CancellationToken cancellationToken)
     {
@@ -21,6 +23,7 @@ internal sealed class ChangePasswordCommandHandler(
             throw new DomainException("The current password is wrong.", "WRONG_PASSWORD");
 
         user.ChangePassword(passwordHasher.Hash(request.NewPassword));
+        await refreshTokens.RevokeAllForUserAsync(user.Id, clock.GetUtcNow(), cancellationToken); // 9.1: every device, this one included, must sign in again
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

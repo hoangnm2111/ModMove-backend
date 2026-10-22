@@ -8,7 +8,9 @@ namespace ModMove.Application.Features.Auth.Commands.Logout;
 internal sealed class LogoutCommandHandler(
     ICurrentUserService currentUser,
     IUserRepository users,
-    IUnitOfWork unitOfWork) : ICommandHandler<LogoutCommand>
+    IRefreshTokenRepository refreshTokens,
+    IUnitOfWork unitOfWork,
+    TimeProvider clock) : ICommandHandler<LogoutCommand>
 {
     public async Task Handle(LogoutCommand request, CancellationToken cancellationToken)
     {
@@ -18,6 +20,7 @@ internal sealed class LogoutCommandHandler(
             return;
 
         user.SetFcmToken(null);
+        await refreshTokens.RevokeAllForUserAsync(user.Id, clock.GetUtcNow(), cancellationToken); // one device per account (9.2)
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

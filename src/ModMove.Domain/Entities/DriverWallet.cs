@@ -1,3 +1,4 @@
+using ModMove.Domain.Constants;
 using ModMove.Domain.Common;
 using ModMove.Domain.Enums;
 using ModMove.Domain.Exceptions;
@@ -31,10 +32,12 @@ public sealed class DriverWallet : BaseAuditableEntity, IAggregateRoot
     /// <summary>GB-16: <paramref name="minDeposit"/> is the MIN_COD_DEPOSIT platform setting (Admin can change it).</summary>
     public bool CanReceiveCod(decimal minDeposit) => WalletStatus == WalletStatus.Active && DepositBalance >= minDeposit;
 
+    /// <summary>DECISIONS 5.2: at least 50,000 VND per top-up. Withdrawals have no minimum (5.1).</summary>
     public WalletTransaction TopUpDeposit(decimal amount)
     {
         EnsureActive();
-        EnsurePositive(amount);
+        if (amount < BusinessRules.MinDepositTopUp)
+            throw new DomainException($"A deposit top-up must be at least {BusinessRules.MinDepositTopUp:N0} VND.", "TOP_UP_TOO_SMALL");
         DepositBalance += amount;
         return Record(WalletTransactionType.TopUpDeposit, null, amount, DepositBalance, WalletTransactionStatus.Completed);
     }

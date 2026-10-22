@@ -96,6 +96,26 @@ internal sealed class InMemoryRepository<T> : IRepository<T> where T : ModMove.D
     public void Remove(T aggregate) => Items.Remove(aggregate);
 }
 
+internal sealed class InMemoryRefreshTokens : IRefreshTokenRepository
+{
+    public List<RefreshToken> Items { get; } = [];
+
+    public Task<RefreshToken?> GetByHashAsync(string tokenHash, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(t => t.TokenHash == tokenHash));
+
+    public Task RevokeAllForUserAsync(long userId, DateTimeOffset now, CancellationToken cancellationToken = default)
+    {
+        foreach (var token in Items.Where(t => t.UserId == userId))
+            token.Revoke(now);
+        return Task.CompletedTask;
+    }
+
+    public Task<RefreshToken?> GetByIdAsync(long id, CancellationToken cancellationToken = default) => Task.FromResult(Items.FirstOrDefault(t => t.Id == id));
+    public void Add(RefreshToken aggregate) => Items.Add(aggregate);
+    public void Update(RefreshToken aggregate) { }
+    public void Remove(RefreshToken aggregate) => Items.Remove(aggregate);
+}
+
 internal sealed class CountingUnitOfWork : IUnitOfWork
 {
     public int Saves { get; private set; }
@@ -155,6 +175,7 @@ internal sealed class TestApp
     public InMemoryUsers Users { get; }
     public InMemoryOtps Otps { get; } = new();
     public InMemoryOrders Orders { get; } = new();
+    public InMemoryRefreshTokens RefreshTokens { get; } = new();
     public InMemoryRepository<SupportRequest> SupportRequests { get; } = new();
     public CountingUnitOfWork UnitOfWork { get; } = new();
     public CapturingEmailSender Email { get; } = new();
@@ -179,6 +200,7 @@ internal sealed class TestApp
             .AddSingleton<IUserRepository>(Users)
             .AddSingleton<IOtpRepository>(Otps)
             .AddSingleton<IShippingOrderRepository>(Orders)
+            .AddSingleton<IRefreshTokenRepository>(RefreshTokens)
             .AddSingleton<IRepository<SupportRequest>>(SupportRequests)
             .AddSingleton<IUnitOfWork>(UnitOfWork)
             .AddSingleton<IPasswordHasher>(new FakeHasher())

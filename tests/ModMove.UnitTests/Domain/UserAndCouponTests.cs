@@ -152,4 +152,59 @@ public class UserAndCouponTests
         Assert.Equal(SupportRequestStatus.New, request.Status);
         Assert.Equal("An", request.FullName);
     }
+
+    [Fact]
+    public void Rating_is_allowed_within_one_day_of_completion_7_5()
+    {
+        var rating = Rating.Create(1, 2, 3, 5, "Tốt", orderCompletedAt: Now, now: Now.AddHours(23));
+
+        Assert.Equal(5, rating.RatingStars);
+    }
+
+    [Fact]
+    public void Rating_after_one_day_is_rejected_7_5()
+    {
+        var error = Assert.Throws<DomainException>(() => Rating.Create(1, 2, 3, 5, null, Now, Now.AddDays(1).AddMinutes(1)));
+
+        Assert.Equal("RATING_WINDOW_CLOSED", error.Code);
+    }
+
+    [Fact]
+    public void Rating_needs_a_completed_order_GB20()
+    {
+        var error = Assert.Throws<DomainException>(() => Rating.Create(1, 2, 3, 5, null, orderCompletedAt: null, Now));
+
+        Assert.Equal("RATING_NOT_ALLOWED", error.Code);
+    }
+
+    [Fact]
+    public void Customer_answers_a_dispatcher_request_with_text_and_photos_7_4()
+    {
+        var refund = Refund.Request(1, null, RefundSourceType.Complaint, "Hàng vỡ", ["a.jpg", "b.jpg"], 100_000);
+        refund.RequestMoreInfo("Chụp thêm ảnh thùng hàng");
+
+        refund.ReplyToInfoRequest("Đây là ảnh thùng", ["c.jpg"]);
+
+        Assert.Equal("Đây là ảnh thùng", refund.CustomerReply);
+        Assert.Equal(["a.jpg", "b.jpg", "c.jpg"], refund.EvidenceUrls!);
+    }
+
+    [Fact]
+    public void Reply_cannot_push_evidence_past_five_photos_7_4()
+    {
+        var refund = Refund.Request(1, null, RefundSourceType.Complaint, "Hàng vỡ", ["1", "2", "3", "4"], 100_000);
+        refund.RequestMoreInfo("Thêm ảnh");
+
+        var error = Assert.Throws<DomainException>(() => refund.ReplyToInfoRequest("ok", ["5", "6"]));
+
+        Assert.Equal("TOO_MANY_PHOTOS", error.Code);
+    }
+
+    [Fact]
+    public void Reply_without_a_request_is_rejected()
+    {
+        var refund = Refund.Request(1, null, RefundSourceType.Complaint, "Hàng vỡ", null, 100_000);
+
+        Assert.Throws<DomainException>(() => refund.ReplyToInfoRequest("ok", null));
+    }
 }

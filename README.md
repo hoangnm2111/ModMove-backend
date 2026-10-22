@@ -39,9 +39,11 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the folder layout, CQRS con
 1. **README này**: cách chạy dự án (mục bên dưới).
 2. [CLAUDE.md](CLAUDE.md): quy tắc bắt buộc (layer, CQRS, test, commit, review).
 3. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): cấu trúc thư mục, mẫu use case, **quy ước API** (route và quyền theo thư mục, mã lỗi, enum, phân trang).
-4. [docs/BACKEND-GUIDE.md](docs/BACKEND-GUIDE.md): ai sở hữu thư mục nào, việc dùng chung, phụ thuộc giữa các người.
-5. [docs/DECISIONS.md](docs/DECISIONS.md): **quyết định thiết kế nhóm đã chốt**; khác SRS/SDS thì làm theo file này.
-6. [docs/BACKEND-TASKS.md](docs/BACKEND-TASKS.md): checklist việc của từng người theo phase.
+4. [docs/DECISIONS.md](docs/DECISIONS.md): **quyết định nghiệp vụ nhóm đã chốt**; khác SRS/SDS thì làm theo file này. Đọc cả mục "Còn cần làm rõ".
+5. [docs/TEAM-PLAN.md](docs/TEAM-PLAN.md): ai làm gì, ranh giới thư mục, checklist từng người theo phase.
+6. [docs/api/README.md](docs/api/README.md): endpoint đã có và bảng mã lỗi.
+
+Mục lục toàn bộ tài liệu: [docs/README.md](docs/README.md).
 
 Code mẫu để copy: Command `src/ModMove.Application/Features/Auth/Commands/Login`, Query `src/ModMove.Application/Features/Catalog/Queries/GetVehicleTypes`, Controller `src/ModMove.WebApi/Controllers/Public/AuthController.cs`.
 

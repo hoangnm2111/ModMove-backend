@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using ModMove.Application.Features.Auth.Commands.ForgotPassword;
 using ModMove.Application.Features.Auth.Commands.Login;
+using ModMove.Application.Features.Auth.Commands.Refresh;
 using ModMove.Application.Features.Auth.Commands.Register;
 using ModMove.Application.Features.Auth.Commands.ResendOtp;
 using ModMove.Application.Features.Auth.Commands.ResetPassword;
@@ -17,6 +18,11 @@ public sealed class AuthController : ApiControllerBase
     /// <summary>Sign in with email and password. One endpoint for every role; the token carries the role.</summary>
     [HttpPost("login")]
     public Task<LoginResponse> Login(LoginCommand command, CancellationToken cancellationToken) =>
+        Sender.Send(command, cancellationToken);
+
+    /// <summary>New access + refresh token for a refresh token; the old refresh token stops working (DECISIONS 9.1).</summary>
+    [HttpPost("refresh")]
+    public Task<LoginResponse> Refresh(RefreshTokenCommand command, CancellationToken cancellationToken) =>
         Sender.Send(command, cancellationToken);
 
     /// <summary>Customer sign-up (web and app). Sends an email OTP; sign-in works once it is verified.</summary>

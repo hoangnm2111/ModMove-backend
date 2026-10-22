@@ -11,7 +11,9 @@ internal sealed class DeleteMyAccountCommandHandler(
     ICurrentUserService currentUser,
     IUserRepository users,
     IShippingOrderRepository orders,
-    IUnitOfWork unitOfWork) : ICommandHandler<DeleteMyAccountCommand>
+    IRefreshTokenRepository refreshTokens,
+    IUnitOfWork unitOfWork,
+    TimeProvider clock) : ICommandHandler<DeleteMyAccountCommand>
 {
     public async Task Handle(DeleteMyAccountCommand request, CancellationToken cancellationToken)
     {
@@ -22,6 +24,7 @@ internal sealed class DeleteMyAccountCommandHandler(
 
         user.ChangeStatus(AccountStatus.Inactive); // B8: soft delete; sign-in now fails with ACCOUNT_INACTIVE
         user.SetFcmToken(null);
+        await refreshTokens.RevokeAllForUserAsync(user.Id, clock.GetUtcNow(), cancellationToken); // 9.1
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }
