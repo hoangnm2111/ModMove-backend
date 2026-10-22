@@ -14,8 +14,8 @@ public static class BusinessRules
     public const int MaxPhotoSizeMb = 5;
     public const int MinPickupPhotos = 2;                                   // GB-11
 
-    public const decimal MinCodDepositBalance = 200_000m;                   // GB-16
-    public const decimal DefaultCommissionRate = 0.10m;                     // GB-14
+    // Values the Administrator can change (commission rate, loading fee, minimum COD deposit,
+    // matching radius) live in platform_settings, not here (DECISIONS C8).
 
     public static readonly TimeSpan PayOsSessionLifetime = TimeSpan.FromMinutes(10); // GB-13
     public static readonly TimeSpan MatchingTimeout = TimeSpan.FromMinutes(10);      // GB-24
