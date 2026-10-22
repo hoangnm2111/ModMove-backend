@@ -8,4 +8,14 @@ public sealed class UserRepository(ApplicationDbContext dbContext) : Repository<
 {
     public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default) =>
         Set.FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
+
+    public Task<bool> IsEmailOrPhoneTakenAsync(string email, string phoneNumber, CancellationToken cancellationToken = default) =>
+        Set.AnyAsync(u => u.Email == email || u.PhoneNumber == phoneNumber, cancellationToken);
+
+    public Task<bool> IsPhoneTakenByAnotherAsync(string phoneNumber, long userId, CancellationToken cancellationToken = default) =>
+        Set.AnyAsync(u => u.PhoneNumber == phoneNumber && u.Id != userId, cancellationToken);
+
+    public Task ReleaseFcmTokenAsync(string token, long keepForUserId, CancellationToken cancellationToken = default) =>
+        Set.Where(u => u.FcmToken == token && u.Id != keepForUserId)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.FcmToken, (string?)null), cancellationToken);
 }

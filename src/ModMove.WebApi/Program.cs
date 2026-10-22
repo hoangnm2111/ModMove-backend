@@ -1,13 +1,16 @@
 using System.Text;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
+using ModMove.Infrastructure.ExternalServices.Email;
 using ModMove.Infrastructure.Identity;
 using ModMove.Application;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Infrastructure;
 using ModMove.Infrastructure.Persistence.Seed;
 using ModMove.WebApi.Controllers;
+using ModMove.WebApi.Controllers.Public;
 using ModMove.WebApi.Middlewares;
 using ModMove.WebApi.Services;
 
@@ -23,6 +26,11 @@ builder.Services
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 
+// No SMTP configured on this machine: in Development only, write emails (OTP codes) to the log instead.
+if (builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(builder.Configuration["Email:Host"]))
+    builder.Services.AddSingleton<IEmailSender, LogOnlyEmailSender>();
+
+builder.Services.AddAuthRateLimit();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
 builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme).Configure<JwtOptions>((bearer, jwt) =>
     bearer.TokenValidationParameters = new TokenValidationParameters
@@ -35,7 +43,14 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
 
 // Enums travel as their names ("Pending"), the same form the database stores.
 builder.Services.AddControllers(options => options.Conventions.Add(new RoleConvention()))
-    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
+    // Malformed JSON is rejected by MVC before our pipeline; give it the same shape as every other 400.
+    .ConfigureApiBehaviorOptions(options => options.InvalidModelStateResponseFactory = context =>
+    {
+        var problem = new ValidationProblemDetails(context.ModelState) { Status = StatusCodes.Status400BadRequest, Title = "Validation failed" };
+        problem.Extensions["code"] = "VALIDATION";
+        return new BadRequestObjectResult(problem) { ContentTypes = { "application/problem+json" } };
+    });
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSignalR();
@@ -69,6 +84,7 @@ app.UseHttpsRedirection();
 app.UseCors(ClientCorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
 app.MapHealthChecks("/health");

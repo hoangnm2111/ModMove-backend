@@ -126,15 +126,6 @@ public class ShippingOrderTests
         Assert.Equal(7, order.DriverProfileId);
     }
 
-    [Fact]
-    public void Pending_order_is_expired_after_matching_timeout_GB24()
-    {
-        var order = NewOrder();
-        order.CreatedAt = Now;
-
-        Assert.False(order.IsMatchingExpired(Now.AddMinutes(9)));
-        Assert.True(order.IsMatchingExpired(Now.AddMinutes(10)));
-    }
 
     [Fact]
     public void Driver_can_resubmit_pickup_photos_after_customer_rejects_GB26()
@@ -163,15 +154,16 @@ public class ShippingOrderTests
     }
 
     [Fact]
-    public void Completion_fixes_commission_on_fees_before_the_coupon_B4()
+    public void Completion_fixes_commission_on_the_total_after_the_coupon_M1()
     {
-        var order = DeliveredOrder(); // distance 200,000 + service 0, coupon 20,000 (platform pays it)
+        var order = DeliveredOrder(); // distance 200,000 + service 0 − coupon 20,000 = total 180,000; the driver bears the coupon
 
         order.Complete(0.10m, ChangedByRole.System, null, Now);
 
         Assert.Equal(OrderStatus.Completed, order.OrderStatus);
         Assert.Equal(0.10m, order.CommissionRate);
-        Assert.Equal(20_000m, order.CommissionAmount);
+        Assert.Equal(18_000m, order.CommissionAmount);  // 10% × 180,000 (M2: a multiplication)
+        Assert.Equal(162_000m, order.DriverEarning);
     }
 
     [Fact]
@@ -184,13 +176,122 @@ public class ShippingOrderTests
     }
 
     [Fact]
-    public void Commission_includes_the_loading_fee_and_rounds_half_away_from_zero_B4()
+    public void Commission_includes_the_loading_fee_and_rounds_half_away_from_zero_M1()
     {
-        // (155,545 + 100,000) × 0.10 = 25,554.5 → 25,555 (banker's rounding would give 25,554)
+        // (155,545 + 100,000 − 20,000) × 0.10 = 23,554.5 → 23,555 (banker's rounding would give 23,554)
         var order = DeliveredOrder(distanceFee: 155_545, serviceFee: 100_000);
 
         order.Complete(0.10m, ChangedByRole.System, null, Now);
 
-        Assert.Equal(25_555m, order.CommissionAmount);
+        Assert.Equal(23_555m, order.CommissionAmount);
+    }
+
+    [Fact]
+    public void Cash_order_waits_for_a_driver_from_creation_GB24_3_2()
+    {
+        var order = NewOrder(PaymentMethod.Cash, PayerRole.Sender);
+        order.CreatedAt = Now;
+
+        Assert.False(order.IsMatchingExpired(Now.AddMinutes(9)));
+        Assert.True(order.IsMatchingExpired(Now.AddMinutes(10)));
+    }
+
+    [Fact]
+    public void PayOs_order_waits_for_a_driver_from_payment_GB24_3_2()
+    {
+        var order = NewOrder(PaymentMethod.PayOS);
+        order.CreatedAt = Now;
+
+        Assert.False(order.IsMatchingExpired(Now.AddHours(1))); // unpaid: drivers cannot see it yet
+
+        order.MarkPaid(Now.AddMinutes(30));
+        Assert.False(order.IsMatchingExpired(Now.AddMinutes(39)));
+        Assert.True(order.IsMatchingExpired(Now.AddMinutes(40)));
+    }
+
+    [Theory]
+    [InlineData(false, 0)]        // nothing paid yet
+    [InlineData(true, 180_000)]   // paid online: full refund of total_fee
+    public void Customer_cancels_free_while_pending_B3(bool paid, double refund)
+    {
+        var order = NewOrder();
+        if (paid)
+            order.MarkPaid(Now);
+
+        var amount = order.CancelByCustomer(customerId: 1, "changed plans", Now);
+
+        Assert.Equal((decimal)refund, amount);
+        Assert.Equal(OrderStatus.Cancelled, order.OrderStatus);
+    }
+
+    [Fact]
+    public void Customer_cancels_free_after_a_driver_accepted_2_2()
+    {
+        var order = AcceptedOrder();
+        order.MarkPaid(Now);
+
+        Assert.Equal(180_000m, order.CancelByCustomer(1, "changed plans", Now.AddHours(2))); // no time window
+    }
+
+    [Fact]
+    public void Customer_cannot_cancel_once_the_driver_arrived_2_1()
+    {
+        var order = AcceptedOrder();
+        order.ConfirmArrival(9, Now);
+
+        var error = Assert.Throws<DomainException>(() => order.CancelByCustomer(1, "too late", Now));
+
+        Assert.Equal("ORDER_NOT_CANCELLABLE", error.Code);
+        Assert.Equal(OrderStatus.Arrived, order.OrderStatus);
+    }
+
+    [Fact]
+    public void Another_customer_cannot_cancel_the_order()
+    {
+        var error = Assert.Throws<DomainException>(() => NewOrder().CancelByCustomer(customerId: 2, "not mine", Now));
+
+        Assert.Equal("ORDER_NOT_YOURS", error.Code);
+    }
+
+    [Fact]
+    public void Complaint_only_while_delivered_and_within_24_hours_7_3()
+    {
+        var order = DeliveredOrder();
+
+        Assert.True(order.CanReceiveComplaint(Now.AddHours(23)));
+        Assert.False(order.CanReceiveComplaint(Now.AddHours(24)));
+
+        order.Complete(0.10m, ChangedByRole.System, null, Now.AddHours(1));
+        Assert.False(order.CanReceiveComplaint(Now.AddHours(2))); // completed: no more complaints
+    }
+
+    [Fact]
+    public void Pickup_photos_can_be_sent_at_most_five_times_6_3()
+    {
+        var order = AcceptedOrder();
+        order.ConfirmArrival(9, Now);
+        order.ConfirmPickup(["1.jpg", "2.jpg"], 9, Now); // 1st
+        for (var i = 2; i <= 5; i++)
+        {
+            order.RejectPickupEvidence("blurry", customerId: 1);
+            order.ConfirmPickup(["1.jpg", "2.jpg"], 9, Now); // 2nd..5th
+        }
+
+        order.RejectPickupEvidence("still blurry", customerId: 1);
+        var error = Assert.Throws<DomainException>(() => order.ConfirmPickup(["1.jpg", "2.jpg"], 9, Now));
+
+        Assert.Equal("PICKUP_PHOTO_LIMIT", error.Code);
+    }
+
+    [Fact]
+    public void A_cancelled_order_cannot_be_marked_paid()
+    {
+        var order = AcceptedOrder();
+        order.CancelByCustomer(1, "changed plans", Now);
+
+        var error = Assert.Throws<DomainException>(() => order.MarkPaid(Now));
+
+        Assert.Equal("ORDER_CANCELLED", error.Code);
+        Assert.NotEqual(PaymentStatus.Paid, order.PaymentStatus);
     }
 }
