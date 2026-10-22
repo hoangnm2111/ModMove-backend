@@ -3,10 +3,12 @@ using ModMove.Application.Features.Auth.Commands.ChangePassword;
 using ModMove.Application.Features.Auth.Commands.ForgotPassword;
 using ModMove.Application.Features.Auth.Commands.Login;
 using ModMove.Application.Features.Auth.Commands.Logout;
+using ModMove.Application.Features.Auth.Commands.Refresh;
 using ModMove.Application.Features.Auth.Commands.Register;
 using ModMove.Application.Features.Auth.Commands.ResendOtp;
 using ModMove.Application.Features.Auth.Commands.ResetPassword;
 using ModMove.Application.Features.Auth.Commands.VerifyEmail;
+using ModMove.Application.Features.Users.Commands.DeleteMyAccount;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 using ModMove.Domain.Exceptions;
@@ -269,5 +271,137 @@ public class AuthFlowTests
         var app = TestApp.SignedInAs(user);
 
         await Assert.ThrowsAsync<ValidationException>(() => app.Sender.Send(new ChangePasswordCommand("old12345", "old12345")));
+    }
+
+    private static async Task<(TestApp App, LoginResponse Login)> SignedInAsync()
+    {
+        var app = new TestApp(null, User.Create("A", "0900000001", "a@x.vn", "h:secret123", UserRole.Customer, emailVerified: true));
+        var login = await app.Sender.Send(new LoginCommand("a@x.vn", "secret123"));
+        return (app, login);
+    }
+
+    [Fact]
+    public async Task Login_returns_a_refresh_token_stored_only_as_a_hash_9_1()
+    {
+        var (app, login) = await SignedInAsync();
+
+        Assert.False(string.IsNullOrEmpty(login.RefreshToken));
+        var stored = Assert.Single(app.RefreshTokens.Items);
+        Assert.NotEqual(login.RefreshToken, stored.TokenHash);
+        Assert.Equal(TestApp.Start.AddDays(30), stored.ExpiresAt);
+    }
+
+    [Fact]
+    public async Task Refresh_rotates_the_token_9_1()
+    {
+        var (app, login) = await SignedInAsync();
+
+        var next = await app.Sender.Send(new RefreshTokenCommand(login.RefreshToken));
+
+        Assert.NotEqual(login.RefreshToken, next.RefreshToken);
+        Assert.Equal("token-Customer", next.AccessToken);
+        Assert.NotNull(app.RefreshTokens.Items[0].RevokedAt); // the old one is used up
+    }
+
+    [Fact]
+    public async Task Reusing_an_old_refresh_token_signs_the_user_out_everywhere_9_1()
+    {
+        var (app, login) = await SignedInAsync();
+        var next = await app.Sender.Send(new RefreshTokenCommand(login.RefreshToken));
+
+        await Assert.ThrowsAsync<UnauthorizedException>(() => app.Sender.Send(new RefreshTokenCommand(login.RefreshToken)));
+
+        // the stolen copy is caught, so even the newest token stops working
+        await Assert.ThrowsAsync<UnauthorizedException>(() => app.Sender.Send(new RefreshTokenCommand(next.RefreshToken)));
+    }
+
+    [Fact]
+    public async Task Expired_refresh_token_is_rejected()
+    {
+        var (app, login) = await SignedInAsync();
+        app.Time.Now = TestApp.Start.AddDays(30);
+
+        await Assert.ThrowsAsync<UnauthorizedException>(() => app.Sender.Send(new RefreshTokenCommand(login.RefreshToken)));
+    }
+
+    [Fact]
+    public async Task Unknown_refresh_token_is_rejected()
+    {
+        var (app, _) = await SignedInAsync();
+
+        await Assert.ThrowsAsync<UnauthorizedException>(() => app.Sender.Send(new RefreshTokenCommand("made-up")));
+    }
+
+    [Fact]
+    public async Task Changing_the_password_ends_every_session_9_1()
+    {
+        var user = User.Create("A", "0900000001", "a@x.vn", "h:secret123", UserRole.Customer, emailVerified: true);
+        var app = TestApp.SignedInAs(user);
+        var login = await app.Sender.Send(new LoginCommand("a@x.vn", "secret123"));
+
+        await app.Sender.Send(new ChangePasswordCommand("secret123", "secret456"));
+
+        await Assert.ThrowsAsync<UnauthorizedException>(() => app.Sender.Send(new RefreshTokenCommand(login.RefreshToken)));
+    }
+
+    [Fact]
+    public async Task Logout_ends_every_session_9_1()
+    {
+        var user = User.Create("A", "0900000001", "a@x.vn", "h:secret123", UserRole.Customer, emailVerified: true);
+        var app = TestApp.SignedInAs(user);
+        var login = await app.Sender.Send(new LoginCommand("a@x.vn", "secret123"));
+
+        await app.Sender.Send(new LogoutCommand());
+
+        await Assert.ThrowsAsync<UnauthorizedException>(() => app.Sender.Send(new RefreshTokenCommand(login.RefreshToken)));
+    }
+
+    [Fact]
+    public async Task A_stale_device_after_logout_does_not_end_the_new_session_9_1()
+    {
+        var user = User.Create("A", "0900000001", "a@x.vn", "h:secret123", UserRole.Customer, emailVerified: true);
+        var app = TestApp.SignedInAs(user);
+        var old = await app.Sender.Send(new LoginCommand("a@x.vn", "secret123"));
+        await app.Sender.Send(new LogoutCommand());
+        var fresh = await app.Sender.Send(new LoginCommand("a@x.vn", "secret123"));
+
+        await Assert.ThrowsAsync<UnauthorizedException>(() => app.Sender.Send(new RefreshTokenCommand(old.RefreshToken)));
+
+        var next = await app.Sender.Send(new RefreshTokenCommand(fresh.RefreshToken));
+        Assert.False(string.IsNullOrEmpty(next.RefreshToken));
+    }
+
+    [Fact]
+    public async Task Reset_password_ends_every_session_9_1()
+    {
+        var (app, login) = await SignedInAsync();
+
+        await app.Sender.Send(new ForgotPasswordCommand("a@x.vn"));
+        await app.Sender.Send(new ResetPasswordCommand("a@x.vn", app.Email.LastCode(), "new12345"));
+
+        await Assert.ThrowsAsync<UnauthorizedException>(() => app.Sender.Send(new RefreshTokenCommand(login.RefreshToken)));
+    }
+
+    [Fact]
+    public async Task Deleting_the_account_ends_every_session_B8()
+    {
+        var user = User.Create("A", "0900000001", "a@x.vn", "h:secret123", UserRole.Customer, emailVerified: true);
+        var app = TestApp.SignedInAs(user);
+        var login = await app.Sender.Send(new LoginCommand("a@x.vn", "secret123"));
+
+        await app.Sender.Send(new DeleteMyAccountCommand());
+
+        await Assert.ThrowsAsync<UnauthorizedException>(() => app.Sender.Send(new RefreshTokenCommand(login.RefreshToken)));
+    }
+
+    [Theory]
+    [InlineData(AccountStatus.Inactive)]
+    [InlineData(AccountStatus.Locked)]
+    public async Task Refresh_is_refused_once_the_account_is_not_active(AccountStatus status)
+    {
+        var (app, login) = await SignedInAsync();
+        app.Users.Items[0].ChangeStatus(status);
+
+        await Assert.ThrowsAsync<UnauthorizedException>(() => app.Sender.Send(new RefreshTokenCommand(login.RefreshToken)));
     }
 }

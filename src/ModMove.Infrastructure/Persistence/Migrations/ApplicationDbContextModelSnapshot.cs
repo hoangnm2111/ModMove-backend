@@ -840,6 +840,10 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnType("json")
                         .HasColumnName("pickup_photo_urls");
 
+                    b.Property<int>("PickupSubmissionCount")
+                        .HasColumnType("int")
+                        .HasColumnName("pickup_submission_count");
+
                     b.Property<string>("ProofStatus")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -912,6 +916,53 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("ModMove.Domain.Entities.RefreshToken", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTimeOffset?>("ReplacedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("replaced_at");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .IsConcurrencyToken()
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("revoked_at");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("char(64)")
+                        .HasColumnName("token_hash")
+                        .IsFixedLength();
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("refresh_tokens", (string)null);
+                });
+
             modelBuilder.Entity("ModMove.Domain.Entities.Refund", b =>
                 {
                     b.Property<long>("Id")
@@ -933,6 +984,11 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("created_at");
+
+                    b.Property<string>("CustomerReply")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)")
+                        .HasColumnName("customer_reply");
 
                     b.Property<DateTimeOffset?>("DecidedAt")
                         .HasColumnType("datetime(6)")
@@ -1115,6 +1171,10 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)")
                         .HasColumnName("order_status");
+
+                    b.Property<DateTimeOffset?>("PaidAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("paid_at");
 
                     b.Property<string>("PayerRole")
                         .HasMaxLength(10)
@@ -1702,6 +1762,15 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("OrderId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("ModMove.Domain.Entities.RefreshToken", b =>
+                {
+                    b.HasOne("ModMove.Domain.Entities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 
