@@ -13,7 +13,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 1. Nhánh `feature/<tên>` → PR vào **`develop`**. Không push thẳng hay mở PR vào `main`; `main` chỉ nhận từ `develop` khi nhóm phát hành.
 2. Chỉ sửa thư mục của mình (mục 2). Cần sửa phần dùng chung: một PR nhỏ riêng, báo cả nhóm.
 3. Một use case = một thư mục `Features/<Module>/{Commands|Queries}/<UseCase>/`. Viết test trước, thấy fail rồi mới code. Luật nghiệp vụ nằm trong entity; vi phạm → `DomainException(message, code)`.
-4. **Migration:** `git pull develop` ngay trước khi tạo; trùng thì xóa migration của mình và tạo lại. DEFAULT ở mức DB theo DECISIONS C9. Đổi schema thì ghi thêm vào [REPORT4-CHANGES.md](REPORT4-CHANGES.md).
+4. **Migration:** `git pull develop` ngay trước khi tạo; trùng thì xóa migration của mình và tạo lại. DEFAULT ở mức DB theo DECISIONS C9.
 5. Xong một việc = `dotnet build` không warning, `dotnet test` pass, `dotnet format --verify-no-changes` sạch, chạy subagent `reviewer` trên diff. Commit: `[TICKET-ID] <type>: <mô tả>`.
 6. Endpoint mới: thêm vào [api/README.md](api/README.md); mã lỗi mới: thêm vào bảng mã lỗi ở đó.
 
@@ -25,7 +25,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 | `Features/Orders`, `Features/Tracking`, `Features/Ratings`, `Domain/Services/FareCalculator` | Hiếu | |
 | `Features/Payments`, `Features/Wallets`, `Controllers/Webhooks` | Hoàng | Thanh toán đơn, coupon, webhook PayOS, ví, rút tiền, chi trả hoàn tiền |
 | `Features/DriverOnboarding`, `Features/Drivers`, `Features/Matching`, `Features/Trips`, `Controllers/Driver` | Hoàng | |
-| `Features/MasterData`, `Features/Pricing`, `Features/Catalog`, `Features/Reports`, `Controllers/Admin` | Hoàng | Giá ở `vehicle_types` + `platform_settings` |
+| `Features/MasterData`, `Features/Pricing`, `Features/Catalog`, `Features/Reports`, `Controllers/Admin` | Hoàng | Giá ở `vehicle_types` + `platform_settings`. **Ngoại lệ:** hai query public `Catalog/Queries/GetVehicleTypes` và `MasterData/Queries/GetPublicContent` do Hiếu viết, giữ nguyên chỗ, Hiếu sửa được |
 | `Features/Incidents`, `Features/Refunds`, `Controllers/Dispatcher` | Huy | **Dùng chung**: Hiếu thêm use case phía khách, Hoàng thêm use case Admin duyệt; mỗi người chỉ tạo thư mục use case của mình |
 | `Infrastructure/BackgroundJobs` | Hoàng (PAY, MATCH, ORDER), Hiếu (GPS) | Job chỉ gửi Command qua `Sender` |
 | `Domain/Entities`, `Domain/Enums`, `Persistence/Migrations` | Dùng chung | Đổi entity người khác đang dùng: PR riêng, báo nhóm |
@@ -33,7 +33,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 ## 3. Nền móng dùng chung (đã xong)
 
 - [x] JWT + refresh token, BCrypt, phân quyền theo thư mục (`RoleConvention`), mã lỗi `code`, rate limit, 409 khi xung đột
-- [x] 21 bảng + migration + seed (4 tài khoản demo, mật khẩu `ModMove@123`)
+- [x] 22 bảng + migration + seed (4 tài khoản demo, mật khẩu `ModMove@123`)
 - [x] Use case mẫu: Command `Auth/Commands/Login`, Query `Catalog/Queries/GetVehicleTypes`
 - [x] Port: `IFileStorage`, `IEmailSender`, `IPushNotificationService`, `IPaymentGateway`, `IMapService`, `IRealtimeNotifier`; `IPlatformSettings`, `ICouponRepository`, `IShippingOrderRepository`, `IRefreshTokenRepository`
 - [x] Fake dùng chung cho test handler: `tests/ModMove.IntegrationTests/Fakes.cs` (`TestApp`, `TestApp.SignedInAs`)
@@ -47,7 +47,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [x] Public: loại xe, chính sách, giới thiệu dịch vụ, gửi yêu cầu hỗ trợ
 - [x] Gửi email Gmail SMTP (Development không có SMTP thì ghi OTP ra log)
 - [ ] Google Maps (`IMapService`: Geocoding + Distance Matrix hoặc Routes API, DECISIONS 3.4) và `FareCalculator` (B1)
-- [ ] `POST api/public/fare-estimate`: loại xe, tải trọng (GB-10, chờ [Còn cần làm rõ](DECISIONS.md#còn-cần-làm-rõ) #2), phí bốc xếp, coupon (GB-21)
+- [ ] `POST api/public/fare-estimate`: loại xe, tải trọng và lọt thùng theo món lớn nhất (GB-10, 4.2; `VehicleType.CanCarry` hiện so từng cạnh mà chưa xếp cạnh từ nhỏ đến lớn), phí bốc xếp, coupon (GB-21) với mã lỗi riêng `COUPON_NOT_FOUND`, `COUPON_INACTIVE`, `COUPON_EXPIRED`, `COUPON_LIMIT_REACHED`, `COUPON_MIN_ORDER_NOT_MET`
 - [ ] Cloudinary (`IFileStorage`) + `POST api/customer/uploads` (JPG/PNG ≤ 5 MB, GB-06); ảnh đại diện và ảnh hàng chỉ nhận URL thuộc domain Cloudinary của nhóm
 - [ ] Tạo đơn (GST-17): cam kết không hàng cấm (4.3), 1–5 ảnh, mã đơn `MMyyyyMMddNNN` giờ VN, coupon `used_count++` (B11), **chỉ tiền mặt** ở Phase 1; **không có sửa đơn** (4.1)
 - [ ] Danh sách, tìm, chi tiết, lịch sử đơn của khách (CUS-08..10, 20)
@@ -69,21 +69,21 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 
 **Phase 1**
 - [ ] MasterData (ADM-14..16), nhập nội dung chính sách và giới thiệu (`description`)
-- [ ] Pricing (ADM-10..13): `vehicle_types`, `LOADING_FEE`, `COMMISSION_RATE` (đọc qua `IPlatformSettings`)
+- [ ] Pricing (ADM-10..13): `vehicle_types`, `LOADING_FEE`, `COMMISSION_RATE` (đọc qua `IPlatformSettings`); chặn sửa `COMMISSION_RATE` khi còn đơn đang chạy (C8)
 - [ ] Tài khoản (ADM-04..07): danh sách, chi tiết, khóa/mở (`Locked`, chỉ Admin mở; khóa thì gọi `RevokeAllForUserAsync`), tạo Dispatcher với mật khẩu cố định (B7)
 - [ ] Hồ sơ tài xế: phía Driver (DRV-03..07) và phía Admin duyệt (ADM-08, 09); `driver_wallets` tạo khi duyệt lần đầu
 - [ ] Adapter PayOS và FCM
 
 **Phase 2**
 - [ ] Thanh toán PayOS (CUS-27, nạp cọc DRV-21 ≥ 50.000đ), tạo lại mã khi hết 10 phút (3.1), webhook (sai chữ ký → từ chối, gọi trùng → idempotent), `ShippingOrder.MarkPaid(now)`
-- [ ] Matching (DRV-08..10, B5): đơn PayOS chỉ hiện khi đã trả; GB-08/09/16; ẩn tài xế mất GPS quá 5 phút (6.4)
+- [ ] Matching (DRV-08..10, B5): đơn PayOS chỉ hiện khi đã trả; GB-08/09; đơn tiền mặt cần ví cọc ≥ `MIN_COD_DEPOSIT` và ≥ hoa hồng của đơn (GB-16; `DriverWallet.CanReceiveCod` hiện mới kiểm tra `MIN_COD_DEPOSIT`); ẩn tài xế mất GPS quá 5 phút (6.4)
 - [ ] Trips (DRV-11..16, 18, 19): không có hủy từ tài xế (6.1); không có người nhận thì vẫn giao và gửi POD (2.7)
 - [ ] Ví (DRV-17, 20..23): thu COD, rút tiền không tối thiểu (5.1), thu nhập = `DriverEarning`
 - [ ] Admin duyệt hoàn tiền (cả hoàn tiền do hủy không qua Dispatcher, 3.3) và chi trả tay; duyệt rút tiền (ADM-24)
 
 **Phase 3**
-- [ ] JOB-PAY-01, JOB-MATCH-01 (từ lúc tạo hoặc lúc trả, 3.2: `IsMatchingExpired`), JOB-ORDER-01 (`CanBeAutoCompleted`)
-- [ ] Báo cáo, doanh thu (8.1, chờ [Còn cần làm rõ](DECISIONS.md#còn-cần-làm-rõ) #3), xuất Excel (B16, xin duyệt package)
+- [ ] JOB-PAY-01 (mã hết hạn sau 10 phút; hủy đơn PayOS vẫn `Unpaid` sau 30 phút từ `created_at`, 3.1), JOB-MATCH-01 (từ lúc tạo hoặc lúc trả, 3.2: `IsMatchingExpired`), JOB-ORDER-01 (`CanBeAutoCompleted`)
+- [ ] Báo cáo, doanh thu (8.1: tổng `commission_amount` của đơn `Completed`, giờ VN), xuất Excel (B16, xin duyệt package)
 - [ ] Thông báo cho tài xế theo bảng sự kiện 8.3
 
 ## 6. Huy: Dispatcher
@@ -93,7 +93,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [ ] Giám sát đơn và tài xế (DIS-01, 16); danh sách, chi tiết sự cố và khiếu nại (DIS-03, 04, 11, 12)
 
 **Phase 2**
-- [ ] Quyết định xử lý sự cố (DIS-05), đổi tài xế (DIS-06, 7.2), hủy đơn do sự cố (DIS-07; hàng cấm không hoàn tiền, 4.3), hủy sự cố (DIS-10)
+- [ ] Quyết định xử lý sự cố (DIS-05), đổi tài xế (DIS-06, 7.2: tài xế mới đủ điều kiện như B5, đơn tiền mặt thêm GB-16), hủy đơn do sự cố (DIS-07: hàng cấm và khách vắng mặt ở điểm lấy không hoàn tiền, 4.3, 2.4; không có tài xế thay thế thì hoàn 100% đơn PayOS, 2.5), hủy sự cố (DIS-10)
 - [ ] Hàng còn trên xe sau khi hủy: trả về hay giữ lại (2.6)
 - [ ] Hoàn tiền và khiếu nại (DIS-08, 09, 13..15, 17): đề xuất `proposed_amount ≤ requested_amount`, xin thêm thông tin (`RequestMoreInfo`, khách trả lời qua 7.4)
 - [ ] Không làm màn hình yêu cầu hỗ trợ (2.9)
