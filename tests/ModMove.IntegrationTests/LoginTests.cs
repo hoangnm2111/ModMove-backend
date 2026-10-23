@@ -1,9 +1,5 @@
-using Microsoft.Extensions.DependencyInjection;
 using MediatR;
-using ModMove.Application;
 using ModMove.Application.Common.Exceptions;
-using ModMove.Application.Common.Interfaces;
-using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Features.Auth.Commands.Login;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
@@ -13,65 +9,16 @@ namespace ModMove.IntegrationTests;
 /// <summary>Runs the real MediatR pipeline (validation + logging + handler) with in-memory fakes for the ports.</summary>
 public class LoginTests
 {
-    private static readonly DateTimeOffset Now = new(2026, 10, 20, 8, 0, 0, TimeSpan.Zero);
-
-    private sealed class FakeUsers(params User[] users) : IUserRepository
-    {
-        public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default) =>
-            Task.FromResult(users.FirstOrDefault(u => u.Email == email));
-
-        public Task<User?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
-            Task.FromResult(users.FirstOrDefault(u => u.Id == id));
-
-        public void Add(User aggregate) { }
-        public void Update(User aggregate) { }
-        public void Remove(User aggregate) { }
-    }
-
-    private sealed class CountingUnitOfWork : IUnitOfWork
-    {
-        public int Saves { get; private set; }
-
-        public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
-        {
-            Saves++;
-            return Task.FromResult(1);
-        }
-    }
-
-    private sealed class FakeHasher : IPasswordHasher
-    {
-        public string Hash(string password) => "h:" + password;
-
-        public bool Verify(string password, string passwordHash) => passwordHash == "h:" + password;
-    }
-
-    private sealed class FakeTokens : IJwtTokenService
-    {
-        public string CreateAccessToken(long userId, UserRole role) => $"token-{role}";
-    }
-
-    private sealed class FixedTime : TimeProvider
-    {
-        public override DateTimeOffset GetUtcNow() => Now;
-    }
+    private static readonly DateTimeOffset Now = TestApp.Start;
 
     private static (ISender Sender, CountingUnitOfWork Uow) Build(User user)
     {
-        var uow = new CountingUnitOfWork();
-        var services = new ServiceCollection()
-            .AddLogging()
-            .AddApplication()
-            .AddSingleton<IUserRepository>(new FakeUsers(user))
-            .AddSingleton<IUnitOfWork>(uow)
-            .AddSingleton<IPasswordHasher>(new FakeHasher())
-            .AddSingleton<IJwtTokenService>(new FakeTokens())
-            .AddSingleton<TimeProvider>(new FixedTime());
-        return (services.BuildServiceProvider().GetRequiredService<ISender>(), uow);
+        var app = new TestApp(null, user);
+        return (app.Sender, app.UnitOfWork);
     }
 
     private static User NewUser(UserRole role = UserRole.Customer) =>
-        User.Create("A", "0900000001", "a@x.vn", "h:secret", role);
+        User.Create("A", "0900000001", "a@x.vn", "h:secret", role, emailVerified: true);
 
     [Fact]
     public async Task Valid_credentials_return_a_token_for_the_users_role()

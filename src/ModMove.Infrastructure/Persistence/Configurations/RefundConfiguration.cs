@@ -16,6 +16,7 @@ internal sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
         builder.Property(r => r.ProposedAmount).HasPrecision(15, 2);
         builder.Property(r => r.ProposalReason).HasMaxLength(1000);
         builder.Property(r => r.InfoRequestNote).HasMaxLength(1000);
+        builder.Property(r => r.CustomerReply).HasMaxLength(1000); // DECISIONS 7.4
         builder.Property(r => r.BankReferenceCode).HasMaxLength(50);
 
         // "One open refund per (order, source)" and "one complaint per order" are checked by the

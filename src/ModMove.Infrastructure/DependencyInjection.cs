@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
+using ModMove.Infrastructure.ExternalServices.Email;
 using ModMove.Infrastructure.Identity;
 using ModMove.Infrastructure.Persistence;
 using ModMove.Infrastructure.Persistence.Interceptors;
@@ -45,12 +46,30 @@ public static class DependencyInjection
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         // Aggregate-specific repositories: register each next to its interface (the open generic above cannot Include).
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<ICouponRepository, CouponRepository>();
+        services.AddScoped<IOtpRepository, OtpRepository>();
+        services.AddScoped<IShippingOrderRepository, ShippingOrderRepository>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 
         // Read side (Queries): raw connection for Dapper.
         services.AddSingleton<ISqlConnectionFactory>(new SqlConnectionFactory(connectionString));
+        services.AddSingleton<IPlatformSettings, PlatformSettings>();
 
-        // External adapters (Cloudinary, GoogleMaps, PayOS, Firebase, Email) are registered here
-        // as they are implemented; their ports are in Application/Common/Interfaces/Ports.cs.
+        // External adapters; ports are in Application/Common/Interfaces/Ports.cs.
+        // Email is registered only when SMTP is configured; Program.cs adds a log-only sender in Development.
+        if (!string.IsNullOrWhiteSpace(configuration["Email:Host"]))
+        {
+            services.AddSingleton(new EmailOptions
+            {
+                Host = configuration["Email:Host"]!,
+                Port = int.TryParse(configuration["Email:Port"], out var port) ? port : 587,
+                UserName = configuration["Email:UserName"] ?? "",
+                Password = configuration["Email:Password"] ?? "",
+                FromAddress = configuration["Email:FromAddress"] ?? configuration["Email:UserName"] ?? "",
+                FromName = configuration["Email:FromName"] ?? "ModMove",
+            });
+            services.AddSingleton<IEmailSender, SmtpEmailSender>();
+        }
 
         return services;
     }

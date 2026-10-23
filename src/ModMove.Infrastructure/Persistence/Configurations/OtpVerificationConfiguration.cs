@@ -12,6 +12,10 @@ internal sealed class OtpVerificationConfiguration : IEntityTypeConfiguration<Ot
         builder.Property(o => o.Email).HasMaxLength(100);
         builder.Property(o => o.CodeHash).HasMaxLength(60);
 
+        // Two requests with the same code, or parallel wrong guesses, must not both win: the loser gets 409.
+        builder.Property(o => o.VerifiedAt).IsConcurrencyToken();
+        builder.Property(o => o.FailedAttempts).IsConcurrencyToken();
+
         builder.HasIndex(o => o.Email);
     }
 }
