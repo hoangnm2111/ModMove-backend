@@ -1,4 +1,5 @@
 using ModMove.Domain.Common;
+using ModMove.Domain.Constants;
 using ModMove.Domain.Enums;
 using ModMove.Domain.Exceptions;
 
@@ -23,6 +24,10 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
     public long? ProposedBy { get; private set; }
     public long? ApprovedBy { get; private set; }
     public string? InfoRequestNote { get; private set; }
+
+    /// <summary>The customer's answer to <see cref="InfoRequestNote"/> (UC-DIS-14, DECISIONS 7.4).</summary>
+    public string? CustomerReply { get; private set; }
+
     public RefundStatus RefundStatus { get; private set; } = RefundStatus.Requested;
     public string? BankReferenceCode { get; private set; }
     public DateTimeOffset? DecidedAt { get; private set; }
@@ -45,6 +50,24 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
     {
         EnsureStatus(RefundStatus.Requested);
         InfoRequestNote = note;
+    }
+
+    /// <summary>
+    /// DECISIONS 7.4: the customer answers a dispatcher's request with a text and more photos; the photos join
+    /// <see cref="EvidenceUrls"/>, at most 5 in all.
+    /// </summary>
+    public void ReplyToInfoRequest(string reply, IEnumerable<string>? extraEvidenceUrls)
+    {
+        EnsureStatus(RefundStatus.Requested);
+        if (InfoRequestNote is null)
+            throw new DomainException("The dispatcher has not asked for more information.", "NO_INFO_REQUEST");
+
+        var evidence = (EvidenceUrls ?? []).Concat(extraEvidenceUrls ?? []).ToList();
+        if (evidence.Count > BusinessRules.MaxRefundEvidencePhotos)
+            throw new DomainException($"At most {BusinessRules.MaxRefundEvidencePhotos} photos in all.", "TOO_MANY_PHOTOS");
+
+        CustomerReply = reply;
+        EvidenceUrls = evidence;
     }
 
     /// <summary>UC-DIS-09 / UC-DIS-15: full, partial or no refund (amount 0).</summary>

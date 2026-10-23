@@ -15,10 +15,11 @@ public class DriverWalletTests
         var wallet = DriverWallet.Create(1);
         Assert.False(wallet.CanReceiveCod(minDeposit));
 
-        wallet.TopUpDeposit(199_999);
+        wallet.TopUpDeposit(149_999);
+        wallet.TopUpDeposit(50_000); // 199,999
         Assert.False(wallet.CanReceiveCod(minDeposit));
 
-        wallet.TopUpDeposit(1);
+        wallet.TopUpDeposit(50_000);
         Assert.True(wallet.CanReceiveCod(minDeposit));
     }
 
@@ -48,9 +49,9 @@ public class DriverWalletTests
     public void Commission_larger_than_deposit_is_rejected()
     {
         var wallet = DriverWallet.Create(1);
-        wallet.TopUpDeposit(10_000);
+        wallet.TopUpDeposit(50_000);
 
-        Assert.Throws<DomainException>(() => wallet.DeductCommissionFromDeposit(10, 20_000));
+        Assert.Throws<DomainException>(() => wallet.DeductCommissionFromDeposit(10, 60_000));
     }
 
     [Fact]
@@ -110,5 +111,28 @@ public class DriverWalletTests
         typeof(DriverWallet).GetProperty("WalletStatus")!.SetValue(wallet, WalletStatus.Frozen);
 
         Assert.Throws<DomainException>(() => wallet.TopUpDeposit(1_000));
+    }
+
+    [Fact]
+    public void Top_up_below_50000_is_rejected_5_2()
+    {
+        var wallet = DriverWallet.Create(1);
+
+        var error = Assert.Throws<DomainException>(() => wallet.TopUpDeposit(49_999));
+
+        Assert.Equal("TOP_UP_TOO_SMALL", error.Code);
+        wallet.TopUpDeposit(50_000);
+        Assert.Equal(50_000m, wallet.DepositBalance);
+    }
+
+    [Fact]
+    public void Withdrawal_has_no_minimum_5_1()
+    {
+        var wallet = DriverWallet.Create(1);
+        wallet.CreditTripEarning(10, 100_000, 10_000);
+
+        wallet.RequestWithdrawal(1_000);
+
+        Assert.Equal(89_000m, wallet.EarningsBalance);
     }
 }
