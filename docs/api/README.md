@@ -50,7 +50,7 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | `WRONG_PASSWORD` | 422 | Mật khẩu hiện tại sai khi đổi mật khẩu |
 | `ACCOUNT_HAS_OPEN_ORDERS` | 422 | Xóa tài khoản khi còn đơn chưa xong |
 | `ORDER_NOT_CANCELLABLE` | 422 | Khách hủy khi tài xế đã đến điểm lấy |
-| `ORDER_NOT_YOURS` | 422 | Hủy đơn của người khác |
+| `ORDER_NOT_YOURS` | 422 | Thao tác (hủy, duyệt ảnh, xác nhận...) lên đơn của người khác (DECISIONS C10) |
 | `ORDER_CANCELLED` | 422 | Thanh toán về sau khi đơn đã hủy (cần hoàn tiền) |
 | `PICKUP_PHOTO_LIMIT` | 422 | Gửi ảnh lấy hàng lần thứ 6 |
 | `TOP_UP_TOO_SMALL` | 422 | Nạp cọc dưới 50.000đ |
