@@ -12,15 +12,26 @@ public class DriverWalletTests
     public void Cod_needs_a_deposit_of_at_least_200000_GB16()
     {
         const decimal minDeposit = 200_000; // seeded MIN_COD_DEPOSIT
+        const decimal commission = 18_000; // 10% of a 180,000 order
         var wallet = DriverWallet.Create(1);
-        Assert.False(wallet.CanReceiveCod(minDeposit));
+        Assert.False(wallet.CanReceiveCod(minDeposit, commission));
 
         wallet.TopUpDeposit(149_999);
         wallet.TopUpDeposit(50_000); // 199,999
-        Assert.False(wallet.CanReceiveCod(minDeposit));
+        Assert.False(wallet.CanReceiveCod(minDeposit, commission));
 
         wallet.TopUpDeposit(50_000);
-        Assert.True(wallet.CanReceiveCod(minDeposit));
+        Assert.True(wallet.CanReceiveCod(minDeposit, commission));
+    }
+
+    [Fact]
+    public void Cod_also_needs_a_deposit_that_covers_the_order_commission_GB16()
+    {
+        var wallet = DriverWallet.Create(1);
+        wallet.TopUpDeposit(200_000);
+
+        Assert.True(wallet.CanReceiveCod(minDeposit: 200_000, orderCommission: 200_000));
+        Assert.False(wallet.CanReceiveCod(minDeposit: 200_000, orderCommission: 250_000)); // 10% of a 2,500,000 order
     }
 
     [Fact]

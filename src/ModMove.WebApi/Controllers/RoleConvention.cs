@@ -29,7 +29,7 @@ public sealed class RoleConvention : IControllerModelConvention
 
     private static readonly HashSet<string> AnonymousFolders = new(StringComparer.Ordinal) { "Public", "Webhooks" };
 
-    // Endpoints every signed-in user has (password, profile, logout, FCM token), whatever the role (DECISIONS D2).
+    // Endpoints every signed-in user has (password, profile, logout, FCM token), whatever the role (ARCHITECTURE.md, API conventions).
     private const string AnyRoleFolder = "Account";
 
     public void Apply(ControllerModel controller)
