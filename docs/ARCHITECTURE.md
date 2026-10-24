@@ -25,7 +25,7 @@ src/
 │   ├── Entities/                      # Aggregate + entity (ShippingOrder, Trip, DriverWallet...)
 │   ├── Enums/
 │   ├── Constants/                     # BusinessRules (giới hạn GB-xx)
-│   ├── Services/                      # Domain service (FareCalculator, OrderSettlement)
+│   ├── Services/                      # Domain service (FareCalculator, DECISIONS B1)
 │   └── Exceptions/                    # DomainException (vi phạm business rule → 422)
 │
 ├── ModMove.Application/               # Use case + interface (port)
@@ -34,7 +34,7 @@ src/
 │   │   ├── Behaviors/                 # Pipeline: Logging → Validation → Handler
 │   │   ├── Interfaces/                # Port mà Infrastructure/WebApi implement (DIP)
 │   │   │   └── Persistence/           # IRepository<T>, IUnitOfWork, ISqlConnectionFactory
-│   │   ├── Exceptions/                # NotFound, Forbidden, Validation
+│   │   ├── Exceptions/                # NotFound, Forbidden, Unauthorized, Conflict, Validation
 │   │   └── Models/                    # PagedResult<T>, DTO dùng chung
 │   ├── Features/<Module>/             # Auth, Orders, Matching, Payments, Wallets...
 │   │   ├── Commands/<UseCase>/        # Command + Handler + Validator
@@ -56,7 +56,7 @@ src/
 │   └── DependencyInjection.cs         # AddInfrastructure()
 │
 └── ModMove.WebApi/                    # Tầng trình bày HTTP/WebSocket
-    ├── Controllers/<Role>/            # Admin, Customer, Driver, Dispatcher, Public, Webhooks (PayOS)
+    ├── Controllers/<Role>/            # Admin, Customer, Driver, Dispatcher, Account, Public, Webhooks (PayOS)
     │   └── ApiControllerBase.cs       # Controller mỏng: HTTP → Sender.Send(...)
     ├── Hubs/                          # SignalR (GPS realtime)
     ├── Middlewares/                   # ExceptionHandlingMiddleware → ProblemDetails
@@ -84,7 +84,7 @@ Query handler **không được** inject `IRepository`/`IUnitOfWork`; architectu
 
 Backend chỉ cung cấp REST (`/api/...`) + SignalR + `/health`. WebApp và Mobile (Flutter/React Native) là các ứng dụng deploy riêng:
 - Origin được phép cấu hình trong `Cors:AllowedOrigins` (appsettings), không hardcode.
-- Mọi lỗi trả về cùng một format **RFC 7807 ProblemDetails** (`400` validation, `401` sai thông tin đăng nhập, `403`, `404`, `409` xung đột, `422` domain, `500`) kèm trường `code` ổn định để client rẽ nhánh: `VALIDATION`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `BUSINESS_RULE`, `SERVER_ERROR`. Muốn mã riêng (vd `MSG67` trong SRS): `throw new DomainException("...", "MSG67")`.
+- Mọi lỗi trả về cùng một format **RFC 7807 ProblemDetails** (`400` validation, `401` sai thông tin đăng nhập, `403`, `404`, `409` xung đột, `422` domain, `500`) kèm trường `code` ổn định để client rẽ nhánh. Bảng `code` đầy đủ ở [api/README.md](api/README.md). Muốn mã riêng: `throw new DomainException("...", "ORDER_NOT_CANCELLABLE")` rồi thêm mã vào bảng đó.
 
 ### Quy ước API (cả nhóm theo)
 
@@ -132,7 +132,7 @@ public sealed record GetOrderByIdQuery(long Id) : IQuery<OrderResponse>;
 
 public sealed record OrderResponse(long Id, string PickupAddress, string DropoffAddress, string Status);
 
-internal sealed class GetOrderByIdQueryHandler(ISqlConnectionFactory db)
+internal sealed class GetOrderByIdQueryHandler(ISqlConnectionFactory db, ICurrentUserService currentUser)
     : IQueryHandler<GetOrderByIdQuery, OrderResponse>
 {
     public async Task<OrderResponse> Handle(GetOrderByIdQuery request, CancellationToken ct)
@@ -140,8 +140,15 @@ internal sealed class GetOrderByIdQueryHandler(ISqlConnectionFactory db)
         using var connection = db.CreateConnection();
         return await connection.QuerySingleOrDefaultAsync<OrderResponse>(
                    new CommandDefinition(
-                       "SELECT Id, PickupAddress, DropoffAddress, Status FROM ShippingOrders WHERE Id = @Id",
-                       request, cancellationToken: ct))
+                       // Bảng và cột trong MySQL là snake_case: alias từng cột sang tên property của response.
+                       // Luôn lọc theo chủ sở hữu (chống IDOR): đơn của khách khác thành "không tìm thấy".
+                       """
+                       SELECT id AS Id, pickup_address AS PickupAddress, dropoff_address AS DropoffAddress,
+                              order_status AS Status
+                       FROM shipping_orders
+                       WHERE id = @Id AND customer_id = @CustomerId
+                       """,
+                       new { request.Id, CustomerId = currentUser.RequireUserId() }, cancellationToken: ct))
                ?? throw new NotFoundException("ShippingOrder", request.Id);
     }
 }
@@ -159,7 +166,7 @@ public sealed class OrdersController : ApiControllerBase
         return CreatedAtAction(nameof(GetById), new { id }, new { id });
     }
 
-    [HttpGet("{id:guid}")]
+    [HttpGet("{id:long}")]
     public async Task<OrderResponse> GetById(long id, CancellationToken ct) =>
         await Sender.Send(new GetOrderByIdQuery(id), ct);
 }

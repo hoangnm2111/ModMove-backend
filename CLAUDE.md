@@ -5,6 +5,10 @@ ModMove backend: REST API + SignalR cho ứng dụng chuyển nhà / giao hàng 
 
 **Đọc [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) trước khi thêm code.** File đó là nguồn sự thật về layer, CQRS và template use case; file này chỉ bổ sung những gì không có ở đó.
 
+**Trước khi code một luật nghiệp vụ** (giá, hủy đơn, hoàn tiền, ví, ghép đơn, tài khoản...), tra mã quyết định trong [docs/DECISIONS.md](docs/DECISIONS.md); file này đè lên SRS/SDS. Luật chưa có trong file đó thì hỏi nhóm trước, không tự chọn. Ranh giới thư mục từng người ở [docs/TEAM-PLAN.md](docs/TEAM-PLAN.md) mục 2.
+
+Khi tài liệu và code khác nhau, sửa tài liệu trong cùng PR.
+
 ## Lệnh
 
 ```bash
@@ -25,7 +29,7 @@ dotnet ef migrations add <Name> -p src/ModMove.Infrastructure -s src/ModMove.Web
 - **Một use case = một thư mục** `Application/Features/<Module>/{Commands|Queries}/<UseCase>/` chứa Command/Query + Handler (+ Validator). MediatR và FluentValidation tự quét assembly, không cần sửa DI.
 - Handler và Validator để `internal sealed`; Command/Query/Response DTO là `public sealed record`.
 - **Business rule nằm trong entity** (Domain), handler chỉ điều phối. Vi phạm rule → ném `DomainException` (ra 422).
-- **Exception**: dùng các exception trong `Application/Common/Exceptions` (`NotFoundException`, `ForbiddenAccessException`, `ValidationException` của project, không phải của FluentValidation). Middleware map sang ProblemDetails; không tự `try/catch` trả lỗi trong controller.
+- **Exception**: dùng các exception trong `Application/Common/Exceptions` (`NotFoundException`, `ForbiddenAccessException`, `UnauthorizedException`, `ConflictException`, `ValidationException` của project, không phải của FluentValidation). Middleware map sang ProblemDetails; không tự `try/catch` trả lỗi trong controller.
 - **Controller mỏng**: kế thừa `ApiControllerBase`, chỉ `Sender.Send(...)`. Đặt theo vai trò trong `Controllers/<Role>/`.
 - Luôn truyền `CancellationToken` xuống tới EF/Dapper. Không dùng `.Result`/`.Wait()`.
 - Dapper: luôn dùng tham số (`@Id`), không nối chuỗi SQL.
@@ -35,7 +39,7 @@ dotnet ef migrations add <Name> -p src/ModMove.Infrastructure -s src/ModMove.Web
 
 ## Test
 
-- Unit test: `tests/ModMove.UnitTests` (tham chiếu Domain + Application). Integration test: `tests/ModMove.IntegrationTests` (dùng `WebApplicationFactory<Program>`).
+- Unit test luật domain: `tests/ModMove.UnitTests/Domain`. Test handler: `tests/ModMove.IntegrationTests`, chạy pipeline MediatR thật với fake trong `Fakes.cs` (`TestApp`, `TestApp.SignedInAs`); không dùng DB thật (DECISIONS C2).
 - Với use case mới: viết test từ yêu cầu trước, xác nhận test fail, rồi mới viết code. Không sửa test cho khớp với bug.
 - Ưu tiên test domain rule và validator; module Payments / Wallet phải có test cho case lỗi (thiếu tiền, webhook sai chữ ký, gọi trùng).
 

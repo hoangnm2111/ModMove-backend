@@ -38,7 +38,7 @@ public interface IPaymentGateway
     bool VerifyWebhookSignature(string rawBody, string signature);
 }
 
-/// <summary>Google Maps: geocoding and Distance Matrix (distance feeds the fare).</summary>
+/// <summary>Google Maps: geocoding and route distance, Distance Matrix or Routes API (DECISIONS 3.4); distance feeds the fare.</summary>
 public interface IMapService
 {
     Task<GeoPoint> GeocodeAsync(string address, CancellationToken cancellationToken);

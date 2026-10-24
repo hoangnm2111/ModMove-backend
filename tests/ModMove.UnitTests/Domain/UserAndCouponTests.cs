@@ -201,6 +201,38 @@ public class UserAndCouponTests
     }
 
     [Fact]
+    public void Cancellation_refund_goes_straight_to_the_administrator_B9()
+    {
+        var refund = Refund.Request(1, null, RefundSourceType.Cancellation, "Khách hủy khi Accepted", null, 180_000);
+
+        refund.Approve(adminId: 4, Now);
+
+        Assert.Equal(RefundStatus.Approved, refund.RefundStatus);
+        Assert.Equal(180_000m, refund.ProposedAmount);
+    }
+
+    [Fact]
+    public void Dispatcher_cannot_change_a_cancellation_refund_B9()
+    {
+        var refund = Refund.Request(1, null, RefundSourceType.Cancellation, "Khách hủy khi Accepted", null, 180_000);
+
+        var propose = Assert.Throws<DomainException>(() => refund.Propose(50_000, "giảm", dispatcherId: 3));
+        var askInfo = Assert.Throws<DomainException>(() => refund.RequestMoreInfo("Gửi thêm ảnh"));
+
+        Assert.Equal("REFUND_NOT_FOR_DISPATCHER", propose.Code);
+        Assert.Equal("REFUND_NOT_FOR_DISPATCHER", askInfo.Code);
+        Assert.Equal(180_000m, refund.ProposedAmount);
+    }
+
+    [Fact]
+    public void Complaint_refund_still_needs_a_dispatcher_proposal_B9()
+    {
+        var refund = Refund.Request(1, null, RefundSourceType.Complaint, "Hàng vỡ", null, 100_000);
+
+        Assert.Throws<DomainException>(() => refund.Approve(adminId: 4, Now));
+    }
+
+    [Fact]
     public void Reply_without_a_request_is_rejected()
     {
         var refund = Refund.Request(1, null, RefundSourceType.Complaint, "Hàng vỡ", null, 100_000);
