@@ -31,6 +31,14 @@ public sealed class ProofOfDelivery : BaseAuditableEntity
         RejectionReason = null;
     }
 
+    /// <summary>DECISIONS 7.2: a new driver re-checks the cargo and starts over with all 5 pickup submissions.</summary>
+    internal void ResetPickupSubmissions()
+    {
+        PickupSubmissionCount = 0;
+        ProofStatus = ProofStatus.Pending;
+        RejectionReason = null;
+    }
+
     internal void Verify() => ProofStatus = ProofStatus.Verified;
 
     internal void Reject(string reason)

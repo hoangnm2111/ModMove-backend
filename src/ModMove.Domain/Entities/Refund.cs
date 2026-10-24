@@ -33,6 +33,10 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
     public DateTimeOffset? DecidedAt { get; private set; }
     public DateTimeOffset? ProcessedAt { get; private set; }
 
+    /// <summary>
+    /// DECISIONS B9: a cancellation refund skips the Dispatcher, so it is proposed at its full amount on creation and
+    /// an Administrator can approve it at once. Incident and complaint refunds wait for <see cref="Propose"/>.
+    /// </summary>
     public static Refund Request(
         long orderId, long? incidentId, RefundSourceType source, string reason,
         IEnumerable<string>? evidenceUrls, decimal requestedAmount) =>
@@ -44,11 +48,13 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
             Reason = reason,
             EvidenceUrls = evidenceUrls?.ToList(),
             RequestedAmount = requestedAmount,
+            ProposedAmount = source == RefundSourceType.Cancellation ? requestedAmount : null,
         };
 
     public void RequestMoreInfo(string note)
     {
         EnsureStatus(RefundStatus.Requested);
+        EnsureDispatcherStep();
         InfoRequestNote = note;
     }
 
@@ -74,6 +80,7 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
     public void Propose(decimal amount, string reason, long dispatcherId)
     {
         EnsureStatus(RefundStatus.Requested);
+        EnsureDispatcherStep();
         if (amount < 0 || amount > RequestedAmount)
             throw new DomainException("The proposed amount must be between 0 and the requested amount.");
 
@@ -120,6 +127,13 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
     {
         EnsureStatus(RefundStatus.Requested);
         RefundStatus = RefundStatus.Withdrawn;
+    }
+
+    // DECISIONS B9: a cancellation refund is 100% of what was paid and skips the Dispatcher entirely.
+    private void EnsureDispatcherStep()
+    {
+        if (SourceType == RefundSourceType.Cancellation)
+            throw new DomainException("A cancellation refund goes straight to an Administrator.", "REFUND_NOT_FOR_DISPATCHER");
     }
 
     private void EnsureStatus(RefundStatus expected)
