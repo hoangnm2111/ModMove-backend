@@ -208,8 +208,15 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         TransitionTo(OrderStatus.Completed, by, userId, null, now);
         CompletedAt = now;
         CommissionRate = commissionRate;
-        CommissionAmount = Math.Round(commissionRate * TotalFee, 0, MidpointRounding.AwayFromZero);
+        CommissionAmount = CommissionFor(commissionRate);
     }
+
+    /// <summary>
+    /// DECISIONS M1/M2: commission = rate × total_fee (after the coupon), rounded to the dong. Used at completion and,
+    /// before that, for the GB-16 deposit check when a driver takes a cash order.
+    /// </summary>
+    public decimal CommissionFor(decimal commissionRate) =>
+        Math.Round(commissionRate * TotalFee, 0, MidpointRounding.AwayFromZero);
 
     /// <summary>What the driver earns for this order (DECISIONS M1): total_fee minus the commission.</summary>
     public decimal DriverEarning => TotalFee - (CommissionAmount ?? 0);
@@ -249,7 +256,10 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         OrderStatus == OrderStatus.Delivered && DeliveredAt is not null &&
         now - DeliveredAt < BusinessRules.ComplaintWindow;
 
-    /// <summary>GB-17: dispatcher hands the order to another driver; the order goes back to Accepted.</summary>
+    /// <summary>
+    /// GB-17 / DECISIONS 7.2: dispatcher hands the order to another driver; the order goes back to Accepted, so the new
+    /// driver arrives, re-checks the cargo and sends pickup photos again, with a fresh count of 5 submissions.
+    /// </summary>
     public void ReassignDriver(long newDriverProfileId, long dispatcherId, string? note)
     {
         if (OrderStatus is not (OrderStatus.Accepted or OrderStatus.Arrived or OrderStatus.PickedUp or OrderStatus.InTransit))
@@ -258,6 +268,7 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         var from = OrderStatus;
         DriverProfileId = newDriverProfileId;
         OrderStatus = OrderStatus.Accepted;
+        Proof?.ResetPickupSubmissions();
         RowVersion++;
         _statusHistories.Add(OrderStatusHistory.Create(from, OrderStatus.Accepted, ChangedByRole.Dispatcher, dispatcherId, note));
     }

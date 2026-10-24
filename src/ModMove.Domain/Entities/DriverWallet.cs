@@ -29,8 +29,13 @@ public sealed class DriverWallet : BaseAuditableEntity, IAggregateRoot
 
     public static DriverWallet Create(long driverProfileId) => new() { DriverProfileId = driverProfileId };
 
-    /// <summary>GB-16: <paramref name="minDeposit"/> is the MIN_COD_DEPOSIT platform setting (Admin can change it).</summary>
-    public bool CanReceiveCod(decimal minDeposit) => WalletStatus == WalletStatus.Active && DepositBalance >= minDeposit;
+    /// <summary>
+    /// GB-16: the deposit covers both <paramref name="minDeposit"/> (the MIN_COD_DEPOSIT setting) and the commission of
+    /// this order (<see cref="ShippingOrder.CommissionFor"/>), so <see cref="DeductCommissionFromDeposit"/> cannot fail
+    /// at completion. The same check applies to a driver taking over the order (DECISIONS 7.2).
+    /// </summary>
+    public bool CanReceiveCod(decimal minDeposit, decimal orderCommission) =>
+        WalletStatus == WalletStatus.Active && DepositBalance >= minDeposit && DepositBalance >= orderCommission;
 
     /// <summary>DECISIONS 5.2: at least 50,000 VND per top-up. Withdrawals have no minimum (5.1).</summary>
     public WalletTransaction TopUpDeposit(decimal amount)

@@ -30,6 +30,14 @@ public class ShippingOrderTests
     }
 
     [Fact]
+    public void Commission_is_rate_times_total_rounded_to_the_dong_M1()
+    {
+        var order = NewOrder(distanceFee: 200_005); // total 180,005 after the 20,000 coupon
+
+        Assert.Equal(18_001m, order.CommissionFor(0.10m)); // 18,000.5 rounds up
+    }
+
+    [Fact]
     public void Create_cash_order_without_payer_is_rejected()
     {
         Assert.Throws<DomainException>(() => NewOrder(PaymentMethod.Cash, payer: null));
@@ -126,6 +134,21 @@ public class ShippingOrderTests
         Assert.Equal(7, order.DriverProfileId);
     }
 
+    [Fact]
+    public void New_driver_after_a_reassignment_gets_all_five_pickup_submissions_7_2()
+    {
+        var order = AcceptedOrder();
+        order.ConfirmArrival(9, Now);
+        order.ConfirmPickup(["1.jpg", "2.jpg"], 9, Now);
+        order.RejectPickupEvidence("blurry", customerId: 1);
+        order.ConfirmPickup(["3.jpg", "4.jpg"], 9, Now);
+
+        order.ReassignDriver(newDriverProfileId: 7, dispatcherId: 3, note: "breakdown");
+        order.ConfirmArrival(11, Now);
+        order.ConfirmPickup(["5.jpg", "6.jpg"], 11, Now);
+
+        Assert.Equal(1, order.Proof!.PickupSubmissionCount);
+    }
 
     [Fact]
     public void Driver_can_resubmit_pickup_photos_after_customer_rejects_GB26()
