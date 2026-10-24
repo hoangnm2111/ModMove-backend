@@ -57,5 +57,6 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | `RATING_NOT_ALLOWED` | 422 | Đánh giá đơn chưa hoàn tất |
 | `RATING_WINDOW_CLOSED` | 422 | Đánh giá quá 1 ngày sau hoàn tất |
 | `TOO_MANY_PHOTOS` | 422 | Bằng chứng hoàn tiền quá 5 ảnh |
+| `REFUND_NOT_FOR_DISPATCHER` | 422 | Dispatcher đề xuất số tiền hay xin thêm thông tin cho khoản hoàn do hủy (DECISIONS B9: đi thẳng tới Admin) |
 | `NO_INFO_REQUEST` | 422 | Trả lời khi Dispatcher chưa xin thêm thông tin |
 | `SERVER_ERROR` | 500 | Lỗi không lường trước (xem log theo `traceId`) |

@@ -21,8 +21,11 @@ internal static class CurrentUserExtensions
         var user = await users.GetByIdAsync(currentUser.RequireUserId(), ct) ?? throw new UnauthorizedException("Sign in again.");
 
         if (user.AccountStatus != AccountStatus.Active)
-            throw new ForbiddenAccessException("The account is not active.", "ACCOUNT_INACTIVE");
+            throw InactiveAccount();
 
         return user;
     }
+
+    /// <summary>403 ACCOUNT_INACTIVE: the same answer from commands (via <see cref="LoadUserAsync"/>) and Dapper queries.</summary>
+    public static ForbiddenAccessException InactiveAccount() => new("The account is not active.", "ACCOUNT_INACTIVE");
 }

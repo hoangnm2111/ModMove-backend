@@ -41,8 +41,19 @@ public sealed class VehicleType : BaseAuditableEntity, IAggregateRoot
 
     public void SetActive(bool isActive) => IsActive = isActive;
 
-    /// <summary>GB-10: weight and every dimension must stay within the cargo bed.</summary>
-    public bool CanCarry(decimal weightKg, int lengthCm, int widthCm, int heightCm) =>
-        weightKg <= MaxLoadWeightKg &&
-        lengthCm <= CargoBedLengthCm && widthCm <= CargoBedWidthCm && heightCm <= CargoBedHeightCm;
+    /// <summary>
+    /// GB-10 / DECISIONS 4.2: the order's total weight stays within the load, and its largest item fits the cargo bed.
+    /// The item may be turned, so both sets of sides are sorted and compared smallest to smallest.
+    /// </summary>
+    public bool CanCarry(decimal weightKg, int lengthCm, int widthCm, int heightCm)
+    {
+        if (weightKg > MaxLoadWeightKg)
+            return false;
+
+        int[] item = [lengthCm, widthCm, heightCm];
+        int[] bed = [CargoBedLengthCm, CargoBedWidthCm, CargoBedHeightCm];
+        Array.Sort(item);
+        Array.Sort(bed);
+        return item[0] <= bed[0] && item[1] <= bed[1] && item[2] <= bed[2];
+    }
 }
