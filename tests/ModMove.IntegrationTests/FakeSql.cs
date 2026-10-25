@@ -14,6 +14,7 @@ namespace ModMove.IntegrationTests;
 internal sealed class FakeSql : ISqlConnectionFactory
 {
     public DataTable Result { get; set; } = new();
+    public Queue<DataTable> Results { get; } = new();
     public string LastSql { get; private set; } = "";
     public IReadOnlyDictionary<string, object?> LastParameters { get; private set; } = new Dictionary<string, object?>();
 
@@ -52,6 +53,8 @@ internal sealed class FakeSql : ISqlConnectionFactory
         {
             sql.LastSql = CommandText;
             sql.LastParameters = DbParameterCollection.Cast<DbParameter>().ToDictionary(p => p.ParameterName, p => p.Value);
+            if (sql.Results.Count > 0)
+                return sql.Results.Dequeue().CreateDataReader();
             return sql.Result.CreateDataReader();
         }
     }

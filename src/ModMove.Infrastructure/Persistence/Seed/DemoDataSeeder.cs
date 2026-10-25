@@ -21,8 +21,8 @@ internal static class DemoDataSeeder
         var passwordHash = hasher.Hash(DefaultPassword);
 
         var admin = await EnsureUserAsync(db, "Admin ModMove", "0900000001", "admin@modmove.local", UserRole.Administrator, passwordHash, ct);
-        await EnsureUserAsync(db, "Dispatcher ModMove", "0900000002", "dispatcher@modmove.local", UserRole.Dispatcher, passwordHash, ct);
-        await EnsureUserAsync(db, "Khách hàng Demo", "0900000003", "customer@modmove.local", UserRole.Customer, passwordHash, ct);
+        var dispatcher = await EnsureUserAsync(db, "Dispatcher ModMove", "0900000002", "dispatcher@modmove.local", UserRole.Dispatcher, passwordHash, ct);
+        var customer = await EnsureUserAsync(db, "Khách hàng Demo", "0900000003", "customer@modmove.local", UserRole.Customer, passwordHash, ct);
         var driverUser = await EnsureUserAsync(db, "Tài xế Demo", "0900000004", "driver@modmove.local", UserRole.Driver, passwordHash, ct);
         await db.SaveChangesAsync(ct);
 
@@ -62,6 +62,8 @@ internal static class DemoDataSeeder
             db.Add(wallet);
             await db.SaveChangesAsync(ct);
         }
+
+        await DemoOperationsSeeder.SeedAsync(db, admin, dispatcher, customer, driverUser, profile, now, ct);
     }
 
     /// <summary>Matches by email or phone, so an existing dev account is reused instead of colliding on the unique index (GB-01).</summary>
