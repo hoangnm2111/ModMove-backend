@@ -32,6 +32,12 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | POST | `api/account/password` | Đã đăng nhập | `{ currentPassword, newPassword }` → 204; thu hồi mọi refresh token, mọi máy (cả máy đang dùng) phải đăng nhập lại |
 | POST | `api/account/logout` | Đã đăng nhập | 204; thu hồi mọi refresh token |
 | DELETE | `api/customer/account` | Customer | 204; tài khoản thành `Inactive` |
+| GET | `api/dispatcher/incidents` | Dispatcher | Danh sách sự cố (`status`, `incidentType`, `search`, `page`, `pageSize`) |
+| GET | `api/dispatcher/incidents/{id}` | Dispatcher | Chi tiết sự cố kèm đơn hàng, hàng hóa, tài xế, khách hàng, lịch sử, khoản hoàn |
+| GET | `api/dispatcher/complaints` | Dispatcher | Danh sách khiếu nại (`stage`, `search`, `page`, `pageSize`) |
+| GET | `api/dispatcher/complaints/{id}` | Dispatcher | Chi tiết khiếu nại kèm POD, đánh giá đơn, lịch sử sự cố để đối soát |
+| POST | `api/dispatcher/complaints/{id}/request-info` | Dispatcher | `{ note }` → 204; xin thêm thông tin từ khách hàng |
+| POST | `api/dispatcher/complaints/{id}/proposal` | Dispatcher | `{ amount, reason }` → 204; gửi đề xuất hoàn tiền lên Admin duyệt |
 
 ## Mã lỗi
 

@@ -89,13 +89,15 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 ## 6. Huy: Dispatcher
 
 **Phase 1**
-- [ ] Mở rộng `DemoDataSeeder` (chỉ Development): vài đơn ở các trạng thái, 1 sự cố, 1 khiếu nại
-- [ ] Giám sát đơn và tài xế (DIS-01, 16); danh sách, chi tiết sự cố và khiếu nại (DIS-03, 04, 11, 12)
+- [x] Mở rộng `DemoDataSeeder` (chỉ Development): các đơn ở mọi trạng thái (`MMDEMO001` - `MMDEMO010`), 5 sự cố, 5 khiếu nại (DemoOperationsSeeder)
+- [x] Danh sách, chi tiết sự cố (DIS-03, 04)
+- [x] Danh sách, chi tiết và xác minh khiếu nại (DIS-11, 12, 13)
+- [x] Xử lý khiếu nại (DIS-14, 15, 08, 09, 17): xin thêm thông tin (`RequestComplaintInfo`), đề xuất hoàn tiền `proposed_amount ≤ requested_amount` lên Admin duyệt (`ProposeComplaintResolution`)
+- [ ] Giám sát đơn và tài xế (DIS-01, 16)
 
 **Phase 2**
 - [ ] Quyết định xử lý sự cố (DIS-05), đổi tài xế (DIS-06, 7.2: tài xế mới đủ điều kiện như B5, đơn tiền mặt thêm GB-16), hủy đơn do sự cố (DIS-07: hàng cấm và khách vắng mặt ở điểm lấy không hoàn tiền, 4.3, 2.4; không có tài xế thay thế thì hoàn 100% đơn PayOS, 2.5), hủy sự cố (DIS-10)
 - [ ] Hàng còn trên xe sau khi hủy: trả về hay giữ lại (2.6)
-- [ ] Hoàn tiền và khiếu nại (DIS-08, 09, 13..15, 17): đề xuất `proposed_amount ≤ requested_amount`, xin thêm thông tin (`RequestMoreInfo`, khách trả lời qua 7.4)
 - [ ] Không làm màn hình yêu cầu hỗ trợ (2.9)
 
 ## 7. Dịch vụ ngoài

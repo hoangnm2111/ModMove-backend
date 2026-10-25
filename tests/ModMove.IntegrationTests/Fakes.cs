@@ -91,7 +91,12 @@ internal sealed class InMemoryRepository<T> : IRepository<T> where T : ModMove.D
     public List<T> Items { get; } = [];
 
     public Task<T?> GetByIdAsync(long id, CancellationToken cancellationToken = default) => Task.FromResult(Items.FirstOrDefault(i => i.Id == id));
-    public void Add(T aggregate) => Items.Add(aggregate);
+    public void Add(T aggregate)
+    {
+        if (aggregate.Id == 0)
+            TestIds.Set(aggregate, Items.Count + 1);
+        Items.Add(aggregate);
+    }
     public void Update(T aggregate) { }
     public void Remove(T aggregate) => Items.Remove(aggregate);
 }
@@ -177,6 +182,7 @@ internal sealed class TestApp
     public InMemoryOrders Orders { get; } = new();
     public InMemoryRefreshTokens RefreshTokens { get; } = new();
     public InMemoryRepository<SupportRequest> SupportRequests { get; } = new();
+    public InMemoryRepository<Refund> Refunds { get; } = new();
     public CountingUnitOfWork UnitOfWork { get; } = new();
     public CapturingEmailSender Email { get; } = new();
     public MutableTime Time { get; } = new(Start);
@@ -202,6 +208,7 @@ internal sealed class TestApp
             .AddSingleton<IShippingOrderRepository>(Orders)
             .AddSingleton<IRefreshTokenRepository>(RefreshTokens)
             .AddSingleton<IRepository<SupportRequest>>(SupportRequests)
+            .AddSingleton<IRepository<Refund>>(Refunds)
             .AddSingleton<IUnitOfWork>(UnitOfWork)
             .AddSingleton<IPasswordHasher>(new FakeHasher())
             .AddSingleton<IJwtTokenService>(new FakeTokens())
