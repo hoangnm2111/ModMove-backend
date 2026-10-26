@@ -127,6 +127,48 @@ internal sealed class InMemoryCoupons : ICouponRepository
     public void Remove(Coupon aggregate) => Items.Remove(aggregate);
 }
 
+internal sealed class InMemoryDriverProfiles : IDriverProfileRepository
+{
+    public List<DriverProfile> Items { get; } = [];
+
+    public Task<DriverProfile?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(d => d.Id == id));
+
+    public Task<DriverProfile?> GetByIdWithApplicationsAndVehicleAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(d => d.Id == id));
+
+    public Task<DriverProfile?> GetByApplicationIdWithApplicationsAndVehicleAsync(long applicationId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(d => d.Applications.Any(a => a.Id == applicationId)));
+
+    public void Add(DriverProfile aggregate)
+    {
+        if (aggregate.Id == 0)
+            TestIds.Set(aggregate, Items.Count + 1);
+        Items.Add(aggregate);
+    }
+    public void Update(DriverProfile aggregate) { }
+    public void Remove(DriverProfile aggregate) => Items.Remove(aggregate);
+}
+
+internal sealed class InMemoryDriverWallets : IDriverWalletRepository
+{
+    public List<DriverWallet> Items { get; } = [];
+
+    public Task<DriverWallet?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(w => w.Id == id));
+
+    public Task<DriverWallet?> GetByDriverProfileIdAsync(long driverProfileId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(w => w.DriverProfileId == driverProfileId));
+
+    public void Add(DriverWallet aggregate)
+    {
+        if (aggregate.Id == 0)
+            TestIds.Set(aggregate, Items.Count + 1);
+        Items.Add(aggregate);
+    }
+    public void Update(DriverWallet aggregate) { }
+    public void Remove(DriverWallet aggregate) => Items.Remove(aggregate);
+}
 
 internal sealed class InMemoryRefreshTokens : IRefreshTokenRepository
 {
@@ -192,6 +234,18 @@ internal sealed class CapturingEmailSender : IEmailSender
     public string LastCode() => Regex.Match(Sent[^1].Body, "<b>([0-9]{6})</b>").Groups[1].Value;
 }
 
+internal sealed class CapturingPushNotifications : IPushNotificationService
+{
+    public List<(string Token, string Title, string Body, IReadOnlyDictionary<string, string>? Data)> Sent { get; } = [];
+
+    public Task SendAsync(
+        string deviceToken, string title, string body,
+        IReadOnlyDictionary<string, string>? data, CancellationToken cancellationToken)
+    {
+        Sent.Add((deviceToken, title, body, data));
+        return Task.CompletedTask;
+    }
+}
 
 internal sealed class FakeCurrentUser(long? userId) : ICurrentUserService
 {
