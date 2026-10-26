@@ -18,4 +18,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="ModMove.UnitTests" />
+    <InternalsVisibleTo Include="ModMove.IntegrationTests" />
+  </ItemGroup>
+
 </Project>

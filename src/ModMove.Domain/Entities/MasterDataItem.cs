@@ -23,5 +23,11 @@ public sealed class MasterDataItem : BaseAuditableEntity, IAggregateRoot
 
     public void UpdateDescription(string? description) => Description = description;
 
+    public void Update(string name, string? description)
+    {
+        Name = name;
+        Description = description;
+    }
+
     public void SetActive(bool isActive) => IsActive = isActive;
 }
