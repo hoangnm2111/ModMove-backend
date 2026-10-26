@@ -77,8 +77,14 @@ internal sealed class InMemoryOrders : IShippingOrderRepository
     /// <summary>Customers that still have an order neither Completed nor Cancelled.</summary>
     public HashSet<long> CustomersWithOpenOrders { get; } = [];
 
+    /// <summary>Set to true to pretend an order is between Accepted and Delivered (DECISIONS C8).</summary>
+    public bool HasOrdersInProgress { get; set; }
+
     public Task<bool> HasOpenOrdersForCustomerAsync(long customerId, CancellationToken cancellationToken = default) =>
         Task.FromResult(CustomersWithOpenOrders.Contains(customerId));
+
+    public Task<bool> HasOrdersInProgressAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(HasOrdersInProgress);
 
     public Task<ShippingOrder?> GetByIdAsync(long id, CancellationToken cancellationToken = default) => Task.FromResult<ShippingOrder?>(null);
     public void Add(ShippingOrder aggregate) { }
@@ -91,10 +97,36 @@ internal sealed class InMemoryRepository<T> : IRepository<T> where T : ModMove.D
     public List<T> Items { get; } = [];
 
     public Task<T?> GetByIdAsync(long id, CancellationToken cancellationToken = default) => Task.FromResult(Items.FirstOrDefault(i => i.Id == id));
-    public void Add(T aggregate) => Items.Add(aggregate);
+    public void Add(T aggregate)
+    {
+        if (aggregate.Id == 0)
+            TestIds.Set(aggregate, Items.Count + 1);
+        Items.Add(aggregate);
+    }
     public void Update(T aggregate) { }
     public void Remove(T aggregate) => Items.Remove(aggregate);
 }
+
+internal sealed class InMemoryCoupons : ICouponRepository
+{
+    public List<Coupon> Items { get; } = [];
+
+    public Task<Coupon?> GetByCodeAsync(string code, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(c => c.DiscountCode.Equals(code, StringComparison.OrdinalIgnoreCase)));
+
+    public Task<Coupon?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(c => c.Id == id));
+
+    public void Add(Coupon aggregate)
+    {
+        if (aggregate.Id == 0)
+            TestIds.Set(aggregate, Items.Count + 1);
+        Items.Add(aggregate);
+    }
+    public void Update(Coupon aggregate) { }
+    public void Remove(Coupon aggregate) => Items.Remove(aggregate);
+}
+
 
 internal sealed class InMemoryRefreshTokens : IRefreshTokenRepository
 {
@@ -159,6 +191,7 @@ internal sealed class CapturingEmailSender : IEmailSender
     /// <summary>The 6-digit code in the last email (the OTP emails show it in bold).</summary>
     public string LastCode() => Regex.Match(Sent[^1].Body, "<b>([0-9]{6})</b>").Groups[1].Value;
 }
+
 
 internal sealed class FakeCurrentUser(long? userId) : ICurrentUserService
 {
