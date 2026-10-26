@@ -32,6 +32,23 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | POST | `api/account/password` | Đã đăng nhập | `{ currentPassword, newPassword }` → 204; thu hồi mọi refresh token, mọi máy (cả máy đang dùng) phải đăng nhập lại |
 | POST | `api/account/logout` | Đã đăng nhập | 204; thu hồi mọi refresh token |
 | DELETE | `api/customer/account` | Customer | 204; tài khoản thành `Inactive` |
+| GET | `api/admin/pricing` | Administrator | `{ vehicleTypes: [{ id, name, maxLoadWeightKg, baseFare, pricePerKm, minimumFare, isActive }], settings: { commissionRate, loadingFee, minCodDeposit, matchingRadiusKm } }`. Có cả loại xe đang tắt. `commissionRate` là phân số (0.10 = 10%) |
+| PUT | `api/admin/pricing/vehicletypes/{id}` | Administrator | `{ baseFare, pricePerKm, minimumFare }` → 204; id lạ → 404. Đơn đã đặt giữ nguyên giá (DECISIONS 4.4) |
+| PATCH | `api/admin/pricing/vehicletypes/{id}/status` | Administrator | `{ isActive }` → 204; bật/tắt loại xe |
+| PUT | `api/admin/pricing/settings` | Administrator | `{ commissionRate?, loadingFee?, minCodDeposit?, matchingRadiusKm? }` → 204; trường bỏ trống = không đổi, phải có ít nhất một. Đổi `commissionRate` khi còn đơn đang chạy → 422 `COMMISSION_RATE_LOCKED` (DECISIONS C8) |
+| GET | `api/admin/masterdata` | Administrator | `?category={category}` → danh sách master data items (`id`, `category`, `code`, `name`, `description`, `isActive`) |
+| POST | `api/admin/masterdata` | Administrator | `{ category, code, name, description? }` → 201 `{ id }` |
+| PUT | `api/admin/masterdata/{id}` | Administrator | `{ name, description? }` → 204 |
+| PATCH | `api/admin/masterdata/{id}/status` | Administrator | `{ isActive }` → 204; bật/tắt mục danh mục |
+| GET | `api/admin/coupons` | Administrator | `?page=1&pageSize=20&isActive=true` → `{ items, pageNumber, pageSize, totalCount }` |
+| POST | `api/admin/coupons` | Administrator | `{ discountCode, discountValue, minimumOrderValue, validFrom, expiresAt, usageLimit? }` → 201 `{ id }` (GB-21) |
+| PATCH | `api/admin/coupons/{id}/status` | Administrator | `{ isActive }` → 204; bật/tắt coupon |
+| GET | `api/admin/driver-applications/pending` | Administrator | `?page=1&pageSize=20` → `{ items, pageNumber, pageSize, totalCount }`. Hàng đợi hồ sơ nộp chờ duyệt (sắp xếp nộp trước duyệt trước, UC-ADM-08) |
+| GET | `api/admin/driver-applications/{id}` | Administrator | Xem chi tiết hồ sơ tài xế: thông tin cá nhân, phương tiện, các link ảnh giấy tờ/xe, lịch sử nộp (UC-ADM-09) |
+| POST | `api/admin/driver-applications/{id}/approve` | Administrator | 204; Phê duyệt hồ sơ tài xế → trạng thái thành `Approved`, cập nhật/tạo thực thể Xe, tự động tạo Ví tài xế ban đầu nếu chưa có (Rule GB-16, TEAM-PLAN 74). Gửi push notification |
+| POST | `api/admin/driver-applications/{id}/reject` | Administrator | `{ reasons: ["Lý do 1", "Lý do 2"] }` → 204; Từ chối hồ sơ kèm danh sách lý do cụ thể từng mục (UC-ADM-09). Gửi push notification |
+
+
 
 ## Mã lỗi
 
@@ -59,4 +76,5 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | `TOO_MANY_PHOTOS` | 422 | Bằng chứng hoàn tiền quá 5 ảnh |
 | `REFUND_NOT_FOR_DISPATCHER` | 422 | Dispatcher đề xuất số tiền hay xin thêm thông tin cho khoản hoàn do hủy (DECISIONS B9: đi thẳng tới Admin) |
 | `NO_INFO_REQUEST` | 422 | Trả lời khi Dispatcher chưa xin thêm thông tin |
+| `COMMISSION_RATE_LOCKED` | 422 | Admin đổi tỷ lệ hoa hồng khi còn đơn từ `Accepted` tới trước `Completed` (DECISIONS C8) |
 | `SERVER_ERROR` | 500 | Lỗi không lường trước (xem log theo `traceId`) |
