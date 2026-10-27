@@ -42,7 +42,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 ## 4. Hiếu: Guest / Customer
 
 **Phase 1**
-- [x] Auth: đăng ký Customer (`register`) và Driver (`register-driver`), OTP email, xác minh, đăng nhập, refresh token, quên/đặt lại/đổi mật khẩu, đăng xuất
+- [x] Auth: đăng ký Customer (`register`) , OTP email, xác minh, đăng nhập, refresh token, quên/đặt lại/đổi mật khẩu, đăng xuất
 - [x] Tài khoản: xem/sửa hồ sơ, FCM token, xóa tài khoản (`Inactive`, chặn khi còn đơn mở)
 - [x] Public: loại xe, chính sách, giới thiệu dịch vụ, gửi yêu cầu hỗ trợ
 - [x] Gửi email Gmail SMTP (Development không có SMTP thì ghi OTP ra log)
