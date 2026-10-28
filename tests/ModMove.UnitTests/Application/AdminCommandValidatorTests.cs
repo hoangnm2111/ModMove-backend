@@ -4,6 +4,9 @@ using ModMove.Application.Features.MasterData.Commands.CreateMasterDataItem;
 using ModMove.Application.Features.MasterData.Coupons.Commands.CreateCoupon;
 using ModMove.Application.Features.Pricing.Commands.UpdatePlatformSettings;
 using ModMove.Application.Features.Pricing.Commands.UpdateVehicleTypeFares;
+using ModMove.Application.Features.Users.Commands.CreateDispatcher;
+using ModMove.Application.Features.Users.Commands.UpdateUserStatus;
+using ModMove.Domain.Enums;
 
 namespace ModMove.UnitTests.Application;
 
@@ -231,5 +234,69 @@ public class AdminCommandValidatorTests
         var result = validator.TestValidate(command);
 
         result.ShouldHaveValidationErrorFor(x => x.Reasons);
+    }
+
+    // ==========================================
+    // 6. UpdateUserStatusCommandValidator
+    // ==========================================
+
+    [Fact]
+    public void UpdateUserStatus_validator_happy_path()
+    {
+        var validator = new UpdateUserStatusCommandValidator();
+        var command = new UpdateUserStatusCommand(2, AccountStatus.Locked, "Vi phạm quy tắc cộng đồng");
+
+        var result = validator.TestValidate(command);
+
+        result.ShouldNotHaveAnyValidationErrors();
+    }
+
+    [Theory]
+    [InlineData(0, "Lý do hợp lệ", nameof(UpdateUserStatusCommand.UserId))]
+    [InlineData(-5, "Lý do hợp lệ", nameof(UpdateUserStatusCommand.UserId))]
+    [InlineData(2, "", nameof(UpdateUserStatusCommand.Reason))]
+    [InlineData(2, "   ", nameof(UpdateUserStatusCommand.Reason))]
+    public void UpdateUserStatus_validator_edge_cases_have_errors(
+        long userId, string reason, string expectedErrorField)
+    {
+        var validator = new UpdateUserStatusCommandValidator();
+        var command = new UpdateUserStatusCommand(userId, AccountStatus.Locked, reason);
+
+        var result = validator.TestValidate(command);
+
+        result.ShouldHaveValidationErrorFor(expectedErrorField);
+    }
+
+    // ==========================================
+    // 7. CreateDispatcherCommandValidator
+    // ==========================================
+
+    [Fact]
+    public void CreateDispatcher_validator_happy_path()
+    {
+        var validator = new CreateDispatcherCommandValidator();
+        var command = new CreateDispatcherCommand("Trần Điều Phối", "0912345678", "dispatcher@modmove.vn", "ModMove@123");
+
+        var result = validator.TestValidate(command);
+
+        result.ShouldNotHaveAnyValidationErrors();
+    }
+
+    [Theory]
+    [InlineData("", "0912345678", "disp@modmove.vn", "ModMove123", nameof(CreateDispatcherCommand.FullName))]
+    [InlineData("Trần Điều Phối", "12345", "disp@modmove.vn", "ModMove123", nameof(CreateDispatcherCommand.PhoneNumber))]
+    [InlineData("Trần Điều Phối", "0912345678", "invalid-email", "ModMove123", nameof(CreateDispatcherCommand.Email))]
+    [InlineData("Trần Điều Phối", "0912345678", "disp@modmove.vn", "short1", nameof(CreateDispatcherCommand.Password))]
+    [InlineData("Trần Điều Phối", "0912345678", "disp@modmove.vn", "onlyletters", nameof(CreateDispatcherCommand.Password))]
+    [InlineData("Trần Điều Phối", "0912345678", "disp@modmove.vn", "123456789", nameof(CreateDispatcherCommand.Password))]
+    public void CreateDispatcher_validator_edge_cases_have_errors(
+        string fullName, string phone, string email, string password, string expectedErrorField)
+    {
+        var validator = new CreateDispatcherCommandValidator();
+        var command = new CreateDispatcherCommand(fullName, phone, email, password);
+
+        var result = validator.TestValidate(command);
+
+        result.ShouldHaveValidationErrorFor(expectedErrorField);
     }
 }
