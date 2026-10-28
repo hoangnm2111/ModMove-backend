@@ -33,6 +33,7 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | POST | `api/account/password` | Đã đăng nhập | `{ currentPassword, newPassword }` → 204; thu hồi mọi refresh token, mọi máy (cả máy đang dùng) phải đăng nhập lại |
 | POST | `api/account/logout` | Đã đăng nhập | 204; thu hồi mọi refresh token |
 | DELETE | `api/customer/account` | Customer | 204; tài khoản thành `Inactive` |
+| POST | `api/customer/orders` | Customer | Tạo đơn **tiền mặt**: `{ vehicleTypeId, pickupAddress, dropoffAddress, receiverName, receiverPhone, cargo: { cargoType, quantity, weightKg, lengthCm, widthCm, heightCm, photoUrls[1..5], specialNotes? }, hasLoadingService, couponCode?, paymentMethod: "Cash", payerRole: Sender \| Receiver, prohibitedGoodsCommitment: true }` → 201 `{ orderId, orderCode, totalFee }`. Giá tính lại ở server như báo giá |
 | POST | `api/customer/uploads` | Customer | `multipart/form-data`, field `file`: một ảnh JPG/PNG ≤ 5 MB → `{ url }` (Cloudinary) dùng cho ảnh hàng khi tạo đơn |
 | GET | `api/admin/pricing` | Administrator | `{ vehicleTypes: [{ id, name, maxLoadWeightKg, baseFare, pricePerKm, minimumFare, isActive }], settings: { commissionRate, loadingFee, minCodDeposit, matchingRadiusKm } }`. Có cả loại xe đang tắt. `commissionRate` là phân số (0.10 = 10%) |
 | PUT | `api/admin/pricing/vehicletypes/{id}` | Administrator | `{ baseFare, pricePerKm, minimumFare }` → 204; id lạ → 404. Đơn đã đặt giữ nguyên giá (DECISIONS 4.4) |
@@ -78,6 +79,7 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | `TOO_MANY_PHOTOS` | 422 | Bằng chứng hoàn tiền quá 5 ảnh |
 | `REFUND_NOT_FOR_DISPATCHER` | 422 | Dispatcher đề xuất số tiền hay xin thêm thông tin cho khoản hoàn do hủy (DECISIONS B9: đi thẳng tới Admin) |
 | `NO_INFO_REQUEST` | 422 | Trả lời khi Dispatcher chưa xin thêm thông tin |
+| `PAYMENT_METHOD_NOT_SUPPORTED` | 422 | Tạo đơn PayOS khi Phase 1 chỉ nhận tiền mặt |
 | `ADDRESS_NOT_FOUND` | 422 | Google Maps không tìm thấy địa chỉ lấy hoặc giao |
 | `ROUTE_NOT_FOUND` | 422 | Không có đường bộ giữa điểm lấy và điểm giao |
 | `VEHICLE_TOO_SMALL` | 422 | Khối lượng đơn vượt tải hoặc món lớn nhất không lọt thùng loại xe đã chọn (GB-10, 4.2) |

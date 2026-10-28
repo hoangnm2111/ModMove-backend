@@ -19,4 +19,7 @@ public sealed class ShippingOrderRepository(ApplicationDbContext dbContext)
 
     public Task<bool> HasOrdersInProgressAsync(CancellationToken cancellationToken = default) =>
         Set.AnyAsync(o => InProgress.Contains(o.OrderStatus), cancellationToken);
+
+    public Task<int> CountCreatedBetweenAsync(DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken = default) =>
+        Set.CountAsync(o => o.CreatedAt >= fromUtc && o.CreatedAt < toUtc, cancellationToken);
 }

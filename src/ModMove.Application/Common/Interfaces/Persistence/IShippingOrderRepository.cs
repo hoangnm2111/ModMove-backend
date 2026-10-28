@@ -13,4 +13,7 @@ public interface IShippingOrderRepository : IRepository<ShippingOrder>
     /// Pending has no driver yet and Cancelled is over, so neither counts.
     /// </summary>
     Task<bool> HasOrdersInProgressAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Orders created in [fromUtc, toUtc); numbers the next order code of the day (DECISIONS 9.5).</summary>
+    Task<int> CountCreatedBetweenAsync(DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken = default);
 }
