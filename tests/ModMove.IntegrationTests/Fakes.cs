@@ -247,6 +247,22 @@ internal sealed class CapturingPushNotifications : IPushNotificationService
     }
 }
 
+/// <summary>Stands in for Cloudinary; the team's cloud is called "demo" here.</summary>
+internal sealed class FakeFileStorage : IFileStorage
+{
+    public const string CloudName = "demo";
+
+    public List<(string FileName, string Folder)> Uploaded { get; } = [];
+
+    public Task<string> UploadImageAsync(Stream content, string fileName, string folder, CancellationToken cancellationToken)
+    {
+        Uploaded.Add((fileName, folder));
+        return Task.FromResult($"https://res.cloudinary.com/{CloudName}/image/upload/{folder}/{Uploaded.Count}.jpg");
+    }
+
+    public bool IsOwnedUrl(string url) => url.StartsWith($"https://res.cloudinary.com/{CloudName}/", StringComparison.Ordinal);
+}
+
 internal sealed class FakeCurrentUser(long? userId) : ICurrentUserService
 {
     public long? UserId { get; } = userId;
@@ -266,6 +282,7 @@ internal sealed class TestApp
     public InMemoryRepository<SupportRequest> SupportRequests { get; } = new();
     public CountingUnitOfWork UnitOfWork { get; } = new();
     public CapturingEmailSender Email { get; } = new();
+    public FakeFileStorage Files { get; } = new();
     public MutableTime Time { get; } = new(Start);
     public ISender Sender { get; }
 
@@ -293,6 +310,7 @@ internal sealed class TestApp
             .AddSingleton<IPasswordHasher>(new FakeHasher())
             .AddSingleton<IJwtTokenService>(new FakeTokens())
             .AddSingleton<IEmailSender>(Email)
+            .AddSingleton<IFileStorage>(Files)
             .AddSingleton<ICurrentUserService>(new FakeCurrentUser(signedInUserId))
             .AddSingleton<TimeProvider>(Time)
             .BuildServiceProvider()

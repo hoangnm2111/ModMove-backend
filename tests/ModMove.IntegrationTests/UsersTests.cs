@@ -63,6 +63,16 @@ public class UsersTests
         await Assert.ThrowsAsync<ValidationException>(() => app.Sender.Send(new UpdateMyProfileCommand("An", "0900000001", avatar)));
     }
 
+    [Theory]
+    [InlineData("https://example.com/a.jpg")]
+    [InlineData("https://res.cloudinary.com/someone-else/image/upload/a.jpg")]
+    public async Task Avatar_outside_our_cloudinary_is_rejected(string avatar)
+    {
+        var app = SignedIn(Customer());
+
+        await Assert.ThrowsAsync<ValidationException>(() => app.Sender.Send(new UpdateMyProfileCommand("An", "0900000001", avatar)));
+    }
+
     [Fact]
     public async Task Fcm_token_is_saved_for_push_notifications()
     {

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
+using ModMove.Infrastructure.ExternalServices.Cloudinary;
 using ModMove.Infrastructure.ExternalServices.Email;
 using ModMove.Infrastructure.ExternalServices.GoogleMaps;
 using ModMove.Infrastructure.Identity;
@@ -80,6 +81,19 @@ public static class DependencyInjection
         {
             services.AddSingleton(new GoogleMapsOptions { ApiKey = configuration["GoogleMaps:ApiKey"]! });
             services.AddHttpClient<IMapService, GoogleMapService>();
+        }
+
+        // Cloudinary (GB-06): image uploads and the "is this URL ours" check used by validators.
+        if (!string.IsNullOrWhiteSpace(configuration["Cloudinary:CloudName"]))
+        {
+            services.AddSingleton(new CloudinaryOptions
+            {
+                CloudName = configuration["Cloudinary:CloudName"]!,
+                ApiKey = configuration["Cloudinary:ApiKey"] ?? "",
+                ApiSecret = configuration["Cloudinary:ApiSecret"] ?? "",
+                UploadPreset = configuration["Cloudinary:UploadPreset"] ?? "modmove",
+            });
+            services.AddSingleton<IFileStorage, CloudinaryFileStorage>();
         }
 
         return services;
