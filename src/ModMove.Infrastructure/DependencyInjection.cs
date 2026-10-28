@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Infrastructure.ExternalServices.Email;
+using ModMove.Infrastructure.ExternalServices.GoogleMaps;
 using ModMove.Infrastructure.Identity;
 using ModMove.Infrastructure.Persistence;
 using ModMove.Infrastructure.Persistence.Interceptors;
@@ -72,6 +73,13 @@ public static class DependencyInjection
                 FromName = configuration["Email:FromName"] ?? "ModMove",
             });
             services.AddSingleton<IEmailSender, SmtpEmailSender>();
+        }
+
+        // Google Maps (DECISIONS 3.4): needed by fare estimate and order creation; registered only when a key is set.
+        if (!string.IsNullOrWhiteSpace(configuration["GoogleMaps:ApiKey"]))
+        {
+            services.AddSingleton(new GoogleMapsOptions { ApiKey = configuration["GoogleMaps:ApiKey"]! });
+            services.AddHttpClient<IMapService, GoogleMapService>();
         }
 
         return services;
