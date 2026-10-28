@@ -26,12 +26,17 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | GET | `api/public/policies` | Ai cũng được | Chính sách (`code`, `name`, `description`) |
 | GET | `api/public/serviceinfo` | Ai cũng được | Giới thiệu, khu vực, lợi ích |
 | POST | `api/public/supportrequests` | Ai cũng được | `{ fullName, contact, content }` → 204 |
+| POST | `api/public/fareestimate` | Ai cũng được | `{ vehicleTypeId, pickupAddress, dropoffAddress, weightKg, lengthCm, widthCm, heightCm, hasLoadingService, couponCode? }` → `{ distanceKm, durationMinutes, distanceFee, serviceFee, discountAmount, totalFee }`. Kích thước là của món lớn nhất, khối lượng là cả đơn |
 | GET | `api/account/profile` | Đã đăng nhập | Hồ sơ của chính mình |
 | PUT | `api/account/profile` | Đã đăng nhập | `{ fullName, phoneNumber, avatarUrl }` → 204 |
 | PUT | `api/account/fcmtoken` | App mobile | `{ token }` → 204 |
 | POST | `api/account/password` | Đã đăng nhập | `{ currentPassword, newPassword }` → 204; thu hồi mọi refresh token, mọi máy (cả máy đang dùng) phải đăng nhập lại |
 | POST | `api/account/logout` | Đã đăng nhập | 204; thu hồi mọi refresh token |
 | DELETE | `api/customer/account` | Customer | 204; tài khoản thành `Inactive` |
+| POST | `api/customer/orders` | Customer | Tạo đơn **tiền mặt**: `{ vehicleTypeId, pickupAddress, dropoffAddress, receiverName, receiverPhone, cargo: { cargoType, quantity, weightKg, lengthCm, widthCm, heightCm, photoUrls[1..5], specialNotes? }, hasLoadingService, couponCode?, paymentMethod: "Cash", payerRole: Sender \| Receiver, prohibitedGoodsCommitment: true }` → 201 `{ orderId, orderCode, totalFee }`. Giá tính lại ở server như báo giá |
+| GET | `api/customer/orders` | Customer | `?page=1&pageSize=20&view=All\|Active\|History&search=` → `PagedResult` đơn của chính mình, mới nhất trước (`page` 1–10 000, `pageSize` ≤ 50; History = Completed/Cancelled) |
+| GET | `api/customer/orders/{id}` | Customer | Chi tiết đơn: phí, hàng (ảnh), tài xế (khi đã nhận), lịch sử trạng thái. Đơn người khác → 404 |
+| POST | `api/customer/uploads` | Customer | `multipart/form-data`, field `file`: một ảnh JPG/PNG ≤ 5 MB → `{ url }` (Cloudinary) dùng cho ảnh hàng khi tạo đơn |
 | GET | `api/admin/pricing` | Administrator | `{ vehicleTypes: [{ id, name, maxLoadWeightKg, baseFare, pricePerKm, minimumFare, isActive }], settings: { commissionRate, loadingFee, minCodDeposit, matchingRadiusKm } }`. Có cả loại xe đang tắt. `commissionRate` là phân số (0.10 = 10%) |
 | PUT | `api/admin/pricing/vehicletypes/{id}` | Administrator | `{ baseFare, pricePerKm, minimumFare }` → 204; id lạ → 404. Đơn đã đặt giữ nguyên giá (DECISIONS 4.4) |
 | PATCH | `api/admin/pricing/vehicletypes/{id}/status` | Administrator | `{ isActive }` → 204; bật/tắt loại xe |
@@ -76,5 +81,14 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | `TOO_MANY_PHOTOS` | 422 | Bằng chứng hoàn tiền quá 5 ảnh |
 | `REFUND_NOT_FOR_DISPATCHER` | 422 | Dispatcher đề xuất số tiền hay xin thêm thông tin cho khoản hoàn do hủy (DECISIONS B9: đi thẳng tới Admin) |
 | `NO_INFO_REQUEST` | 422 | Trả lời khi Dispatcher chưa xin thêm thông tin |
+| `PAYMENT_METHOD_NOT_SUPPORTED` | 422 | Tạo đơn PayOS khi Phase 1 chỉ nhận tiền mặt |
+| `ADDRESS_NOT_FOUND` | 422 | Google Maps không tìm thấy địa chỉ lấy hoặc giao |
+| `ROUTE_NOT_FOUND` | 422 | Không có đường bộ giữa điểm lấy và điểm giao |
+| `VEHICLE_TOO_SMALL` | 422 | Khối lượng đơn vượt tải hoặc món lớn nhất không lọt thùng loại xe đã chọn (GB-10, 4.2) |
+| `COUPON_NOT_FOUND` | 422 | Mã giảm giá không tồn tại |
+| `COUPON_INACTIVE` | 422 | Mã giảm giá đang tắt |
+| `COUPON_EXPIRED` | 422 | Mã giảm giá chưa tới hạn hoặc đã hết hạn |
+| `COUPON_LIMIT_REACHED` | 422 | Mã giảm giá đã hết lượt |
+| `COUPON_MIN_ORDER_NOT_MET` | 422 | Đơn chưa đạt giá trị tối thiểu của mã (so với cước trước giảm, gồm phí bốc xếp) |
 | `COMMISSION_RATE_LOCKED` | 422 | Admin đổi tỷ lệ hoa hồng khi còn đơn từ `Accepted` tới trước `Completed` (DECISIONS C8) |
 | `SERVER_ERROR` | 500 | Lỗi không lường trước (xem log theo `traceId`) |

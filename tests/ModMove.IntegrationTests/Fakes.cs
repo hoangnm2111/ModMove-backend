@@ -86,8 +86,21 @@ internal sealed class InMemoryOrders : IShippingOrderRepository
     public Task<bool> HasOrdersInProgressAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(HasOrdersInProgress);
 
-    public Task<ShippingOrder?> GetByIdAsync(long id, CancellationToken cancellationToken = default) => Task.FromResult<ShippingOrder?>(null);
-    public void Add(ShippingOrder aggregate) { }
+    /// <summary>Orders added by commands; CreatedAt stays unset unless a test stamps it like the database would.</summary>
+    public List<ShippingOrder> Items { get; } = [];
+
+    public Task<int> CountCreatedBetweenAsync(DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Count(o => o.CreatedAt >= fromUtc && o.CreatedAt < toUtc));
+
+    public Task<ShippingOrder?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(o => o.Id == id));
+
+    public void Add(ShippingOrder aggregate)
+    {
+        if (aggregate.Id == 0)
+            TestIds.Set(aggregate, Items.Count + 1);
+        Items.Add(aggregate);
+    }
     public void Update(ShippingOrder aggregate) { }
     public void Remove(ShippingOrder aggregate) { }
 }
@@ -194,8 +207,13 @@ internal sealed class CountingUnitOfWork : IUnitOfWork
 {
     public int Saves { get; private set; }
 
+    /// <summary>Pretends a unique index lost a race, like ApplicationDbContext turning a duplicate key into 409.</summary>
+    public bool ThrowConflictOnSave { get; set; }
+
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        if (ThrowConflictOnSave)
+            throw new ModMove.Application.Common.Exceptions.ConflictException("A record with the same unique value already exists.");
         Saves++;
         return Task.FromResult(1);
     }
@@ -247,6 +265,37 @@ internal sealed class CapturingPushNotifications : IPushNotificationService
     }
 }
 
+/// <summary>Stands in for Google Maps: every address geocodes to a point, every trip has <see cref="Route"/>.</summary>
+internal sealed class FakeMapService : IMapService
+{
+    public const string UnknownAddress = "nowhere";
+
+    public RouteInfo Route { get; set; } = new(12m, 30);
+
+    public Task<GeoPoint> GeocodeAsync(string address, CancellationToken cancellationToken) =>
+        address == UnknownAddress
+            ? throw new ModMove.Domain.Exceptions.DomainException("Address not found.", "ADDRESS_NOT_FOUND")
+            : Task.FromResult(new GeoPoint(21.0285m, 105.8542m));
+
+    public Task<RouteInfo> GetRouteAsync(GeoPoint from, GeoPoint to, CancellationToken cancellationToken) => Task.FromResult(Route);
+}
+
+/// <summary>Stands in for Cloudinary; the team's cloud is called "demo" here.</summary>
+internal sealed class FakeFileStorage : IFileStorage
+{
+    public const string CloudName = "demo";
+
+    public List<(string FileName, string Folder)> Uploaded { get; } = [];
+
+    public Task<string> UploadImageAsync(Stream content, string fileName, string folder, CancellationToken cancellationToken)
+    {
+        Uploaded.Add((fileName, folder));
+        return Task.FromResult($"https://res.cloudinary.com/{CloudName}/image/upload/{folder}/{Uploaded.Count}.jpg");
+    }
+
+    public bool IsOwnedUrl(string url) => url.StartsWith($"https://res.cloudinary.com/{CloudName}/", StringComparison.Ordinal);
+}
+
 internal sealed class FakeCurrentUser(long? userId) : ICurrentUserService
 {
     public long? UserId { get; } = userId;
@@ -266,6 +315,11 @@ internal sealed class TestApp
     public InMemoryRepository<SupportRequest> SupportRequests { get; } = new();
     public CountingUnitOfWork UnitOfWork { get; } = new();
     public CapturingEmailSender Email { get; } = new();
+    public FakeFileStorage Files { get; } = new();
+    public FakeMapService Maps { get; } = new();
+    public InMemoryCoupons Coupons { get; } = new();
+    public InMemoryRepository<VehicleType> VehicleTypes { get; } = new();
+    public InMemoryPlatformSettings Settings { get; } = new();
     public MutableTime Time { get; } = new(Start);
     public ISender Sender { get; }
 
@@ -293,6 +347,11 @@ internal sealed class TestApp
             .AddSingleton<IPasswordHasher>(new FakeHasher())
             .AddSingleton<IJwtTokenService>(new FakeTokens())
             .AddSingleton<IEmailSender>(Email)
+            .AddSingleton<IFileStorage>(Files)
+            .AddSingleton<IMapService>(Maps)
+            .AddSingleton<ICouponRepository>(Coupons)
+            .AddSingleton<IRepository<VehicleType>>(VehicleTypes)
+            .AddSingleton<IPlatformSettings>(Settings)
             .AddSingleton<ICurrentUserService>(new FakeCurrentUser(signedInUserId))
             .AddSingleton<TimeProvider>(Time)
             .BuildServiceProvider()
