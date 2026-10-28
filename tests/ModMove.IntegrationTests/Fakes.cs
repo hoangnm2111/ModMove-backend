@@ -247,6 +247,21 @@ internal sealed class CapturingPushNotifications : IPushNotificationService
     }
 }
 
+/// <summary>Stands in for Google Maps: every address geocodes to a point, every trip has <see cref="Route"/>.</summary>
+internal sealed class FakeMapService : IMapService
+{
+    public const string UnknownAddress = "nowhere";
+
+    public RouteInfo Route { get; set; } = new(12m, 30);
+
+    public Task<GeoPoint> GeocodeAsync(string address, CancellationToken cancellationToken) =>
+        address == UnknownAddress
+            ? throw new ModMove.Domain.Exceptions.DomainException("Address not found.", "ADDRESS_NOT_FOUND")
+            : Task.FromResult(new GeoPoint(21.0285m, 105.8542m));
+
+    public Task<RouteInfo> GetRouteAsync(GeoPoint from, GeoPoint to, CancellationToken cancellationToken) => Task.FromResult(Route);
+}
+
 /// <summary>Stands in for Cloudinary; the team's cloud is called "demo" here.</summary>
 internal sealed class FakeFileStorage : IFileStorage
 {
@@ -283,6 +298,10 @@ internal sealed class TestApp
     public CountingUnitOfWork UnitOfWork { get; } = new();
     public CapturingEmailSender Email { get; } = new();
     public FakeFileStorage Files { get; } = new();
+    public FakeMapService Maps { get; } = new();
+    public InMemoryCoupons Coupons { get; } = new();
+    public InMemoryRepository<VehicleType> VehicleTypes { get; } = new();
+    public InMemoryPlatformSettings Settings { get; } = new();
     public MutableTime Time { get; } = new(Start);
     public ISender Sender { get; }
 
@@ -311,6 +330,10 @@ internal sealed class TestApp
             .AddSingleton<IJwtTokenService>(new FakeTokens())
             .AddSingleton<IEmailSender>(Email)
             .AddSingleton<IFileStorage>(Files)
+            .AddSingleton<IMapService>(Maps)
+            .AddSingleton<ICouponRepository>(Coupons)
+            .AddSingleton<IRepository<VehicleType>>(VehicleTypes)
+            .AddSingleton<IPlatformSettings>(Settings)
             .AddSingleton<ICurrentUserService>(new FakeCurrentUser(signedInUserId))
             .AddSingleton<TimeProvider>(Time)
             .BuildServiceProvider()
