@@ -126,6 +126,19 @@ public class DriverOnboardingDomainTests
         Assert.Equal("A driver application is already pending review.", ex.Message);
     }
 
+    [Fact]
+    public void Profile_update_credentials_happy_path()
+    {
+        var profile = CreateProfile();
+
+        profile.UpdateCredentials("079090999999", "790000999999", "https://cdn/f2.jpg", "https://cdn/b2.jpg");
+
+        Assert.Equal("079090999999", profile.CitizenIdNumber);
+        Assert.Equal("790000999999", profile.DriverLicenseNumber);
+        Assert.Equal("https://cdn/f2.jpg", profile.LicenseFrontUrl);
+        Assert.Equal("https://cdn/b2.jpg", profile.LicenseBackUrl);
+    }
+
     // ==========================================
     // 3. DriverProfile Approval, Vehicle Update & Online Status
     // ==========================================
