@@ -18,6 +18,9 @@ public static class DependencyInjection
 
         services.AddValidatorsFromAssembly(AssemblyReference.Assembly, includeInternalTypes: true);
 
+        // Shared by the fare estimate and order creation (one price, DECISIONS 4.4).
+        services.AddScoped<Features.Orders.OrderPricing>();
+
         return services;
     }
 }

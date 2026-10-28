@@ -13,6 +13,9 @@ public sealed record PaymentLink(string CheckoutUrl, string? QrCode);
 public interface IFileStorage
 {
     Task<string> UploadImageAsync(Stream content, string fileName, string folder, CancellationToken cancellationToken);
+
+    /// <summary>True only for an https URL of the team's own Cloudinary cloud (avatars, cargo photos).</summary>
+    bool IsOwnedUrl(string url);
 }
 
 /// <summary>Gmail SMTP: OTP codes and notification emails.</summary>

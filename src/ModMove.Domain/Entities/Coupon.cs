@@ -39,12 +39,14 @@ public sealed class Coupon : BaseAuditableEntity, IAggregateRoot
     /// <summary>GB-21: minimum spend, valid dates and unused limit must all hold.</summary>
     public void EnsureApplicable(decimal orderValue, DateTimeOffset now)
     {
-        if (!IsActive || now < ValidFrom || now > ExpiresAt)
-            throw new DomainException("The coupon is not valid at this time.");
+        if (!IsActive)
+            throw new DomainException("The coupon is not valid at this time.", "COUPON_INACTIVE");
+        if (now < ValidFrom || now > ExpiresAt)
+            throw new DomainException("The coupon is not valid at this time.", "COUPON_EXPIRED");
         if (UsageLimit is not null && UsedCount >= UsageLimit)
-            throw new DomainException("The coupon has reached its usage limit.");
+            throw new DomainException("The coupon has reached its usage limit.", "COUPON_LIMIT_REACHED");
         if (orderValue < MinimumOrderValue)
-            throw new DomainException("The order does not reach the minimum value of the coupon.");
+            throw new DomainException("The order does not reach the minimum value of the coupon.", "COUPON_MIN_ORDER_NOT_MET");
     }
 
     /// <summary>Discount for an order value; never more than the order itself.</summary>
