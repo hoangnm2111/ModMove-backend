@@ -264,4 +264,20 @@ public class UserAndCouponTests
 
         Assert.Throws<DomainException>(() => refund.ReplyToInfoRequest("ok", null));
     }
+
+    [Fact]
+    public void User_change_status_updates_account_status()
+    {
+        var user = NewUser();
+        Assert.Equal(AccountStatus.Active, user.AccountStatus);
+
+        user.ChangeStatus(AccountStatus.Locked);
+        Assert.Equal(AccountStatus.Locked, user.AccountStatus);
+
+        user.ChangeStatus(AccountStatus.Inactive);
+        Assert.Equal(AccountStatus.Inactive, user.AccountStatus);
+
+        user.ChangeStatus(AccountStatus.Active);
+        Assert.Equal(AccountStatus.Active, user.AccountStatus);
+    }
 }

@@ -40,11 +40,23 @@ public sealed class DriverProfile : BaseAuditableEntity, IAggregateRoot
 
     public int NextVersionNumber() => _applications.Count == 0 ? 1 : _applications.Max(a => a.VersionNumber) + 1;
 
-    /// <summary>Add a new application version; only one may be Pending at a time.</summary>
+    /// <summary>UC-DRV-05: a resubmission replaces the personal credentials kept on the profile.</summary>
+    public void UpdateCredentials(string citizenIdNumber, string driverLicenseNumber, string licenseFrontUrl, string licenseBackUrl)
+    {
+        CitizenIdNumber = citizenIdNumber;
+        DriverLicenseNumber = driverLicenseNumber;
+        LicenseFrontUrl = licenseFrontUrl;
+        LicenseBackUrl = licenseBackUrl;
+    }
+
+    /// <summary>Add a new application version; only one may be Pending at a time, and Approved profiles cannot resubmit (MSG07).</summary>
     public void Submit(DriverApplication application)
     {
+        if (ApprovalStatus == ApprovalStatus.Approved)
+            throw new DomainException("An approved driver application cannot be resubmitted.", "APPLICATION_NOT_EDITABLE");
+
         if (_applications.Any(a => a.ApplicationStatus == ApprovalStatus.Pending))
-            throw new DomainException("A driver application is already pending review.");
+            throw new DomainException("A driver application is already pending review.", "APPLICATION_NOT_EDITABLE");
 
         _applications.Add(application);
         ApprovalStatus = ApprovalStatus.Pending;
