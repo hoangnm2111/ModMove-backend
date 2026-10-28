@@ -136,6 +136,10 @@ public class MyOrdersQueryTests
     }
 
     [Fact]
+    public async Task Huge_page_number_is_rejected_not_a_server_error() =>
+        await Assert.ThrowsAsync<ValidationException>(() => new Db().Sender().Send(new GetMyOrdersQuery(Page: int.MaxValue)));
+
+    [Fact]
     public async Task Page_size_over_50_is_rejected() =>
         await Assert.ThrowsAsync<ValidationException>(() => new Db().Sender().Send(new GetMyOrdersQuery(PageSize: 51)));
 

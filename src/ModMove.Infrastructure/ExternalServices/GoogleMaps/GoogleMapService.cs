@@ -53,9 +53,12 @@ public sealed class GoogleMapService(HttpClient http, GoogleMapsOptions options)
         if (!json.RootElement.TryGetProperty("routes", out var routes) || routes.GetArrayLength() == 0)
             throw new DomainException("No road route between the two points.", "ROUTE_NOT_FOUND");
 
+        // Routes API uses proto3 JSON, which leaves out zero values: same pickup and dropoff has no distanceMeters.
         var route = routes[0];
-        var meters = route.GetProperty("distanceMeters").GetDecimal();
-        var seconds = decimal.Parse(route.GetProperty("duration").GetString()!.TrimEnd('s'), CultureInfo.InvariantCulture);
+        var meters = route.TryGetProperty("distanceMeters", out var distance) ? distance.GetDecimal() : 0m;
+        var seconds = route.TryGetProperty("duration", out var duration)
+            ? decimal.Parse(duration.GetString()!.TrimEnd('s'), CultureInfo.InvariantCulture)
+            : 0m;
         return new RouteInfo(Math.Round(meters / 1000m, 2, MidpointRounding.AwayFromZero), (int)Math.Ceiling(seconds / 60m));
     }
 

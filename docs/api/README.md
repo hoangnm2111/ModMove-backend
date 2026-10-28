@@ -34,7 +34,7 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | POST | `api/account/logout` | Đã đăng nhập | 204; thu hồi mọi refresh token |
 | DELETE | `api/customer/account` | Customer | 204; tài khoản thành `Inactive` |
 | POST | `api/customer/orders` | Customer | Tạo đơn **tiền mặt**: `{ vehicleTypeId, pickupAddress, dropoffAddress, receiverName, receiverPhone, cargo: { cargoType, quantity, weightKg, lengthCm, widthCm, heightCm, photoUrls[1..5], specialNotes? }, hasLoadingService, couponCode?, paymentMethod: "Cash", payerRole: Sender \| Receiver, prohibitedGoodsCommitment: true }` → 201 `{ orderId, orderCode, totalFee }`. Giá tính lại ở server như báo giá |
-| GET | `api/customer/orders` | Customer | `?page=1&pageSize=20&view=All\|Active\|History&search=` → `PagedResult` đơn của chính mình, mới nhất trước (`pageSize` ≤ 50; History = Completed/Cancelled) |
+| GET | `api/customer/orders` | Customer | `?page=1&pageSize=20&view=All\|Active\|History&search=` → `PagedResult` đơn của chính mình, mới nhất trước (`page` 1–10 000, `pageSize` ≤ 50; History = Completed/Cancelled) |
 | GET | `api/customer/orders/{id}` | Customer | Chi tiết đơn: phí, hàng (ảnh), tài xế (khi đã nhận), lịch sử trạng thái. Đơn người khác → 404 |
 | POST | `api/customer/uploads` | Customer | `multipart/form-data`, field `file`: một ảnh JPG/PNG ≤ 5 MB → `{ url }` (Cloudinary) dùng cho ảnh hàng khi tạo đơn |
 | GET | `api/admin/pricing` | Administrator | `{ vehicleTypes: [{ id, name, maxLoadWeightKg, baseFare, pricePerKm, minimumFare, isActive }], settings: { commissionRate, loadingFee, minCodDeposit, matchingRadiusKm } }`. Có cả loại xe đang tắt. `commissionRate` là phân số (0.10 = 10%) |
