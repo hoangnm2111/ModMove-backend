@@ -32,6 +32,7 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | POST | `api/account/password` | Đã đăng nhập | `{ currentPassword, newPassword }` → 204; thu hồi mọi refresh token, mọi máy (cả máy đang dùng) phải đăng nhập lại |
 | POST | `api/account/logout` | Đã đăng nhập | 204; thu hồi mọi refresh token |
 | DELETE | `api/customer/account` | Customer | 204; tài khoản thành `Inactive` |
+| POST | `api/customer/uploads` | Customer | `multipart/form-data`, field `file`: một ảnh JPG/PNG ≤ 5 MB → `{ url }` (Cloudinary) dùng cho ảnh hàng khi tạo đơn |
 | GET | `api/admin/pricing` | Administrator | `{ vehicleTypes: [{ id, name, maxLoadWeightKg, baseFare, pricePerKm, minimumFare, isActive }], settings: { commissionRate, loadingFee, minCodDeposit, matchingRadiusKm } }`. Có cả loại xe đang tắt. `commissionRate` là phân số (0.10 = 10%) |
 | PUT | `api/admin/pricing/vehicletypes/{id}` | Administrator | `{ baseFare, pricePerKm, minimumFare }` → 204; id lạ → 404. Đơn đã đặt giữ nguyên giá (DECISIONS 4.4) |
 | PATCH | `api/admin/pricing/vehicletypes/{id}/status` | Administrator | `{ isActive }` → 204; bật/tắt loại xe |
