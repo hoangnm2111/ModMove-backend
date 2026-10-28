@@ -86,8 +86,21 @@ internal sealed class InMemoryOrders : IShippingOrderRepository
     public Task<bool> HasOrdersInProgressAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(HasOrdersInProgress);
 
-    public Task<ShippingOrder?> GetByIdAsync(long id, CancellationToken cancellationToken = default) => Task.FromResult<ShippingOrder?>(null);
-    public void Add(ShippingOrder aggregate) { }
+    /// <summary>Orders added by commands; CreatedAt stays unset unless a test stamps it like the database would.</summary>
+    public List<ShippingOrder> Items { get; } = [];
+
+    public Task<int> CountCreatedBetweenAsync(DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Count(o => o.CreatedAt >= fromUtc && o.CreatedAt < toUtc));
+
+    public Task<ShippingOrder?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(o => o.Id == id));
+
+    public void Add(ShippingOrder aggregate)
+    {
+        if (aggregate.Id == 0)
+            TestIds.Set(aggregate, Items.Count + 1);
+        Items.Add(aggregate);
+    }
     public void Update(ShippingOrder aggregate) { }
     public void Remove(ShippingOrder aggregate) { }
 }
@@ -194,8 +207,13 @@ internal sealed class CountingUnitOfWork : IUnitOfWork
 {
     public int Saves { get; private set; }
 
+    /// <summary>Pretends a unique index lost a race, like ApplicationDbContext turning a duplicate key into 409.</summary>
+    public bool ThrowConflictOnSave { get; set; }
+
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        if (ThrowConflictOnSave)
+            throw new ModMove.Application.Common.Exceptions.ConflictException("A record with the same unique value already exists.");
         Saves++;
         return Task.FromResult(1);
     }
