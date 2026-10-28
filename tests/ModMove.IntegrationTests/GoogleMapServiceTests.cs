@@ -63,6 +63,17 @@ public class GoogleMapServiceTests
     }
 
     [Fact]
+    public async Task Same_pickup_and_dropoff_is_a_zero_km_route()
+    {
+        // Routes API omits zero-valued fields (proto3 JSON): a 0 m route has no distanceMeters.
+        var (maps, _) = Create("""{"routes":[{"duration":"0s"}]}""");
+
+        var route = await maps.GetRouteAsync(HoanKiem, HoanKiem, CancellationToken.None);
+
+        Assert.Equal(new RouteInfo(0m, 0), route);
+    }
+
+    [Fact]
     public async Task Route_without_routes_is_ROUTE_NOT_FOUND()
     {
         var (maps, _) = Create("{}");
