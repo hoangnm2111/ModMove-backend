@@ -52,8 +52,12 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | GET | `api/admin/driver-applications/{id}` | Administrator | Xem chi tiết hồ sơ tài xế: thông tin cá nhân, phương tiện, các link ảnh giấy tờ/xe, lịch sử nộp (UC-ADM-09) |
 | POST | `api/admin/driver-applications/{id}/approve` | Administrator | 204; Phê duyệt hồ sơ tài xế → trạng thái thành `Approved`, cập nhật/tạo thực thể Xe, tự động tạo Ví tài xế ban đầu nếu chưa có (Rule GB-16, TEAM-PLAN 74). Gửi push notification |
 | POST | `api/admin/driver-applications/{id}/reject` | Administrator | `{ reasons: ["Lý do 1", "Lý do 2"] }` → 204; Từ chối hồ sơ kèm danh sách lý do cụ thể từng mục (UC-ADM-09). Gửi push notification |
-
-
+| GET | `api/driver/onboarding/status` | Driver | `{ hasApplication, canSubmit, profileApprovalStatus, applicationId, latestVersionNumber, submittedAt, reviewedAt, vehicleTypeId, vehicleTypeName, licensePlate, maxLoadWeightKg, citizenIdNumber, driverLicenseNumber, documentUrls, rejectionReasons }`. Chưa nộp: `hasApplication=false`, `canSubmit=true`; `canSubmit=true` khi chưa có hồ sơ hoặc phiên bản mới nhất bị `Rejected` (UC-DRV-04) |
+| POST | `api/driver/onboarding` | Driver | `{ vehicleTypeId, citizenIdNumber, driverLicenseNumber, licensePlate, maxLoadWeightKg, documentUrls: [bằng lái mặt trước, mặt sau, đăng ký xe, đăng kiểm, ảnh xe] }` → 201 `{ id }` (id phiên bản mới). Mỗi lần nộp là một version mới (UC-DRV-03, DRV-05). Đang `Pending`/`Approved` → 422 `APPLICATION_NOT_EDITABLE`; CCCD, GPLX hoặc biển số đã dùng bởi tài xế khác → 409 (GB-01, GB-04); email chưa xác minh → 403 `EMAIL_NOT_VERIFIED` |
+| GET | `api/admin/users` | Administrator | `?page=1&pageSize=20&search=&role=&status=` → `{ items, pageNumber, pageSize, totalCount }`. Danh sách người dùng phân trang, lọc theo role (`Customer`, `Driver`, `Dispatcher`, `Administrator`), trạng thái (`Active`, `Inactive`, `Locked`), tìm kiếm theo tên/SĐT/email (UC-ADM-04) |
+| GET | `api/admin/users/{id}` | Administrator | Xem chi tiết hồ sơ tài khoản, trạng thái, thông tin tài xế/biển số xe (nếu là Driver) và thống kê đơn hàng (UC-ADM-05) |
+| PATCH | `api/admin/users/{id}/status` | Administrator | `{ status: Active \| Inactive \| Locked, reason }` → 204; Đổi trạng thái tài khoản kèm lý do bắt buộc (UC-ADM-06). Khi chuyển sang `Inactive` hoặc `Locked`, thu hồi mọi refresh token (`RevokeAllForUserAsync`) và xóa FCM token (DECISIONS B8, 8.2). Tự đổi tài khoản của chính mình → 422 `CANNOT_CHANGE_OWN_STATUS` (MSG65) |
+| POST | `api/admin/users/dispatchers` | Administrator | `{ fullName, phoneNumber, email, password }` → 201 `{ id }`; Tạo tài khoản Điều phối viên (`Role=Dispatcher`, `AccountStatus=Active`, `EmailVerified=true`) để đăng nhập ngay không cần OTP (UC-ADM-07, DECISIONS B7). Trùng email/SĐT → 409 (GB-01) |
 
 ## Mã lỗi
 
@@ -91,4 +95,6 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | `COUPON_LIMIT_REACHED` | 422 | Mã giảm giá đã hết lượt |
 | `COUPON_MIN_ORDER_NOT_MET` | 422 | Đơn chưa đạt giá trị tối thiểu của mã (so với cước trước giảm, gồm phí bốc xếp) |
 | `COMMISSION_RATE_LOCKED` | 422 | Admin đổi tỷ lệ hoa hồng khi còn đơn từ `Accepted` tới trước `Completed` (DECISIONS C8) |
+| `APPLICATION_NOT_EDITABLE` | 422 | Tài xế nộp hồ sơ khi phiên bản mới nhất đang `Pending` hoặc đã `Approved` (MSG07) |
+| `CANNOT_CHANGE_OWN_STATUS` | 422 | Admin tự khóa hoặc vô hiệu hóa tài khoản của chính mình (UC-ADM-06, MSG65) |
 | `SERVER_ERROR` | 500 | Lỗi không lường trước (xem log theo `traceId`) |
