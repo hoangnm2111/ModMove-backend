@@ -76,15 +76,25 @@ public static class DependencyInjection
             services.AddSingleton<IEmailSender, SmtpEmailSender>();
         }
 
-        // Google Maps (DECISIONS 3.4): needed by fare estimate and order creation; registered only when a key is set.
+        // Google Maps (DECISIONS 3.4) for fare estimate and order creation. Without a key the app still starts
+        // (a stand-in fails only when called), so teammates without the key can run everything else.
         if (!string.IsNullOrWhiteSpace(configuration["GoogleMaps:ApiKey"]))
         {
             services.AddSingleton(new GoogleMapsOptions { ApiKey = configuration["GoogleMaps:ApiKey"]! });
-            services.AddHttpClient<IMapService, GoogleMapService>();
+            // The Geocoding URL carries the key: the default HttpClient logs print request URIs, so they are removed.
+            services.AddHttpClient<IMapService, GoogleMapService>().RemoveAllLoggers();
+        }
+        else
+        {
+            services.AddSingleton<IMapService, NotConfiguredMapService>();
         }
 
-        // Cloudinary (GB-06): image uploads and the "is this URL ours" check used by validators.
-        if (!string.IsNullOrWhiteSpace(configuration["Cloudinary:CloudName"]))
+        // Cloudinary (GB-06): image uploads and the "is this URL ours" check used by validators. Same stand-in rule.
+        if (string.IsNullOrWhiteSpace(configuration["Cloudinary:CloudName"]))
+        {
+            services.AddSingleton<IFileStorage, NotConfiguredFileStorage>();
+        }
+        else
         {
             services.AddSingleton(new CloudinaryOptions
             {
