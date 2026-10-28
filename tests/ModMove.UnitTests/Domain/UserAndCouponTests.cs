@@ -87,6 +87,31 @@ public class UserAndCouponTests
         Assert.Throws<DomainException>(() => coupon.EnsureApplicable(100_000, Now.AddDays(1)));
     }
 
+    [Theory]
+    [InlineData("inactive", "COUPON_INACTIVE")]
+    [InlineData("not-started", "COUPON_EXPIRED")]
+    [InlineData("expired", "COUPON_EXPIRED")]
+    [InlineData("used-up", "COUPON_LIMIT_REACHED")]
+    [InlineData("too-small", "COUPON_MIN_ORDER_NOT_MET")]
+    public void Coupon_rejections_have_their_own_code_GB21(string scenario, string code)
+    {
+        var coupon = Coupon.Create("SAVE20", 20_000, 100_000, Now, Now.AddDays(30), usageLimit: 1);
+        var at = Now.AddDays(1);
+        var orderValue = 100_000m;
+        switch (scenario)
+        {
+            case "inactive": coupon.SetActive(false); break;
+            case "not-started": at = Now.AddDays(-1); break;
+            case "expired": at = Now.AddDays(31); break;
+            case "used-up": coupon.MarkUsed(); break;
+            case "too-small": orderValue = 99_999; break;
+        }
+
+        var error = Assert.Throws<DomainException>(() => coupon.EnsureApplicable(orderValue, at));
+
+        Assert.Equal(code, error.Code);
+    }
+
     [Fact]
     public void Coupon_discount_never_exceeds_the_order()
     {
