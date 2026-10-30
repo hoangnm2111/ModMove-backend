@@ -1,6 +1,6 @@
 # Quyết định thiết kế Backend
 
-Đây là các quyết định nhóm đã chốt (bản cuối, 2026-10-24). Khi SRS/SDS khác file này, **làm theo file này**. Muốn đổi một quyết định: sửa file này trong một PR riêng, cả nhóm duyệt.
+Đây là các quyết định nhóm đã chốt (bản cuối 2026-10-24, cập nhật kênh client và thông báo 2026-10-30). Khi SRS/SDS khác file này, **làm theo file này**. Muốn đổi một quyết định: sửa file này trong một PR riêng, cả nhóm duyệt.
 
 - **Thiết kế DB:** Report-4 mục 3 chỉ là bản thiết kế ban đầu. Nguồn sự thật của schema là **migration trong code** cùng file này.
 - **Mã quyết định:** `B*`, `C*` là từ các buổi họp trước; `M*` và `1.x`–`9.x` là số mục trong tài liệu "Các vấn đề cần nhóm thống nhất".
@@ -42,7 +42,7 @@
 | # | Quyết định |
 |---|---|
 | B10 | Đơn tạo ra ở `Pending`, `PaymentStatus = Unpaid`. Đơn **PayOS** chỉ hiện cho tài xế khi đã `Paid`; đơn **tiền mặt** hiện ngay |
-| 3.1 | Phiên PayOS sống 10 phút (GB-13). Hết hạn mà chưa trả: app báo khách tạo mã mới cho **cùng đơn**; mã cũ không nhận chuyển khoản nữa. Đơn PayOS vẫn `Unpaid` sau **30 phút** kể từ `created_at` thì tự hủy (đủ cho khoảng 3 mã); JOB-PAY-01 làm việc này cùng lúc đánh dấu mã hết hạn |
+| 3.1 | Phiên PayOS sống 10 phút (GB-13). Hết hạn mà chưa trả: web/app hiển thị MSG50 và nút tạo mã mới cho **cùng đơn**; mã cũ không nhận chuyển khoản nữa. Đơn PayOS vẫn `Unpaid` sau **30 phút** kể từ `created_at` thì tự hủy (đủ cho khoảng 3 mã); JOB-PAY-01 làm việc này cùng lúc đánh dấu mã hết hạn.<br>`CreateOrderPayment` nhận `platform` (`Web` \| `App`); server chọn `returnUrl`/`cancelUrl` từ cấu hình (`PayOS:ReturnUrls:Web` là trang chi tiết đơn, `PayOS:ReturnUrls:App` là deep link). **Client không gửi URL** (tránh open redirect). Trạng thái thanh toán **chỉ tin webhook**, không tin việc PayOS chuyển hướng về `returnUrl` |
 | 3.2 | Thời gian ghép đơn 10 phút (GB-24): đơn tiền mặt tính **từ lúc tạo**, đơn PayOS **từ lúc thanh toán xong** (`shipping_orders.paid_at`) |
 | 5.1 | Rút tiền: **không** giới hạn tối thiểu |
 | 5.2 | Nạp cọc: **tối thiểu 50.000đ** mỗi lần |
@@ -58,7 +58,7 @@
 | 6.3 | Khách từ chối ảnh lấy hàng: tài xế chụp lại; **tối đa 5 lần gửi ảnh** tính cả lần đầu, sau đó báo sự cố |
 | 6.4 | Quá 5 phút không gửi GPS: coi là mất kết nối, không hiện trên bản đồ Dispatcher và không thấy đơn mới; đang có đơn thì giữ nguyên |
 | 7.2 | Đổi tài xế giữa chuyến: tài xế mới nhận toàn bộ thu nhập; Dispatcher chỉ chọn được tài xế đủ **mọi điều kiện như tài xế nhận đơn lần đầu** (B5: Online, Approved, đúng loại xe, không có đơn; đơn tiền mặt thêm GB-16). Đơn quay về `Accepted`: tài xế mới đến chỗ xe cũ nhận hàng (`Arrived`), kiểm hàng và gửi lại ảnh lấy hàng (`PickedUp`), với lượt đếm 5 lần gửi ảnh mới (6.3) |
-| B12 | Realtime: hub `/hubs/tracking`, group `order-{id}`; client gửi `SendLocation(lat, lng)`, server phát `LocationUpdated` và `OrderStatusChanged`; JWT qua `access_token` trên query string. Chỉ ghi `driver_location_logs` khi đang có đơn |
+| B12 | Realtime: hub `/hubs/tracking`, JWT qua `access_token` trên query string, từ chối user không `Active`.<br>**Khách (web/app):** gọi `JoinOrder(orderId)` khi mở màn hình theo dõi; server kiểm tra đơn là của khách đó, không phải thì lỗi `ORDER_NOT_YOURS` (C10). Kết nối lại thì client gọi lại `JoinOrder`.<br>**Tài xế (app):** gửi `SendLocation(lat, lng)`; server cập nhật vị trí cuối, ghi `driver_location_logs` chỉ khi đang có đơn, phát `LocationUpdated` tới `order-{id}` và group `dispatchers`. Tài xế không join group đơn; trạng thái đơn tới tài xế qua `Clients.User`.<br>**Dispatcher (web):** server tự thêm vào group `dispatchers` khi kết nối, theo role. Bản đồ lấy danh sách ban đầu bằng REST (tài xế Online có GPS trong 5 phút, 6.4), sau đó cập nhật bằng `LocationUpdated`. Dispatcher thấy **mọi tài xế Online**, không chỉ tài xế đang có đơn.<br>**Sự kiện server phát:** `LocationUpdated`; `OrderStatusChanged` (tới `order-{id}` và `Clients.User` của tài xế); `NotificationReceived` (B17) |
 
 ## 5. Sự cố, khiếu nại, đánh giá
 
@@ -74,13 +74,13 @@
 
 | # | Quyết định |
 |---|---|
-| B6 | Web chỉ đăng ký **Customer** (`register`); **Driver** chỉ đăng ký trên app (`register-driver`). Backend không nhận `role` từ client. Dispatcher/Admin không tự đăng ký |
+| B6 | **Customer** đăng ký bằng `register` trên web hoặc app. **Driver** chỉ đăng ký bằng `register-driver` trên app. Dispatcher và Admin không tự đăng ký. Backend không nhận `role` từ client. Kênh client xem C11 |
 | B7 | Admin tạo tài khoản và mật khẩu cố định cho Dispatcher |
 | D1 | Chưa xác minh email bằng OTP thì không đăng nhập được (403 `EMAIL_NOT_VERIFIED`) |
 | A-01 | Sai email, sai mật khẩu, tài khoản đang khóa tạm (GB-02): **cùng một** lỗi 401 để không lộ email. Đánh đổi chấp nhận: ai biết email có thể làm khóa tài khoản đó 10 phút |
 | A-02 | OTP: 6 số, sống 5 phút, gửi tối đa 3 lần/15 phút (GB-25), chết sau 5 lần nhập sai, dùng một lần. Gửi lại/quên mật khẩu luôn 204. Giới hạn 10 request/phút/IP cho `api/public/auth/*`, đổi mật khẩu và yêu cầu hỗ trợ (429 `TOO_MANY_REQUESTS`). Số điện thoại không được xác minh |
 | 9.1 | **Refresh token 30 ngày**: lưu dạng hash (bảng `refresh_tokens`), dùng một lần rồi đổi token mới (`POST api/public/auth/refresh`); token cũ dùng lại = bị lộ, thu hồi hết. **Đổi/đặt lại mật khẩu, xóa tài khoản, đăng xuất thu hồi hết.** Admin khóa tài khoản cũng phải gọi `IRefreshTokenRepository.RevokeAllForUserAsync` |
-| 9.2 | Một tài khoản, một thiết bị nhận thông báo (FCM token thuộc máy đăng ký sau cùng) |
+| 9.2 | Chỉ app đăng ký FCM token; **web không dùng FCM**. Mỗi tài khoản giữ **một** token (máy đăng ký sau cùng), không cần bảng `device_tokens`. Đăng xuất trên app: app gửi kèm token khi gọi logout, server chỉ xóa token nếu đúng là token đang lưu (máy khác đã đăng ký sau thì giữ nguyên) |
 | B8, 8.2 | Xóa tài khoản = `Inactive`, giữ đơn và lịch sử; Admin có thể mở lại. `Locked` = Admin khóa, chỉ Admin mở. Cả hai không đăng nhập và không dùng token cũ được. Khác với `Locked`: sai mật khẩu 5 lần chỉ khóa tạm (GB-02, `users.locked_until`) và tự mở sau 10 phút |
 
 ## 7. Admin, báo cáo, nội dung, thông báo
@@ -91,7 +91,7 @@
 | B13 | Nội dung chính sách và giới thiệu dịch vụ: cột `master_data_items.description`, Admin nhập |
 | B15 | Hóa đơn điện tử, hoàn tiền tự động: ngoài phạm vi |
 | B16 | Xuất báo cáo Excel (cần xin duyệt một package Excel khi bắt đầu) |
-| B17, 8.3 | Chỉ gửi FCM, không lưu lịch sử. Sự kiện tối thiểu cho **khách**: đơn được nhận, tài xế đến điểm lấy, ảnh lấy hàng chờ duyệt, đã giao, đã hoàn thành, kết quả sự cố, kết quả hoàn tiền. Cho **tài xế**: đơn mới gần, quyết định sự cố, kết quả duyệt hồ sơ, kết quả rút tiền. Ai đổi trạng thái thì gửi thông báo đó |
+| B17, 8.3 | Mỗi sự kiện dưới đây gửi **hai đường**: FCM tới app, và SignalR `NotificationReceived` tới mọi kết nối của user (`Clients.User(userId)`, đọc claim `NameIdentifier`, không tự tạo group `user-{id}`). Web chỉ nhận khi đang mở trang. Gói hai đường vào một chỗ (`INotificationService` gọi `IPushNotificationService` và `IRealtimeNotifier`) để mọi người chỉ gọi một hàm. **Không lưu lịch sử, không có bảng `notifications`**: mở lại web thì khách xem trạng thái hiện tại ở danh sách và chi tiết đơn. Sự kiện tối thiểu cho **khách**: đơn được nhận, tài xế đến điểm lấy, ảnh lấy hàng chờ duyệt, đã giao, đã hoàn thành, kết quả sự cố, kết quả hoàn tiền. Cho **tài xế**: đơn mới gần, quyết định sự cố, kết quả duyệt hồ sơ, kết quả rút tiền. Ai đổi trạng thái thì gửi thông báo đó |
 
 ## 8. Hạ tầng và quy ước
 
@@ -105,5 +105,6 @@
 | C8 | Admin sửa được (`platform_settings`): `COMMISSION_RATE`, `LOADING_FEE`, `MIN_COD_DEPOSIT`, `MATCHING_RADIUS_KM`. Cố định trong `BusinessRules.cs`: mốc thời gian, giới hạn OTP/đăng nhập/ảnh, nạp cọc tối thiểu, cửa sổ đánh giá. Không để một giá trị ở cả hai chỗ. `COMMISSION_RATE` chỉ được sửa khi hệ thống bảo trì hoặc không có đơn nào đang chạy (từ `Accepted` tới trước `Completed`), để hoa hồng lúc hoàn tất bằng đúng số đã kiểm tra lúc nhận đơn (GB-16) |
 | C9 | Collation `utf8mb4_unicode_ci`; DEFAULT ở mức DB viết bằng SQL trong migration, không dùng `HasDefaultValue`. Ai `AlterColumn` một cột có DEFAULT phải `SET DEFAULT` lại trong cùng migration |
 | C10 | Thao tác lên đơn không phải của mình: kiểm tra trong entity, trả 422 `ORDER_NOT_YOURS` |
+| C11 | **Kênh client.** Web (React 19 + Vite + TypeScript + Tailwind) cho Guest, Customer, Dispatcher, Admin. Mobile (Flutter, **một app**, màn hình theo role) cho Customer và Driver. Dispatcher và Admin không dùng app. Đăng ký theo B6, thông báo theo 9.2 và B17 |
 | 9.4 | API trả `detail` tiếng Anh kèm `code` ổn định. Web hiển thị tiếng Anh (có tùy chọn tiếng Việt), app hiển thị tiếng Việt theo `code`. Bảng `code` ở [api/README.md](api/README.md) |
 | 9.5 | Lưu UTC; ngày trong báo cáo, mã đơn và hiển thị theo giờ Việt Nam (UTC+7) |

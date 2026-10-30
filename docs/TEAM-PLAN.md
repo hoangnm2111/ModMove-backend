@@ -5,7 +5,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 | Người | Vai trò | Controllers |
 |---|---|---|
 | **Hiếu** | Guest, Customer, Auth và tài khoản dùng chung | `Public/`, `Customer/`, `Account/` |
-| **Hoàng** | Administrator, Driver (app tài xế), toàn bộ Payments | `Admin/`, `Driver/`, `Webhooks/` |
+| **Hoàng** | Administrator, Driver (màn hình tài xế trên app), toàn bộ Payments | `Admin/`, `Driver/`, `Webhooks/` |
 | **Huy** | Dispatcher | `Dispatcher/` |
 
 ## 1. Quy tắc làm việc
@@ -55,11 +55,12 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 **Phase 2**
 - [ ] Hủy đơn qua `ShippingOrder.CancelByCustomer` (chỉ Pending/Accepted) + tạo hoàn tiền Cancellation cho Admin (3.3)
 - [ ] Duyệt/từ chối ảnh lấy hàng (GB-26, tối đa 5 lần gửi: 6.3), xác nhận nhận hàng (CUS-19)
-- [ ] Tracking: `TrackingHub` SignalR (B12), đọc `access_token` trên query string cho `/hubs`
+- [ ] Tracking: `TrackingHub` SignalR theo B12: `access_token` trên query string; `JoinOrder` kiểm tra đơn là của khách (`ORDER_NOT_YOURS`); `SendLocation` phát tới `order-{id}` và group `dispatchers`; Dispatcher tự vào `dispatchers` theo role
 - [ ] Phía khách của sự cố, hoàn tiền, khiếu nại (CUS-15..18, 21..24; 7.3, 7.4 `ReplyToInfoRequest`) — cùng tuần với Huy
 - [ ] Đánh giá (CUS-25, 26; trong 1 ngày sau hoàn tất, 7.5)
 - [ ] Nối thanh toán PayOS vào đặt đơn qua `CreateOrderPayment` của Hoàng (B10, 3.1)
-- [ ] Gửi thông báo cho khách theo bảng sự kiện 8.3
+- [ ] `INotificationService` (B17): gửi FCM tới app và SignalR `NotificationReceived` qua `Clients.User`; không lưu lịch sử. Gửi thông báo cho khách theo bảng sự kiện 8.3
+- [ ] Logout nhận kèm FCM token của app, chỉ xóa token nếu khớp token đang lưu (9.2)
 
 **Phase 3**
 - [ ] JOB-GPS-01 (xóa GPS log quá 30 ngày)
@@ -75,7 +76,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [ ] Adapter PayOS và FCM
 
 **Phase 2**
-- [ ] Thanh toán PayOS (CUS-27, nạp cọc DRV-21 ≥ 50.000đ), tạo lại mã khi hết 10 phút (3.1), webhook (sai chữ ký → từ chối, gọi trùng → idempotent), `ShippingOrder.MarkPaid(now)`
+- [ ] Thanh toán PayOS (CUS-27, nạp cọc DRV-21 ≥ 50.000đ), tạo lại mã khi hết 10 phút (3.1), `CreateOrderPayment` nhận `platform` (`Web` | `App`) và chọn `returnUrl` từ cấu hình `PayOS:ReturnUrls:*`, client không gửi URL (3.1), webhook (sai chữ ký → từ chối, gọi trùng → idempotent), `ShippingOrder.MarkPaid(now)`
 - [ ] Matching (DRV-08..10, B5): đơn PayOS chỉ hiện khi đã trả; GB-08/09; đơn tiền mặt cần ví cọc ≥ `MIN_COD_DEPOSIT` và ≥ hoa hồng của đơn (GB-16: `DriverWallet.CanReceiveCod(minDeposit, order.CommissionFor(rate))`, dùng cả khi đổi tài xế); ẩn tài xế mất GPS quá 5 phút (6.4)
 - [ ] Trips (DRV-11..16, 18, 19): không có hủy từ tài xế (6.1); không có người nhận thì vẫn giao và gửi POD (2.7)
 - [ ] Ví (DRV-17, 20..23): thu COD, rút tiền không tối thiểu (5.1), thu nhập = `DriverEarning`
@@ -84,13 +85,13 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 **Phase 3**
 - [ ] JOB-PAY-01 (mã hết hạn sau 10 phút; hủy đơn PayOS vẫn `Unpaid` sau 30 phút từ `created_at`, 3.1), JOB-MATCH-01 (từ lúc tạo hoặc lúc trả, 3.2: `IsMatchingExpired`), JOB-ORDER-01 (`CanBeAutoCompleted`)
 - [ ] Báo cáo, doanh thu (8.1: tổng `commission_amount` của đơn `Completed`, giờ VN), xuất Excel (B16, xin duyệt package)
-- [ ] Thông báo cho tài xế theo bảng sự kiện 8.3
+- [ ] Thông báo cho tài xế theo bảng sự kiện 8.3, gọi qua `INotificationService` (B17)
 
 ## 6. Huy: Dispatcher
 
 **Phase 1**
 - [ ] Mở rộng `DemoDataSeeder` (chỉ Development): vài đơn ở các trạng thái, 1 sự cố, 1 khiếu nại
-- [ ] Giám sát đơn và tài xế (DIS-01, 16); danh sách, chi tiết sự cố và khiếu nại (DIS-03, 04, 11, 12)
+- [ ] Giám sát đơn và tài xế (DIS-01, 16): bản đồ lấy danh sách ban đầu bằng REST (tài xế Online có GPS trong 5 phút, 6.4), sau đó nhận `LocationUpdated` từ group `dispatchers` (B12); danh sách, chi tiết sự cố và khiếu nại (DIS-03, 04, 11, 12)
 
 **Phase 2**
 - [ ] Quyết định xử lý sự cố (DIS-05), đổi tài xế (DIS-06, 7.2: tài xế mới đủ điều kiện như B5, đơn tiền mặt thêm GB-16), hủy đơn do sự cố (DIS-07: hàng cấm và khách vắng mặt ở điểm lấy không hoàn tiền, 4.3, 2.4; không có tài xế thay thế thì hoàn 100% đơn PayOS, 2.5), hủy sự cố (DIS-10)
