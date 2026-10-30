@@ -374,6 +374,7 @@ internal sealed class TestApp
     public InMemoryRefreshTokens RefreshTokens { get; } = new();
     public InMemoryRepository<SupportRequest> SupportRequests { get; } = new();
     public InMemoryRefunds Refunds { get; } = new();
+    public InMemoryDriverProfiles DriverProfiles { get; } = new();
     public CapturingRealtimeNotifier Realtime { get; } = new();
     public CapturingPushNotifications Push { get; } = new();
     public CountingUnitOfWork UnitOfWork { get; } = new();
@@ -407,6 +408,7 @@ internal sealed class TestApp
             .AddSingleton<IRefreshTokenRepository>(RefreshTokens)
             .AddSingleton<IRepository<SupportRequest>>(SupportRequests)
             .AddSingleton<IRefundRepository>(Refunds)
+            .AddSingleton<IDriverProfileRepository>(DriverProfiles)
             .AddSingleton<IRealtimeNotifier>(Realtime)
             .AddSingleton<IPushNotificationService>(Push)
             .AddSingleton<IUnitOfWork>(UnitOfWork)

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using ModMove.Application.Common.Models;
+using ModMove.Application.Features.Orders.Commands.CancelOrder;
 using ModMove.Application.Features.Orders.Commands.CreateOrder;
 using ModMove.Application.Features.Orders.Queries.GetMyOrderDetail;
 using ModMove.Application.Features.Orders.Queries.GetMyOrders;
@@ -24,5 +25,13 @@ public sealed class OrdersController : ApiControllerBase
     {
         var result = await Sender.Send(command, cancellationToken);
         return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    /// <summary>Cancel while Pending or Accepted (UC-CUS-29). A paid PayOS order gets a 100% refund for the Administrator.</summary>
+    [HttpPost("{id:long}/cancel")]
+    public async Task<IActionResult> Cancel(long id, CancelOrderRequest request, CancellationToken cancellationToken)
+    {
+        await Sender.Send(new CancelOrderCommand(id, request.Reason), cancellationToken);
+        return NoContent();
     }
 }
