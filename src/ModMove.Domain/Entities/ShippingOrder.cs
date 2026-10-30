@@ -206,6 +206,18 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         Complete(commissionRate, ChangedByRole.Customer, customerId, now);
     }
 
+    /// <summary>
+    /// UC-CUS-25: the customer of the order rates its driver. Completed only, within 1 day (GB-20, 7.5); the
+    /// one-rating-per-order rule is the unique index on ratings.order_id.
+    /// </summary>
+    public Rating Rate(long customerId, int stars, string? comment, DateTimeOffset now)
+    {
+        EnsureCustomer(customerId);
+        var driverProfileId = DriverProfileId
+            ?? throw new DomainException("Only a completed trip with a driver can be rated.", "RATING_NOT_ALLOWED");
+        return Rating.Create(Id, customerId, driverProfileId, stars, comment, CompletedAt, now);
+    }
+
     /// <summary>GB-12: a delivery photo and timestamp are required for Delivered.</summary>
     public void Deliver(string deliveryPhotoUrl, long driverUserId, DateTimeOffset now)
     {

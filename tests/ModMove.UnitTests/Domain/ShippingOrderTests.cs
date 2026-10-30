@@ -418,4 +418,52 @@ public class ShippingOrderTests
 
         Assert.Throws<DomainException>(() => order.ConfirmReceipt(1, 0.10m, Now));
     }
+
+    private static ShippingOrder CompletedOrder()
+    {
+        var order = DeliveredOrder();
+        order.Complete(0.10m, ChangedByRole.System, null, Now);
+        return order;
+    }
+
+    [Fact]
+    public void Customer_rates_the_driver_of_a_completed_order_GB20()
+    {
+        var order = CompletedOrder();
+
+        var rating = order.Rate(customerId: 1, stars: 5, "Tốt", Now.AddHours(2));
+
+        Assert.Equal((order.Id, 1L, 5L, 5), (rating.OrderId, rating.CustomerId, rating.DriverProfileId, rating.RatingStars));
+        Assert.Equal("Tốt", rating.ReviewComment);
+    }
+
+    [Fact]
+    public void Only_the_customer_of_the_order_rates_it_C10()
+    {
+        var order = CompletedOrder();
+
+        var error = Assert.Throws<DomainException>(() => order.Rate(customerId: 2, 5, null, Now));
+
+        Assert.Equal("ORDER_NOT_YOURS", error.Code);
+    }
+
+    [Fact]
+    public void An_order_that_is_not_completed_cannot_be_rated_GB20()
+    {
+        var order = DeliveredOrder();
+
+        var error = Assert.Throws<DomainException>(() => order.Rate(1, 5, null, Now));
+
+        Assert.Equal("RATING_NOT_ALLOWED", error.Code);
+    }
+
+    [Fact]
+    public void Rating_window_is_one_day_after_completion_7_5()
+    {
+        var order = CompletedOrder();
+
+        var error = Assert.Throws<DomainException>(() => order.Rate(1, 5, null, Now.AddDays(1).AddMinutes(1)));
+
+        Assert.Equal("RATING_WINDOW_CLOSED", error.Code);
+    }
 }
