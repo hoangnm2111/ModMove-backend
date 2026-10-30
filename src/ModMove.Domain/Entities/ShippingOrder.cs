@@ -165,23 +165,45 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         Proof.RecordPickup(photos);
     }
 
-    /// <summary>GB-26: the trip starts only after the customer approves the cargo evidence.</summary>
+    /// <summary>GB-26: the trip starts only after the customer of the order approves the pickup photos waiting for review.</summary>
     public void ApprovePickupEvidence(long customerId, DateTimeOffset now)
     {
-        if (OrderStatus != OrderStatus.PickedUp || Proof is null)
-            throw new DomainException("There is no pickup evidence to approve.");
-
-        Proof.Verify();
+        var proof = EnsurePickupEvidenceToReview(customerId);
+        proof.Verify();
         TransitionTo(OrderStatus.InTransit, ChangedByRole.Customer, customerId, null, now);
     }
 
+    /// <summary>DECISIONS 6.3: the driver then sends new photos (at most 5 submissions in all).</summary>
     public void RejectPickupEvidence(string reason, long customerId)
     {
-        if (OrderStatus != OrderStatus.PickedUp || Proof is null)
-            throw new DomainException("There is no pickup evidence to reject.");
-
-        Proof.Reject(reason);
+        var proof = EnsurePickupEvidenceToReview(customerId);
+        proof.Reject(reason);
         _statusHistories.Add(OrderStatusHistory.Create(OrderStatus, OrderStatus, ChangedByRole.Customer, customerId, reason));
+    }
+
+    private ProofOfDelivery EnsurePickupEvidenceToReview(long customerId)
+    {
+        EnsureCustomer(customerId);
+        if (OrderStatus != OrderStatus.PickedUp || Proof is not { ProofStatus: ProofStatus.Pending })
+            throw new DomainException("There are no pickup photos waiting for review.");
+        return Proof;
+    }
+
+    /// <summary>DECISIONS C10: the order belongs to another customer.</summary>
+    private void EnsureCustomer(long customerId)
+    {
+        if (customerId != CustomerId)
+            throw new DomainException("This order belongs to another customer.", "ORDER_NOT_YOURS");
+    }
+
+    /// <summary>
+    /// UC-CUS-19: the customer of the order confirms the cargo arrived, which completes it (GB-14). The driver's
+    /// wallet is settled in the same transaction by the caller.
+    /// </summary>
+    public void ConfirmReceipt(long customerId, decimal commissionRate, DateTimeOffset now)
+    {
+        EnsureCustomer(customerId);
+        Complete(commissionRate, ChangedByRole.Customer, customerId, now);
     }
 
     /// <summary>GB-12: a delivery photo and timestamp are required for Delivered.</summary>
@@ -210,6 +232,7 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         CompletedAt = now;
         CommissionRate = commissionRate;
         CommissionAmount = CommissionFor(commissionRate);
+        RowVersion++; // the customer and the auto-complete job racing: the later save is a 409, so the wallet is settled once
     }
 
     /// <summary>

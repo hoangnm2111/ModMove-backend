@@ -350,4 +350,72 @@ public class ShippingOrderTests
         Assert.Equal("ORDER_CANCELLED", error.Code);
         Assert.NotEqual(PaymentStatus.Paid, order.PaymentStatus);
     }
+
+    private static ShippingOrder PickedUpOrder()
+    {
+        var order = AcceptedOrder();
+        order.ConfirmArrival(9, Now);
+        order.ConfirmPickup(["1.jpg", "2.jpg"], 9, Now);
+        return order;
+    }
+
+    [Fact]
+    public void Only_the_customer_of_the_order_reviews_the_pickup_photos_C10()
+    {
+        var order = PickedUpOrder();
+
+        var approve = Assert.Throws<DomainException>(() => order.ApprovePickupEvidence(customerId: 2, Now));
+        var reject = Assert.Throws<DomainException>(() => order.RejectPickupEvidence("mờ", customerId: 2));
+
+        Assert.Equal(("ORDER_NOT_YOURS", "ORDER_NOT_YOURS"), (approve.Code, reject.Code));
+        Assert.Equal(ProofStatus.Pending, order.Proof!.ProofStatus);
+    }
+
+    [Fact]
+    public void Rejected_photos_cannot_be_approved_until_the_driver_sends_new_ones_6_3()
+    {
+        var order = PickedUpOrder();
+        order.RejectPickupEvidence("mờ", customerId: 1);
+
+        Assert.Throws<DomainException>(() => order.ApprovePickupEvidence(1, Now));
+        Assert.Throws<DomainException>(() => order.RejectPickupEvidence("lại", 1));
+
+        order.ConfirmPickup(["3.jpg", "4.jpg"], 9, Now);
+        order.ApprovePickupEvidence(1, Now);
+        Assert.Equal(OrderStatus.InTransit, order.OrderStatus);
+    }
+
+    [Fact]
+    public void Customer_confirming_receipt_completes_the_order_with_commission_CUS19()
+    {
+        var order = DeliveredOrder();
+        var version = order.RowVersion;
+
+        order.ConfirmReceipt(customerId: 1, commissionRate: 0.10m, Now.AddHours(1));
+
+        Assert.Equal(OrderStatus.Completed, order.OrderStatus);
+        Assert.Equal(Now.AddHours(1), order.CompletedAt);
+        Assert.Equal(18_000m, order.CommissionAmount);
+        Assert.Equal(ChangedByRole.Customer, order.StatusHistories.Last().ChangedByRole);
+        Assert.Equal(version + 1, order.RowVersion); // the auto-complete job racing the customer gets a 409
+    }
+
+    [Fact]
+    public void Only_the_customer_of_the_order_confirms_receipt_C10()
+    {
+        var order = DeliveredOrder();
+
+        var error = Assert.Throws<DomainException>(() => order.ConfirmReceipt(customerId: 2, 0.10m, Now));
+
+        Assert.Equal("ORDER_NOT_YOURS", error.Code);
+        Assert.Equal(OrderStatus.Delivered, order.OrderStatus);
+    }
+
+    [Fact]
+    public void Receipt_can_only_be_confirmed_once_delivered()
+    {
+        var order = PickedUpOrder();
+
+        Assert.Throws<DomainException>(() => order.ConfirmReceipt(1, 0.10m, Now));
+    }
 }
