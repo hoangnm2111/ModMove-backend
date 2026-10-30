@@ -53,6 +53,39 @@ public class ShippingOrderTests
         Assert.Equal(1, order.RowVersion);
     }
 
+    // A save that lost the race must fail with 409, whichever of the two writers saved first.
+    [Fact]
+    public void Cancelling_bumps_row_version_so_a_late_accept_cannot_revive_the_order()
+    {
+        var order = NewOrder();
+
+        order.CancelByCustomer(1, "Đổi ý", Now);
+
+        Assert.Equal(1, order.RowVersion);
+    }
+
+    [Fact]
+    public void Marking_paid_bumps_row_version_so_a_cancel_cannot_miss_the_payment()
+    {
+        var order = NewOrder();
+
+        order.MarkPaid(Now);
+
+        Assert.Equal(1, order.RowVersion);
+    }
+
+    [Fact]
+    public void A_cancelled_order_cannot_be_cancelled_again()
+    {
+        var order = NewOrder();
+        order.CancelByCustomer(1, "Đổi ý", Now);
+
+        var error = Assert.Throws<DomainException>(() => order.CancelByCustomer(1, "Lần hai", Now));
+
+        Assert.Equal("ORDER_NOT_CANCELLABLE", error.Code);
+        Assert.Equal("Đổi ý", order.CancellationReason);
+    }
+
     [Fact]
     public void Accept_twice_is_rejected_GB08()
     {

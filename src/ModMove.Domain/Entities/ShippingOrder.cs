@@ -123,6 +123,7 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
             throw new DomainException("A cancelled order cannot be paid; refund the payment instead.", "ORDER_CANCELLED");
         PaymentStatus = PaymentStatus.Paid;
         PaidAt ??= now;
+        RowVersion++; // a customer cancel racing the webhook must not miss the payment (409 instead)
     }
 
     /// <summary>GB-08: the first driver to accept is assigned; a stale RowVersion makes the save fail for the others.</summary>
@@ -229,6 +230,7 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     {
         TransitionTo(OrderStatus.Cancelled, by, userId, reason, now);
         CancellationReason = reason;
+        RowVersion++; // a driver accepting with a stale copy gets a 409 instead of reviving the order
     }
 
     /// <summary>
@@ -242,7 +244,8 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
             throw new DomainException("Only the customer who placed the order can cancel it.", "ORDER_NOT_YOURS");
         if (OrderStatus is not (OrderStatus.Pending or OrderStatus.Accepted))
             throw new DomainException(
-                "The driver has already arrived. Report an incident so a dispatcher can handle it.", "ORDER_NOT_CANCELLABLE");
+                "Only a Pending or Accepted order can be cancelled. Once the driver has arrived, report an incident instead.",
+                "ORDER_NOT_CANCELLABLE");
 
         Cancel(reason, ChangedByRole.Customer, customerId, now);
         return PaymentStatus == PaymentStatus.Paid ? TotalFee : 0;
