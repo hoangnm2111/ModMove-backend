@@ -150,6 +150,9 @@ internal sealed class InMemoryDriverProfiles : IDriverProfileRepository
     public Task<DriverProfile?> GetByIdWithApplicationsAndVehicleAsync(long id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(d => d.Id == id));
 
+    public Task<DriverProfile?> GetByUserIdWithApplicationsAndVehicleAsync(long userId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(d => d.UserId == userId));
+
     public Task<DriverProfile?> GetByApplicationIdWithApplicationsAndVehicleAsync(long applicationId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(d => d.Applications.Any(a => a.Id == applicationId)));
 
