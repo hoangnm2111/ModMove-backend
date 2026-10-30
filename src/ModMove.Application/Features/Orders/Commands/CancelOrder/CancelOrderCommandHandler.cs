@@ -1,4 +1,3 @@
-using System.Globalization;
 using ModMove.Application.Common;
 using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
@@ -34,13 +33,7 @@ internal sealed class CancelOrderCommandHandler(
         // Accept, MarkPaid and Cancel all bump RowVersion: of two racing saves, the later one is a 409.
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        if (order.DriverProfileId is { } driverProfileId
-            && await driverProfiles.GetByIdAsync(driverProfileId, cancellationToken) is { } driver)
-        {
-            await notifications.NotifyAsync(driver.UserId, new Notification(
-                "ORDER_CANCELLED", "Đơn đã bị hủy", $"Khách đã hủy đơn {order.OrderCode}.",
-                new Dictionary<string, string> { ["orderId"] = order.Id.ToString(CultureInfo.InvariantCulture) }),
-                cancellationToken);
-        }
+        await notifications.NotifyDriverAsync(driverProfiles, order, "ORDER_CANCELLED",
+            "Đơn đã bị hủy", $"Khách đã hủy đơn {order.OrderCode}.", cancellationToken);
     }
 }

@@ -83,7 +83,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [ ] Admin duyệt hoàn tiền (cả hoàn tiền do hủy không qua Dispatcher, 3.3) và chi trả tay; duyệt rút tiền (ADM-24)
 
 **Phase 3**
-- [ ] JOB-PAY-01 (mã hết hạn sau 10 phút; hủy đơn PayOS vẫn `Unpaid` sau 30 phút từ `created_at`, 3.1), JOB-MATCH-01 (từ lúc tạo hoặc lúc trả, 3.2: `IsMatchingExpired`), JOB-ORDER-01 (`CanBeAutoCompleted`)
+- [ ] JOB-PAY-01 (mã hết hạn sau 10 phút; hủy đơn PayOS vẫn `Unpaid` sau 30 phút từ `created_at`, 3.1), JOB-MATCH-01 (từ lúc tạo hoặc lúc trả, 3.2: `IsMatchingExpired`), JOB-ORDER-01 (`CanBeAutoCompleted`, rồi `order.Complete(rate, System, null, now)` + `OrderSettlement.SettleAsync` trong `Features/Orders` như ConfirmReceipt của Hiếu, để ví được tất toán giống nhau)
 - [ ] Báo cáo, doanh thu (8.1: tổng `commission_amount` của đơn `Completed`, giờ VN), xuất Excel (B16, xin duyệt package)
 - [ ] Thông báo cho tài xế theo bảng sự kiện 8.3, gọi qua `INotificationService` (B17)
 

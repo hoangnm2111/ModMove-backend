@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using ModMove.Application.Common.Models;
 using ModMove.Application.Features.Orders.Commands.CancelOrder;
+using ModMove.Application.Features.Orders.Commands.ConfirmReceipt;
+using ModMove.Application.Features.Orders.Commands.ReviewPickupEvidence;
 using ModMove.Application.Features.Orders.Commands.CreateOrder;
 using ModMove.Application.Features.Orders.Queries.GetMyOrderDetail;
 using ModMove.Application.Features.Orders.Queries.GetMyOrders;
@@ -32,6 +34,22 @@ public sealed class OrdersController : ApiControllerBase
     public async Task<IActionResult> Cancel(long id, CancelOrderRequest request, CancellationToken cancellationToken)
     {
         await Sender.Send(new CancelOrderCommand(id, request.Reason), cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>Approve the driver's pickup photos (the trip starts) or reject them with a reason (UC-CUS-12, GB-26).</summary>
+    [HttpPost("{id:long}/pickup-evidence")]
+    public async Task<IActionResult> ReviewPickupEvidence(long id, ReviewPickupEvidenceRequest request, CancellationToken cancellationToken)
+    {
+        await Sender.Send(new ReviewPickupEvidenceCommand(id, request.Approve, request.Reason), cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>Confirm the cargo arrived: the order completes and the driver is paid (UC-CUS-19).</summary>
+    [HttpPost("{id:long}/confirm-receipt")]
+    public async Task<IActionResult> ConfirmReceipt(long id, CancellationToken cancellationToken)
+    {
+        await Sender.Send(new ConfirmReceiptCommand(id), cancellationToken);
         return NoContent();
     }
 }
