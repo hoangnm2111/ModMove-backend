@@ -23,6 +23,7 @@ public class MyOrdersQueryTests
         public DataTable Orders { get; set; } = OrderRows(1);
         public DataTable Cargo { get; set; } = CargoRows();
         public DataTable History { get; set; } = HistoryRows();
+        public DataTable Proof { get; set; } = NoRows(ProofRows());
         public List<(string Sql, IReadOnlyDictionary<string, object?> Parameters)> Executed { get; } = [];
 
         public Db()
@@ -37,6 +38,8 @@ public class MyOrdersQueryTests
                     return Cargo;
                 if (text.Contains("FROM order_status_histories"))
                     return History;
+                if (text.Contains("FROM proof_of_deliveries"))
+                    return Proof;
                 return Orders;
             };
         }
@@ -83,6 +86,17 @@ public class MyOrdersQueryTests
         ("CargoType", typeof(string), "FURNITURE"), ("Quantity", typeof(int), 2), ("WeightKg", typeof(decimal), 100m),
         ("LengthCm", typeof(int), 100), ("WidthCm", typeof(int), 100), ("HeightCm", typeof(int), 100),
         ("PhotoUrls", typeof(string), """["https://res.cloudinary.com/demo/a.jpg"]"""), ("SpecialNotes", typeof(string), "Dễ vỡ"));
+
+    private static DataTable ProofRows() => Table(
+        ("PickupPhotoUrls", typeof(string), """["https://res.cloudinary.com/demo/p1.jpg","https://res.cloudinary.com/demo/p2.jpg"]"""),
+        ("ProofStatus", typeof(string), "Rejected"), ("PickupSubmissionCount", typeof(int), 2), ("RejectionReason", typeof(string), "Ảnh mờ"),
+        ("DeliveryPhotoUrl", typeof(string), null), ("DeliveryCompletionTime", typeof(DateTime), null));
+
+    private static DataTable NoRows(DataTable table)
+    {
+        table.Rows.Clear();
+        return table;
+    }
 
     private static DataTable HistoryRows() => Table(
         ("FromStatus", typeof(string), null), ("ToStatus", typeof(string), "Pending"), ("ChangedByRole", typeof(string), "Customer"),
@@ -166,6 +180,39 @@ public class MyOrdersQueryTests
         Assert.Equal(["https://res.cloudinary.com/demo/a.jpg"], order.Cargo.PhotoUrls);
         Assert.Equal("Pending", order.History.Single().ToStatus);
         Assert.Null(order.Driver);
+    }
+
+    [Fact]
+    public async Task Detail_has_no_photos_section_before_pickup()
+    {
+        var order = await new Db().Sender().Send(new GetMyOrderDetailQuery(1));
+
+        Assert.Null(order.Proof);
+    }
+
+    [Fact]
+    public async Task Detail_shows_the_pickup_photos_to_review_CUS11()
+    {
+        var db = new Db { Proof = ProofRows() };
+
+        var proof = (await db.Sender().Send(new GetMyOrderDetailQuery(1))).Proof!;
+
+        Assert.Equal(2, proof.PickupPhotoUrls.Count);
+        Assert.Equal(("Rejected", 2, "Ảnh mờ"), (proof.ProofStatus, proof.PickupSubmissionCount, proof.RejectionReason));
+        Assert.Null(proof.DeliveryPhotoUrl);
+        Assert.Equal(1L, db.Executed.Last(e => e.Sql.Contains("FROM proof_of_deliveries")).Parameters["OrderId"]);
+    }
+
+    [Fact]
+    public async Task Proof_without_pickup_photos_reads_as_an_empty_list()
+    {
+        var proof = ProofRows();
+        proof.Rows[0]["PickupPhotoUrls"] = DBNull.Value;
+        var db = new Db { Proof = proof };
+
+        var order = await db.Sender().Send(new GetMyOrderDetailQuery(1));
+
+        Assert.Empty(order.Proof!.PickupPhotoUrls);
     }
 
     [Fact]

@@ -375,6 +375,7 @@ internal sealed class TestApp
     public InMemoryRepository<SupportRequest> SupportRequests { get; } = new();
     public InMemoryRefunds Refunds { get; } = new();
     public InMemoryDriverProfiles DriverProfiles { get; } = new();
+    public InMemoryDriverWallets DriverWallets { get; } = new();
     public CapturingRealtimeNotifier Realtime { get; } = new();
     public CapturingPushNotifications Push { get; } = new();
     public CountingUnitOfWork UnitOfWork { get; } = new();
@@ -409,6 +410,7 @@ internal sealed class TestApp
             .AddSingleton<IRepository<SupportRequest>>(SupportRequests)
             .AddSingleton<IRefundRepository>(Refunds)
             .AddSingleton<IDriverProfileRepository>(DriverProfiles)
+            .AddSingleton<IDriverWalletRepository>(DriverWallets)
             .AddSingleton<IRealtimeNotifier>(Realtime)
             .AddSingleton<IPushNotificationService>(Push)
             .AddSingleton<IUnitOfWork>(UnitOfWork)
