@@ -58,7 +58,7 @@ src/
 └── ModMove.WebApi/                    # Tầng trình bày HTTP/WebSocket
     ├── Controllers/<Role>/            # Admin, Customer, Driver, Dispatcher, Account, Public, Webhooks (PayOS)
     │   └── ApiControllerBase.cs       # Controller mỏng: HTTP → Sender.Send(...)
-    ├── Hubs/                          # SignalR (GPS realtime)
+    ├── Hubs/                          # SignalR: TrackingHub + SignalRRealtimeNotifier (adapter IRealtimeNotifier)
     ├── Middlewares/                   # ExceptionHandlingMiddleware → ProblemDetails
     ├── Services/                      # CurrentUserService (đọc JWT claims)
     └── Program.cs                     # Composition root
@@ -93,7 +93,8 @@ Backend chỉ cung cấp REST (`/api/...`) + SignalR + `/health`. Web (React, ch
 - **Id** là số nguyên (`long`). **Enum** trả và nhận dạng chuỗi (`"Pending"`), giống giá trị lưu trong DB. **Tiền** là `decimal` VND. **Ngày giờ** ISO 8601, UTC.
 - **Phân trang** (query): `?page=1&pageSize=20`; trả `PagedResult<T>` (`items`, `pageNumber`, `pageSize`, `totalCount`).
 - **Use case mẫu để copy**: Command: `Features/Auth/Commands/Login`. Query: `Features/Catalog/Queries/GetVehicleTypes`. Controller: `Controllers/Public/AuthController`.
-- **Port ra ngoài** (`IFileStorage`, `IEmailSender`, `IPushNotificationService`, `IPaymentGateway`, `IMapService`, `IRealtimeNotifier`) khai báo ở `Application/Common/Interfaces/Ports.cs`; adapter ở `Infrastructure/ExternalServices/<Provider>`. Người sở hữu adapter được sửa chữ ký cho vừa dịch vụ thật.
+- **Port ra ngoài** (`IFileStorage`, `IEmailSender`, `IPushNotificationService`, `IPaymentGateway`, `IMapService`, `IRealtimeNotifier`) khai báo ở `Application/Common/Interfaces/Ports.cs`; adapter ở `Infrastructure/ExternalServices/<Provider>`. Ngoại lệ: adapter SignalR (`SignalRRealtimeNotifier`) nằm ở `WebApi/Hubs` cạnh `TrackingHub`, vì Infrastructure không được tham chiếu ASP.NET Core. Người sở hữu adapter được sửa chữ ký cho vừa dịch vụ thật.
+- **Thông báo** (B17): handler gọi `INotificationService.NotifyAsync(userId, Notification)` sau `SaveChangesAsync`; service tự gửi SignalR `NotificationReceived` và FCM (khi đã có adapter), lỗi gửi chỉ ghi log. Không gọi thẳng `IPushNotificationService`.
 - **Repository riêng cho aggregate** khi cần `Include` hay truy vấn riêng: interface ở `Application/Common/Interfaces/Persistence`, class ở `Infrastructure/Persistence/Repositories`, đăng ký trong `DependencyInjection.cs` (mẫu: `IUserRepository`).
 
 ## 6. Mẫu thêm một use case

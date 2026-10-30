@@ -95,6 +95,9 @@ internal sealed class InMemoryOrders : IShippingOrderRepository
     public Task<ShippingOrder?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(o => o.Id == id));
 
+    public Task<ShippingOrder?> GetWithProofAsync(long id, CancellationToken cancellationToken = default) =>
+        GetByIdAsync(id, cancellationToken);
+
     public void Add(ShippingOrder aggregate)
     {
         if (aggregate.Id == 0)
@@ -118,6 +121,27 @@ internal sealed class InMemoryRepository<T> : IRepository<T> where T : ModMove.D
     }
     public void Update(T aggregate) { }
     public void Remove(T aggregate) => Items.Remove(aggregate);
+}
+
+internal sealed class InMemoryRefunds : IRefundRepository
+{
+    public List<Refund> Items { get; } = [];
+
+    public Task<bool> HasOpenComplaintAsync(long orderId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Any(r => r.OrderId == orderId && r.SourceType == RefundSourceType.Complaint
+            && r.RefundStatus is RefundStatus.Requested or RefundStatus.Approved));
+
+    public Task<Refund?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(r => r.Id == id));
+
+    public void Add(Refund aggregate)
+    {
+        if (aggregate.Id == 0)
+            TestIds.Set(aggregate, Items.Count + 1);
+        Items.Add(aggregate);
+    }
+    public void Update(Refund aggregate) { }
+    public void Remove(Refund aggregate) => Items.Remove(aggregate);
 }
 
 internal sealed class InMemoryCoupons : ICouponRepository
@@ -259,11 +283,44 @@ internal sealed class CapturingPushNotifications : IPushNotificationService
 {
     public List<(string Token, string Title, string Body, IReadOnlyDictionary<string, string>? Data)> Sent { get; } = [];
 
+    /// <summary>Set to true to act like FCM being down.</summary>
+    public bool Fail { get; set; }
+
     public Task SendAsync(
         string deviceToken, string title, string body,
         IReadOnlyDictionary<string, string>? data, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (Fail)
+            throw new HttpRequestException("FCM is down");
         Sent.Add((deviceToken, title, body, data));
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>Records SignalR pushes: Target is "user", "order" or "dispatchers"; Id is the user or order id.</summary>
+internal sealed class CapturingRealtimeNotifier : IRealtimeNotifier
+{
+    public List<(string Target, string? Id, string EventName, object Payload)> Sent { get; } = [];
+
+    /// <summary>Set to true to act like the SignalR backplane failing.</summary>
+    public bool Fail { get; set; }
+
+    public Task SendToOrderAsync(long orderId, string eventName, object payload, CancellationToken cancellationToken) =>
+        Record("order", orderId.ToString(), eventName, payload, cancellationToken);
+
+    public Task SendToUserAsync(long userId, string eventName, object payload, CancellationToken cancellationToken) =>
+        Record("user", userId.ToString(), eventName, payload, cancellationToken);
+
+    public Task SendToDispatchersAsync(string eventName, object payload, CancellationToken cancellationToken) =>
+        Record("dispatchers", null, eventName, payload, cancellationToken);
+
+    private Task Record(string target, string? id, string eventName, object payload, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (Fail)
+            throw new InvalidOperationException("SignalR is down");
+        Sent.Add((target, id, eventName, payload));
         return Task.CompletedTask;
     }
 }
@@ -316,6 +373,9 @@ internal sealed class TestApp
     public InMemoryOrders Orders { get; } = new();
     public InMemoryRefreshTokens RefreshTokens { get; } = new();
     public InMemoryRepository<SupportRequest> SupportRequests { get; } = new();
+    public InMemoryRefunds Refunds { get; } = new();
+    public CapturingRealtimeNotifier Realtime { get; } = new();
+    public CapturingPushNotifications Push { get; } = new();
     public CountingUnitOfWork UnitOfWork { get; } = new();
     public CapturingEmailSender Email { get; } = new();
     public FakeFileStorage Files { get; } = new();
@@ -346,6 +406,9 @@ internal sealed class TestApp
             .AddSingleton<IShippingOrderRepository>(Orders)
             .AddSingleton<IRefreshTokenRepository>(RefreshTokens)
             .AddSingleton<IRepository<SupportRequest>>(SupportRequests)
+            .AddSingleton<IRefundRepository>(Refunds)
+            .AddSingleton<IRealtimeNotifier>(Realtime)
+            .AddSingleton<IPushNotificationService>(Push)
             .AddSingleton<IUnitOfWork>(UnitOfWork)
             .AddSingleton<IPasswordHasher>(new FakeHasher())
             .AddSingleton<IJwtTokenService>(new FakeTokens())

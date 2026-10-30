@@ -49,10 +49,22 @@ public interface IMapService
     Task<RouteInfo> GetRouteAsync(GeoPoint from, GeoPoint to, CancellationToken cancellationToken);
 }
 
-/// <summary>SignalR push to clients following an order (group order-{id}) or one user.</summary>
+/// <summary>Event names the hub /hubs/tracking sends to clients (DECISIONS B12, B17).</summary>
+public static class RealtimeEvents
+{
+    public const string LocationUpdated = "LocationUpdated";
+    public const string OrderStatusChanged = "OrderStatusChanged";
+    public const string NotificationReceived = "NotificationReceived";
+}
+
+/// <summary>SignalR push to clients following an order (group order-{id}), to one user, or to all Dispatchers.</summary>
 public interface IRealtimeNotifier
 {
     Task SendToOrderAsync(long orderId, string eventName, object payload, CancellationToken cancellationToken);
 
+    /// <summary>Every open connection of the user (Clients.User, by the NameIdentifier claim).</summary>
     Task SendToUserAsync(long userId, string eventName, object payload, CancellationToken cancellationToken);
+
+    /// <summary>Group "dispatchers": Dispatchers join it when they connect (B12).</summary>
+    Task SendToDispatchersAsync(string eventName, object payload, CancellationToken cancellationToken);
 }
