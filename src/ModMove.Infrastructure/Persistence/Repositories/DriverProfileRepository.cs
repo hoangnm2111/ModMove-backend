@@ -12,6 +12,11 @@ public sealed class DriverProfileRepository(ApplicationDbContext dbContext)
            .Include(d => d.Vehicle)
            .FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
 
+    public Task<DriverProfile?> GetByUserIdWithApplicationsAndVehicleAsync(long userId, CancellationToken cancellationToken = default) =>
+        Set.Include(d => d.Applications)
+           .Include(d => d.Vehicle)
+           .FirstOrDefaultAsync(d => d.UserId == userId, cancellationToken);
+
     public Task<DriverProfile?> GetByApplicationIdWithApplicationsAndVehicleAsync(long applicationId, CancellationToken cancellationToken = default) =>
         Set.Include(d => d.Applications)
            .Include(d => d.Vehicle)
