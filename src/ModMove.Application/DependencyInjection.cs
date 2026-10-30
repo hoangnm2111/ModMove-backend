@@ -21,6 +21,9 @@ public static class DependencyInjection
         // Shared by the fare estimate and order creation (one price, DECISIONS 4.4).
         services.AddScoped<Features.Orders.OrderPricing>();
 
+        // DECISIONS B17: FCM + SignalR in one call for every module.
+        services.AddScoped<Common.Interfaces.INotificationService, Common.Notifications.NotificationService>();
+
         return services;
     }
 }

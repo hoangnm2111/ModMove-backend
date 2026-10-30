@@ -12,6 +12,7 @@ using ModMove.Infrastructure;
 using ModMove.Infrastructure.Persistence.Seed;
 using ModMove.WebApi.Controllers;
 using ModMove.WebApi.Controllers.Public;
+using ModMove.WebApi.Hubs;
 using ModMove.WebApi.Middlewares;
 using ModMove.WebApi.Services;
 
@@ -81,6 +82,7 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<IRealtimeNotifier, SignalRRealtimeNotifier>();
 builder.Services.AddHealthChecks();
 
 // Clients (WebApp, mobile) are separate deployables that talk to us only over HTTP/WebSocket.

@@ -12,6 +12,9 @@ public sealed class ShippingOrderRepository(ApplicationDbContext dbContext)
     private static readonly OrderStatus[] InProgress =
         [OrderStatus.Accepted, OrderStatus.Arrived, OrderStatus.PickedUp, OrderStatus.InTransit, OrderStatus.Delivered];
 
+    public Task<ShippingOrder?> GetWithProofAsync(long id, CancellationToken cancellationToken = default) =>
+        Set.Include(o => o.Proof).FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
+
     public Task<bool> HasOpenOrdersForCustomerAsync(long customerId, CancellationToken cancellationToken = default) =>
         Set.AnyAsync(
             o => o.CustomerId == customerId && o.OrderStatus != OrderStatus.Completed && o.OrderStatus != OrderStatus.Cancelled,
