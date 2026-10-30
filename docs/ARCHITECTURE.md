@@ -82,7 +82,7 @@ Query handler **không được** inject `IRepository`/`IUnitOfWork`; architectu
 
 ## 5. Tách rời Client
 
-Backend chỉ cung cấp REST (`/api/...`) + SignalR + `/health`. WebApp và Mobile (Flutter/React Native) là các ứng dụng deploy riêng:
+Backend chỉ cung cấp REST (`/api/...`) + SignalR + `/health`. Web (React, cho Guest, Customer, Dispatcher, Admin) và Mobile (Flutter, một app cho Customer và Driver) là các ứng dụng deploy riêng (DECISIONS C11):
 - Origin được phép cấu hình trong `Cors:AllowedOrigins` (appsettings), không hardcode.
 - Mọi lỗi trả về cùng một format **RFC 7807 ProblemDetails** (`400` validation, `401` sai thông tin đăng nhập, `403`, `404`, `409` xung đột, `422` domain, `500`) kèm trường `code` ổn định để client rẽ nhánh. Bảng `code` đầy đủ ở [api/README.md](api/README.md). Muốn mã riêng: `throw new DomainException("...", "ORDER_NOT_CANCELLABLE")` rồi thêm mã vào bảng đó.
 
