@@ -144,6 +144,26 @@ internal sealed class InMemoryRefunds : IRefundRepository
     public void Remove(Refund aggregate) => Items.Remove(aggregate);
 }
 
+internal sealed class InMemoryRatings : IRatingRepository
+{
+    public List<Rating> Items { get; } = [];
+
+    public Task<bool> ExistsForOrderAsync(long orderId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Any(r => r.OrderId == orderId));
+
+    public Task<Rating?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(r => r.Id == id));
+
+    public void Add(Rating aggregate)
+    {
+        if (aggregate.Id == 0)
+            TestIds.Set(aggregate, Items.Count + 1);
+        Items.Add(aggregate);
+    }
+    public void Update(Rating aggregate) { }
+    public void Remove(Rating aggregate) => Items.Remove(aggregate);
+}
+
 internal sealed class InMemoryCoupons : ICouponRepository
 {
     public List<Coupon> Items { get; } = [];
@@ -376,6 +396,7 @@ internal sealed class TestApp
     public InMemoryRefunds Refunds { get; } = new();
     public InMemoryDriverProfiles DriverProfiles { get; } = new();
     public InMemoryDriverWallets DriverWallets { get; } = new();
+    public InMemoryRatings Ratings { get; } = new();
     public CapturingRealtimeNotifier Realtime { get; } = new();
     public CapturingPushNotifications Push { get; } = new();
     public CountingUnitOfWork UnitOfWork { get; } = new();
@@ -411,6 +432,7 @@ internal sealed class TestApp
             .AddSingleton<IRefundRepository>(Refunds)
             .AddSingleton<IDriverProfileRepository>(DriverProfiles)
             .AddSingleton<IDriverWalletRepository>(DriverWallets)
+            .AddSingleton<IRatingRepository>(Ratings)
             .AddSingleton<IRealtimeNotifier>(Realtime)
             .AddSingleton<IPushNotificationService>(Push)
             .AddSingleton<IUnitOfWork>(UnitOfWork)
