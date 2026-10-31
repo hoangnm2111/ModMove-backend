@@ -203,16 +203,61 @@ public class AuthFlowTests
     }
 
     [Fact]
-    public async Task Logout_stops_push_notifications_to_the_device()
+    public async Task Logout_on_the_app_stops_pushes_to_that_device_9_2()
     {
         var user = User.Create("A", "0900000001", "a@x.vn", "h:x", UserRole.Driver, emailVerified: true);
         user.SetFcmToken("device-token");
         var app = TestApp.SignedInAs(user);
 
-        await app.Sender.Send(new LogoutCommand());
+        await app.Sender.Send(new LogoutCommand("device-token"));
 
         Assert.Null(user.FcmToken);
     }
+
+    [Fact]
+    public async Task Logout_on_an_old_device_keeps_pushes_to_the_newer_one_9_2()
+    {
+        var user = User.Create("A", "0900000001", "a@x.vn", "h:x", UserRole.Driver, emailVerified: true);
+        user.SetFcmToken("new-phone");
+        var app = TestApp.SignedInAs(user);
+
+        await app.Sender.Send(new LogoutCommand("old-phone"));
+
+        Assert.Equal("new-phone", user.FcmToken);
+    }
+
+    [Fact]
+    public async Task Logout_on_the_web_leaves_the_app_token_alone_9_2()
+    {
+        var user = User.Create("A", "0900000001", "a@x.vn", "h:x", UserRole.Customer, emailVerified: true);
+        user.SetFcmToken("phone");
+        var app = TestApp.SignedInAs(user);
+
+        await app.Sender.Send(new LogoutCommand());
+
+        Assert.Equal("phone", user.FcmToken);
+        Assert.Equal(1, app.UnitOfWork.Saves);
+    }
+
+    [Fact]
+    public async Task An_empty_token_clears_nothing_but_still_ends_every_session_9_1()
+    {
+        var user = User.Create("A", "0900000001", "a@x.vn", "h:secret123", UserRole.Driver, emailVerified: true);
+        user.SetFcmToken("phone");
+        var app = TestApp.SignedInAs(user);
+        var login = await app.Sender.Send(new LoginCommand("a@x.vn", "secret123"));
+
+        await app.Sender.Send(new LogoutCommand(""));
+
+        Assert.Equal("phone", user.FcmToken);
+        await Assert.ThrowsAsync<UnauthorizedException>(() => app.Sender.Send(new RefreshTokenCommand(login.RefreshToken)));
+    }
+
+    [Fact]
+    public async Task Logout_token_is_at_most_255_characters() =>
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            TestApp.SignedInAs(User.Create("A", "0900000001", "a@x.vn", "h:x", UserRole.Driver, emailVerified: true))
+                .Sender.Send(new LogoutCommand(new string('x', 256))));
 
     [Fact]
     public async Task Five_wrong_guesses_burn_the_code_even_if_the_sixth_is_right()

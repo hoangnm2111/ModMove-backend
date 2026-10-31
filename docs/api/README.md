@@ -32,7 +32,7 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | PUT | `api/account/profile` | Đã đăng nhập | `{ fullName, phoneNumber, avatarUrl }` → 204 |
 | PUT | `api/account/fcmtoken` | Chỉ app (web không dùng FCM, 9.2) | `{ token }` → 204; mỗi tài khoản giữ một token, máy đăng ký sau cùng thắng |
 | POST | `api/account/password` | Đã đăng nhập | `{ currentPassword, newPassword }` → 204; thu hồi mọi refresh token, mọi máy (cả máy đang dùng) phải đăng nhập lại |
-| POST | `api/account/logout` | Đã đăng nhập | 204; thu hồi mọi refresh token |
+| POST | `api/account/logout` | Đã đăng nhập | App: `{ fcmToken }`; web: không body → 204. Thu hồi mọi refresh token (9.1); chỉ xóa FCM token khi `fcmToken` gửi lên đúng là token đang lưu, máy đăng ký sau vẫn nhận thông báo (9.2) |
 | DELETE | `api/customer/account` | Customer | 204; tài khoản thành `Inactive` |
 | POST | `api/customer/orders` | Customer | Tạo đơn **tiền mặt**: `{ vehicleTypeId, pickupAddress, dropoffAddress, receiverName, receiverPhone, cargo: { cargoType, quantity, weightKg, lengthCm, widthCm, heightCm, photoUrls[1..5], specialNotes? }, hasLoadingService, couponCode?, paymentMethod: "Cash", payerRole: Sender \| Receiver, prohibitedGoodsCommitment: true }` → 201 `{ orderId, orderCode, totalFee }`. Giá tính lại ở server như báo giá |
 | GET | `api/customer/orders` | Customer | `?page=1&pageSize=20&view=All\|Active\|History&search=` → `PagedResult` đơn của chính mình, mới nhất trước (`page` 1–10 000, `pageSize` ≤ 50; History = Completed/Cancelled) |
