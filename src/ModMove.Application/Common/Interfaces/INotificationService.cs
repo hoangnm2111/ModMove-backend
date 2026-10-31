@@ -13,4 +13,7 @@ public sealed record Notification(string Type, string Title, string Body, IReadO
 public interface INotificationService
 {
     Task NotifyAsync(long userId, Notification notification, CancellationToken cancellationToken);
+
+    /// <summary>SignalR NotificationReceived to the group "dispatchers" (B12); the Dispatcher web has no FCM.</summary>
+    Task NotifyDispatchersAsync(Notification notification, CancellationToken cancellationToken);
 }

@@ -13,4 +13,10 @@ public sealed class RefundRepository(ApplicationDbContext dbContext)
             r => r.OrderId == orderId && r.SourceType == RefundSourceType.Complaint
                 && (r.RefundStatus == RefundStatus.Requested || r.RefundStatus == RefundStatus.Approved),
             cancellationToken);
+
+    public Task<bool> HasOpenRefundForIncidentAsync(long incidentId, CancellationToken cancellationToken = default) =>
+        Set.AnyAsync(
+            r => r.IncidentId == incidentId
+                && (r.RefundStatus == RefundStatus.Requested || r.RefundStatus == RefundStatus.Approved),
+            cancellationToken);
 }

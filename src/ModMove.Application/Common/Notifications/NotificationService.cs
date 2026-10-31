@@ -14,6 +14,18 @@ internal sealed class NotificationService(
     ILogger<NotificationService> logger,
     IPushNotificationService? push = null) : INotificationService
 {
+    public async Task NotifyDispatchersAsync(Notification notification, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await realtime.SendToDispatchersAsync(RealtimeEvents.NotificationReceived, notification, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "SignalR notification {Type} to dispatchers failed", notification.Type);
+        }
+    }
+
     public async Task NotifyAsync(long userId, Notification notification, CancellationToken cancellationToken)
     {
         try

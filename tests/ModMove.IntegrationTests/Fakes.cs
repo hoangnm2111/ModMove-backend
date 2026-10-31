@@ -131,6 +131,9 @@ internal sealed class InMemoryRefunds : IRefundRepository
         Task.FromResult(Items.Any(r => r.OrderId == orderId && r.SourceType == RefundSourceType.Complaint
             && r.RefundStatus is RefundStatus.Requested or RefundStatus.Approved));
 
+    public Task<bool> HasOpenRefundForIncidentAsync(long incidentId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Any(r => r.IncidentId == incidentId && r.RefundStatus is RefundStatus.Requested or RefundStatus.Approved));
+
     public Task<Refund?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(r => r.Id == id));
 
@@ -397,6 +400,7 @@ internal sealed class TestApp
     public InMemoryDriverProfiles DriverProfiles { get; } = new();
     public InMemoryDriverWallets DriverWallets { get; } = new();
     public InMemoryRatings Ratings { get; } = new();
+    public InMemoryRepository<InTransitIncident> Incidents { get; } = new();
     public CapturingRealtimeNotifier Realtime { get; } = new();
     public CapturingPushNotifications Push { get; } = new();
     public CountingUnitOfWork UnitOfWork { get; } = new();
@@ -433,6 +437,7 @@ internal sealed class TestApp
             .AddSingleton<IDriverProfileRepository>(DriverProfiles)
             .AddSingleton<IDriverWalletRepository>(DriverWallets)
             .AddSingleton<IRatingRepository>(Ratings)
+            .AddSingleton<IRepository<InTransitIncident>>(Incidents)
             .AddSingleton<IRealtimeNotifier>(Realtime)
             .AddSingleton<IPushNotificationService>(Push)
             .AddSingleton<IUnitOfWork>(UnitOfWork)
