@@ -336,6 +336,9 @@ internal sealed class CapturingRealtimeNotifier : IRealtimeNotifier
     /// <summary>Set to true to act like the SignalR backplane failing.</summary>
     public bool Fail { get; set; }
 
+    /// <summary>Set to true to fail only sends to order groups.</summary>
+    public bool FailOrderGroups { get; set; }
+
     public Task SendToOrderAsync(long orderId, string eventName, object payload, CancellationToken cancellationToken) =>
         Record("order", orderId.ToString(), eventName, payload, cancellationToken);
 
@@ -348,7 +351,7 @@ internal sealed class CapturingRealtimeNotifier : IRealtimeNotifier
     private Task Record(string target, string? id, string eventName, object payload, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (Fail)
+        if (Fail || (FailOrderGroups && target == "order"))
             throw new InvalidOperationException("SignalR is down");
         Sent.Add((target, id, eventName, payload));
         return Task.CompletedTask;

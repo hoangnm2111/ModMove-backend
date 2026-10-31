@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
+using ModMove.Domain.Entities;
 
 namespace ModMove.Application.Common.Notifications;
 
@@ -23,6 +24,31 @@ internal sealed class NotificationService(
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(ex, "SignalR notification {Type} to dispatchers failed", notification.Type);
+        }
+    }
+
+    public async Task PublishOrderStatusAsync(ShippingOrder order, long? driverUserId, CancellationToken cancellationToken)
+    {
+        var update = new OrderStatusUpdate(order.Id, order.OrderStatus.ToString());
+        // Two separate sends: a failing order group must not keep the driver from hearing the change.
+        try
+        {
+            await realtime.SendToOrderAsync(order.Id, RealtimeEvents.OrderStatusChanged, update, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "OrderStatusChanged to the followers of order {OrderId} failed", order.Id);
+        }
+
+        if (driverUserId is not { } driver)
+            return;
+        try
+        {
+            await realtime.SendToUserAsync(driver, RealtimeEvents.OrderStatusChanged, update, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex, "OrderStatusChanged to the driver of order {OrderId} failed", order.Id);
         }
     }
 
