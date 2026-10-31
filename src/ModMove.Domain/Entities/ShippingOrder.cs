@@ -189,8 +189,8 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         return Proof;
     }
 
-    /// <summary>DECISIONS C10: the order belongs to another customer.</summary>
-    private void EnsureCustomer(long customerId)
+    /// <summary>DECISIONS C10: refuses a customer other than the one who placed the order (ORDER_NOT_YOURS).</summary>
+    public void EnsureCustomer(long customerId)
     {
         if (customerId != CustomerId)
             throw new DomainException("This order belongs to another customer.", "ORDER_NOT_YOURS");
@@ -204,6 +204,46 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     {
         EnsureCustomer(customerId);
         Complete(commissionRate, ChangedByRole.Customer, customerId, now);
+    }
+
+    /// <summary>
+    /// UC-CUS-21, DECISIONS 7.3, B9: a complaint while Delivered and within 24 hours of delivery. The Dispatcher proposes
+    /// the amount later. "One open complaint per order" needs the refunds table, so the caller checks it; bumping
+    /// RowVersion makes a second complaint saved at the same time fail with 409.
+    /// </summary>
+    public Refund FileComplaint(
+        long customerId, string reason, IEnumerable<string>? evidenceUrls, decimal requestedAmount, DateTimeOffset now)
+    {
+        EnsureCustomer(customerId);
+        if (!CanReceiveComplaint(now))
+            throw new DomainException(
+                "A complaint is accepted only within 24 hours of delivery, before the order completes.", "COMPLAINT_WINDOW_CLOSED");
+        EnsureRefundAmount(requestedAmount);
+
+        RowVersion++;
+        return Refund.Request(Id, null, RefundSourceType.Complaint, reason, evidenceUrls, requestedAmount);
+    }
+
+    /// <summary>
+    /// UC-CUS-17, DECISIONS B9: the customer asks for a refund because of an incident on this order, whatever the
+    /// incident's state. "One open refund per incident" is checked by the caller; RowVersion guards a concurrent one.
+    /// </summary>
+    public Refund RequestIncidentRefund(
+        long customerId, long incidentId, string reason, IEnumerable<string>? evidenceUrls, decimal requestedAmount)
+    {
+        EnsureCustomer(customerId);
+        EnsureRefundAmount(requestedAmount);
+
+        RowVersion++;
+        return Refund.Request(Id, incidentId, RefundSourceType.Incident, reason, evidenceUrls, requestedAmount);
+    }
+
+    /// <summary>DECISIONS B9: more than 0 and at most what the order cost; larger compensation is handled outside the system.</summary>
+    private void EnsureRefundAmount(decimal requestedAmount)
+    {
+        if (requestedAmount <= 0 || requestedAmount > TotalFee)
+            throw new DomainException(
+                $"The amount requested must be more than 0 and at most the order total ({TotalFee:0} VND).", "REFUND_AMOUNT_INVALID");
     }
 
     /// <summary>

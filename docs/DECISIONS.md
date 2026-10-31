@@ -35,7 +35,7 @@
 | 2.6 | Hàng còn trên xe sau khi hủy: tài xế báo sự cố; Dispatcher quyết định trả về điểm lấy hay giữ lại. Không tính thêm phí quay về |
 | 2.8 | Phân công: Hoàng làm trạng thái chuyến và job; Hiếu làm thông báo và phản hồi của khách; Huy làm phần Dispatcher xử lý |
 | 5.3 | Đơn tiền mặt người nhận trả mà người nhận không trả: người gửi trả thay cho tài xế; tranh chấp chuyển Dispatcher. Tài xế không tự bỏ tiền, giữ hàng và bằng chứng chờ hướng dẫn |
-| B9, 3.3 | Hoàn tiền do **hủy**: tự động tạo với số tiền tính theo 2.1, chuyển thẳng Admin duyệt và chi trả tay (GB-27), không qua Dispatcher: khoản hoàn được tạo với `requested_amount = proposed_amount` = số tiền khách đã trả (100% theo 2.1). Hoàn tiền do **sự cố/khiếu nại**: khách nhập số tiền yêu cầu, Dispatcher đề xuất `proposed_amount ≤ requested_amount`, Admin duyệt và chi trả tay. Mỗi đơn chỉ một khiếu nại mở (kiểm tra trong handler) |
+| B9, 3.3 | Hoàn tiền do **hủy**: tự động tạo với số tiền tính theo 2.1, chuyển thẳng Admin duyệt và chi trả tay (GB-27), không qua Dispatcher: khoản hoàn được tạo với `requested_amount = proposed_amount` = số tiền khách đã trả (100% theo 2.1). Hoàn tiền do **sự cố/khiếu nại**: khách nhập số tiền yêu cầu, Dispatcher đề xuất `proposed_amount ≤ requested_amount`, Admin duyệt và chi trả tay. Mỗi đơn chỉ một khiếu nại mở (kiểm tra trong handler). **Số tiền khách yêu cầu: > 0 và ≤ `total_fee` của đơn** (bồi thường lớn hơn xử lý ngoài hệ thống). **Hoàn tiền do sự cố** (UC-CUS-17): khách gửi cho sự cố thuộc đơn của mình, ở bất kỳ trạng thái sự cố nào; mỗi sự cố chỉ một yêu cầu hoàn đang mở. "Mở" = `Requested` hoặc `Approved`. Khách rút được khiếu nại/hoàn sự cố khi còn `Requested`; hoàn do hủy thì không rút (2026-10-31) |
 
 ## 3. Thanh toán và ví tài xế
 
