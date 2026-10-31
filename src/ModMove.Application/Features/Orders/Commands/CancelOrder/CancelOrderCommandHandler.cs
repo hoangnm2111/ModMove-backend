@@ -33,7 +33,9 @@ internal sealed class CancelOrderCommandHandler(
         // Accept, MarkPaid and Cancel all bump RowVersion: of two racing saves, the later one is a 409.
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        await notifications.NotifyDriverAsync(driverProfiles, order, "ORDER_CANCELLED",
+        var driverUserId = await driverProfiles.DriverUserIdAsync(order, cancellationToken);
+        await notifications.PublishOrderStatusAsync(order, driverUserId, cancellationToken);
+        await notifications.NotifyDriverAsync(driverUserId, order, "ORDER_CANCELLED",
             "Đơn đã bị hủy", $"Khách đã hủy đơn {order.OrderCode}.", cancellationToken);
     }
 }

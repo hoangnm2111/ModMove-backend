@@ -91,7 +91,7 @@ public class CancelOrderTests
 
         await s.App.Sender.Send(Cancel(order));
 
-        var sent = Assert.Single(s.App.Realtime.Sent);
+        var sent = Assert.Single(s.App.Realtime.Sent, x => x.EventName == RealtimeEvents.NotificationReceived);
         Assert.Equal(("user", s.Driver.Id.ToString(), RealtimeEvents.NotificationReceived), (sent.Target, sent.Id, sent.EventName));
         var notification = Assert.IsType<Notification>(sent.Payload);
         Assert.Equal("ORDER_CANCELLED", notification.Type);
@@ -109,7 +109,7 @@ public class CancelOrderTests
         await s.App.Sender.Send(Cancel(order));
 
         Assert.Equal(180_000m, Assert.Single(s.App.Refunds.Items).ProposedAmount);
-        Assert.Equal(s.Driver.Id.ToString(), Assert.Single(s.App.Realtime.Sent).Id);
+        Assert.Equal(s.Driver.Id.ToString(), Assert.Single(s.App.Realtime.Sent, x => x.EventName == RealtimeEvents.NotificationReceived).Id);
     }
 
     [Fact]
@@ -135,7 +135,7 @@ public class CancelOrderTests
 
         await s.App.Sender.Send(Cancel(order));
 
-        Assert.Empty(s.App.Realtime.Sent);
+        Assert.DoesNotContain(s.App.Realtime.Sent, x => x.EventName == RealtimeEvents.NotificationReceived);
     }
 
     [Fact]

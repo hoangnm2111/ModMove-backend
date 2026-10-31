@@ -31,14 +31,16 @@ internal sealed class ReviewPickupEvidenceCommandHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
+        var driverUserId = await driverProfiles.DriverUserIdAsync(order, cancellationToken);
         if (request.Approve)
         {
-            await notifications.NotifyDriverAsync(driverProfiles, order, "PICKUP_APPROVED",
+            await notifications.PublishOrderStatusAsync(order, driverUserId, cancellationToken); // now InTransit
+            await notifications.NotifyDriverAsync(driverUserId, order, "PICKUP_APPROVED",
                 "Khách đã duyệt ảnh lấy hàng", $"Bắt đầu vận chuyển đơn {order.OrderCode}.", cancellationToken);
         }
         else
         {
-            await notifications.NotifyDriverAsync(driverProfiles, order, "PICKUP_REJECTED",
+            await notifications.NotifyDriverAsync(driverUserId, order, "PICKUP_REJECTED",
                 "Khách từ chối ảnh lấy hàng", $"Chụp lại ảnh hàng của đơn {order.OrderCode}: {reason}", cancellationToken,
                 ("reason", reason!));
         }

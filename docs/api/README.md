@@ -81,8 +81,8 @@ Kết nối với JWT trên query string: `/hubs/tracking?access_token=<accessTo
 | client → server | `JoinOrder(orderId)` | Customer | Theo dõi đơn của mình (vào group `order-{id}`); đơn người khác → `ORDER_NOT_YOURS`. Kết nối lại thì gọi lại |
 | client → server | `SendLocation(latitude, longitude)` | Driver (đã duyệt) | Gửi GPS vài giây một lần. Server lưu vị trí cuối; ghi `driver_location_logs` khi đang có đơn (`Accepted`…`InTransit`) |
 | server → client | `LocationUpdated` | khách theo dõi đơn, Dispatcher | `{ driverProfileId, orderId?, latitude, longitude, at }`. Tới group `order-{id}` khi tài xế đang chở đơn đó; tới mọi Dispatcher khi tài xế `Online` (Dispatcher tự vào group `dispatchers` khi kết nối). Quá 5 phút không có GPS: coi là mất kết nối (6.4) |
-| server → client | `NotificationReceived` | mọi user (Dispatcher: thông báo chung) | `{ type, title, body, data }` (B17): cùng nội dung FCM, tới mọi kết nối của user. `type` ví dụ `ORDER_CANCELLED`, `PICKUP_APPROVED`, `PICKUP_REJECTED`, `ORDER_COMPLETED`; Dispatcher nhận `COMPLAINT_SUBMITTED`, `INCIDENT_REFUND_REQUESTED`, `REFUND_INFO_REPLIED`, `INCIDENT_REPORTED` |
-| server → client | `OrderStatusChanged` | | Dành sẵn (B12), chưa phát |
+| server → client | `NotificationReceived` | mọi user (Dispatcher: thông báo chung) | `{ type, title, body, data }` (B17): cùng nội dung FCM, tới mọi kết nối của user. Khách (8.3): `ORDER_ACCEPTED`, `DRIVER_ARRIVED`, `PICKUP_PHOTOS_TO_REVIEW`, `ORDER_DELIVERED`, `ORDER_COMPLETED`, `INCIDENT_RESOLVED`, `REFUND_DECIDED`. Tài xế: `ORDER_CANCELLED`, `PICKUP_APPROVED`, `PICKUP_REJECTED`, `ORDER_COMPLETED`. Dispatcher: `COMPLAINT_SUBMITTED`, `INCIDENT_REFUND_REQUESTED`, `REFUND_INFO_REPLIED`, `INCIDENT_REPORTED`. `data.orderId` luôn có. `ORDER_COMPLETED` gửi cho cả khách và tài xế với nội dung khác: app (một app cho mọi role) xét thêm role của người đang đăng nhập |
+| server → client | `OrderStatusChanged` | khách theo dõi đơn, tài xế của đơn | `{ orderId, orderStatus }` sau mỗi lần đổi trạng thái đơn: tới group `order-{id}` và tới tài xế qua `Clients.User` (B12) |
 
 ## Mã lỗi
 
