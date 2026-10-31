@@ -12,5 +12,8 @@ public interface IDriverProfileRepository : IRepository<DriverProfile>
     /// <summary>The signed-in driver's own profile (UC-DRV-03/05); null when no application was ever submitted.</summary>
     Task<DriverProfile?> GetByUserIdWithApplicationsAndVehicleAsync(long userId, CancellationToken cancellationToken = default);
 
+    /// <summary>The profile alone, without applications or vehicle: for frequent calls such as GPS updates (B12).</summary>
+    Task<DriverProfile?> GetByUserIdAsync(long userId, CancellationToken cancellationToken = default);
+
     Task<DriverProfile?> GetByApplicationIdWithApplicationsAndVehicleAsync(long applicationId, CancellationToken cancellationToken = default);
 }

@@ -1,0 +1,41 @@
+namespace ModMove.Application.Features.Refunds.Queries;
+
+/// <summary>One refund of the customer as read by Dapper; column aliases match the property names.</summary>
+internal sealed class RefundRow
+{
+    /// <summary>Joined with the order so only the caller's refunds come back (IDOR, C10).</summary>
+    public const string FromCustomerRefunds = """
+        FROM refunds r
+        JOIN shipping_orders o ON o.id = r.order_id
+        WHERE o.customer_id = @CustomerId
+        """;
+
+    public const string Columns = """
+        r.id AS Id, r.order_id AS OrderId, o.order_code AS OrderCode, r.incident_id AS IncidentId,
+        r.source_type AS SourceType, r.refund_status AS RefundStatus, r.reason AS Reason, r.evidence_urls AS EvidenceUrls,
+        r.requested_amount AS RequestedAmount, r.proposed_amount AS ProposedAmount,
+        r.info_request_note AS InfoRequestNote, r.customer_reply AS CustomerReply,
+        r.decided_at AS DecidedAt, r.processed_at AS ProcessedAt, r.created_at AS CreatedAt
+        """;
+
+    public long Id { get; init; }
+    public long OrderId { get; init; }
+    public string OrderCode { get; init; } = "";
+    public long? IncidentId { get; init; }
+    public string SourceType { get; init; } = "";
+    public string RefundStatus { get; init; } = "";
+    public string Reason { get; init; } = "";
+    public string? EvidenceUrls { get; init; }
+    public decimal RequestedAmount { get; init; }
+    public decimal? ProposedAmount { get; init; }
+    public string? InfoRequestNote { get; init; }
+    public string? CustomerReply { get; init; }
+    public DateTime? DecidedAt { get; init; }
+    public DateTime? ProcessedAt { get; init; }
+    public DateTime CreatedAt { get; init; }
+
+    /// <summary>A Dispatcher's proposal is not final; the customer sees an amount once an Administrator approved it.</summary>
+    public decimal? ApprovedAmount => RefundStatus is "Approved" or "Processed" ? ProposedAmount : null;
+
+    public bool WaitingForReply => RefundStatus == "Requested" && InfoRequestNote is not null && CustomerReply is null;
+}

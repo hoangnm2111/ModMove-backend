@@ -95,6 +95,13 @@ internal sealed class InMemoryOrders : IShippingOrderRepository
     public Task<ShippingOrder?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(o => o.Id == id));
 
+    public Task<ShippingOrder?> GetWithProofAsync(long id, CancellationToken cancellationToken = default) =>
+        GetByIdAsync(id, cancellationToken);
+
+    public Task<long?> GetActiveOrderIdForDriverAsync(long driverProfileId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(o => o.DriverProfileId == driverProfileId
+            && o.OrderStatus is OrderStatus.Accepted or OrderStatus.Arrived or OrderStatus.PickedUp or OrderStatus.InTransit)?.Id);
+
     public void Add(ShippingOrder aggregate)
     {
         if (aggregate.Id == 0)
@@ -118,6 +125,50 @@ internal sealed class InMemoryRepository<T> : IRepository<T> where T : ModMove.D
     }
     public void Update(T aggregate) { }
     public void Remove(T aggregate) => Items.Remove(aggregate);
+}
+
+internal sealed class InMemoryRefunds : IRefundRepository
+{
+    public List<Refund> Items { get; } = [];
+
+    public Task<bool> HasOpenComplaintAsync(long orderId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Any(r => r.OrderId == orderId && r.SourceType == RefundSourceType.Complaint
+            && r.RefundStatus is RefundStatus.Requested or RefundStatus.Approved));
+
+    public Task<bool> HasOpenRefundForIncidentAsync(long incidentId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Any(r => r.IncidentId == incidentId && r.RefundStatus is RefundStatus.Requested or RefundStatus.Approved));
+
+    public Task<Refund?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(r => r.Id == id));
+
+    public void Add(Refund aggregate)
+    {
+        if (aggregate.Id == 0)
+            TestIds.Set(aggregate, Items.Count + 1);
+        Items.Add(aggregate);
+    }
+    public void Update(Refund aggregate) { }
+    public void Remove(Refund aggregate) => Items.Remove(aggregate);
+}
+
+internal sealed class InMemoryRatings : IRatingRepository
+{
+    public List<Rating> Items { get; } = [];
+
+    public Task<bool> ExistsForOrderAsync(long orderId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Any(r => r.OrderId == orderId));
+
+    public Task<Rating?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(r => r.Id == id));
+
+    public void Add(Rating aggregate)
+    {
+        if (aggregate.Id == 0)
+            TestIds.Set(aggregate, Items.Count + 1);
+        Items.Add(aggregate);
+    }
+    public void Update(Rating aggregate) { }
+    public void Remove(Rating aggregate) => Items.Remove(aggregate);
 }
 
 internal sealed class InMemoryCoupons : ICouponRepository
@@ -151,6 +202,9 @@ internal sealed class InMemoryDriverProfiles : IDriverProfileRepository
         Task.FromResult(Items.FirstOrDefault(d => d.Id == id));
 
     public Task<DriverProfile?> GetByUserIdWithApplicationsAndVehicleAsync(long userId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(d => d.UserId == userId));
+
+    public Task<DriverProfile?> GetByUserIdAsync(long userId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(d => d.UserId == userId));
 
     public Task<DriverProfile?> GetByApplicationIdWithApplicationsAndVehicleAsync(long applicationId, CancellationToken cancellationToken = default) =>
@@ -259,11 +313,47 @@ internal sealed class CapturingPushNotifications : IPushNotificationService
 {
     public List<(string Token, string Title, string Body, IReadOnlyDictionary<string, string>? Data)> Sent { get; } = [];
 
+    /// <summary>Set to true to act like FCM being down.</summary>
+    public bool Fail { get; set; }
+
     public Task SendAsync(
         string deviceToken, string title, string body,
         IReadOnlyDictionary<string, string>? data, CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (Fail)
+            throw new HttpRequestException("FCM is down");
         Sent.Add((deviceToken, title, body, data));
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>Records SignalR pushes: Target is "user", "order" or "dispatchers"; Id is the user or order id.</summary>
+internal sealed class CapturingRealtimeNotifier : IRealtimeNotifier
+{
+    public List<(string Target, string? Id, string EventName, object Payload)> Sent { get; } = [];
+
+    /// <summary>Set to true to act like the SignalR backplane failing.</summary>
+    public bool Fail { get; set; }
+
+    /// <summary>Set to true to fail only sends to order groups.</summary>
+    public bool FailOrderGroups { get; set; }
+
+    public Task SendToOrderAsync(long orderId, string eventName, object payload, CancellationToken cancellationToken) =>
+        Record("order", orderId.ToString(), eventName, payload, cancellationToken);
+
+    public Task SendToUserAsync(long userId, string eventName, object payload, CancellationToken cancellationToken) =>
+        Record("user", userId.ToString(), eventName, payload, cancellationToken);
+
+    public Task SendToDispatchersAsync(string eventName, object payload, CancellationToken cancellationToken) =>
+        Record("dispatchers", null, eventName, payload, cancellationToken);
+
+    private Task Record(string target, string? id, string eventName, object payload, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (Fail || (FailOrderGroups && target == "order"))
+            throw new InvalidOperationException("SignalR is down");
+        Sent.Add((target, id, eventName, payload));
         return Task.CompletedTask;
     }
 }
@@ -316,6 +406,14 @@ internal sealed class TestApp
     public InMemoryOrders Orders { get; } = new();
     public InMemoryRefreshTokens RefreshTokens { get; } = new();
     public InMemoryRepository<SupportRequest> SupportRequests { get; } = new();
+    public InMemoryRefunds Refunds { get; } = new();
+    public InMemoryDriverProfiles DriverProfiles { get; } = new();
+    public InMemoryDriverWallets DriverWallets { get; } = new();
+    public InMemoryRatings Ratings { get; } = new();
+    public InMemoryRepository<InTransitIncident> Incidents { get; } = new();
+    public InMemoryRepository<DriverLocationLog> LocationLogs { get; } = new();
+    public CapturingRealtimeNotifier Realtime { get; } = new();
+    public CapturingPushNotifications Push { get; } = new();
     public CountingUnitOfWork UnitOfWork { get; } = new();
     public CapturingEmailSender Email { get; } = new();
     public FakeFileStorage Files { get; } = new();
@@ -346,6 +444,14 @@ internal sealed class TestApp
             .AddSingleton<IShippingOrderRepository>(Orders)
             .AddSingleton<IRefreshTokenRepository>(RefreshTokens)
             .AddSingleton<IRepository<SupportRequest>>(SupportRequests)
+            .AddSingleton<IRefundRepository>(Refunds)
+            .AddSingleton<IDriverProfileRepository>(DriverProfiles)
+            .AddSingleton<IDriverWalletRepository>(DriverWallets)
+            .AddSingleton<IRatingRepository>(Ratings)
+            .AddSingleton<IRepository<InTransitIncident>>(Incidents)
+            .AddSingleton<IRepository<DriverLocationLog>>(LocationLogs)
+            .AddSingleton<IRealtimeNotifier>(Realtime)
+            .AddSingleton<IPushNotificationService>(Push)
             .AddSingleton<IUnitOfWork>(UnitOfWork)
             .AddSingleton<IPasswordHasher>(new FakeHasher())
             .AddSingleton<IJwtTokenService>(new FakeTokens())

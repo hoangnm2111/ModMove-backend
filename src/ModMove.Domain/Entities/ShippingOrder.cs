@@ -123,6 +123,7 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
             throw new DomainException("A cancelled order cannot be paid; refund the payment instead.", "ORDER_CANCELLED");
         PaymentStatus = PaymentStatus.Paid;
         PaidAt ??= now;
+        RowVersion++; // a customer cancel racing the webhook must not miss the payment (409 instead)
     }
 
     /// <summary>GB-08: the first driver to accept is assigned; a stale RowVersion makes the save fail for the others.</summary>
@@ -164,23 +165,113 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         Proof.RecordPickup(photos);
     }
 
-    /// <summary>GB-26: the trip starts only after the customer approves the cargo evidence.</summary>
+    /// <summary>GB-26: the trip starts only after the customer of the order approves the pickup photos waiting for review.</summary>
     public void ApprovePickupEvidence(long customerId, DateTimeOffset now)
     {
-        if (OrderStatus != OrderStatus.PickedUp || Proof is null)
-            throw new DomainException("There is no pickup evidence to approve.");
-
-        Proof.Verify();
+        var proof = EnsurePickupEvidenceToReview(customerId);
+        proof.Verify();
         TransitionTo(OrderStatus.InTransit, ChangedByRole.Customer, customerId, null, now);
     }
 
+    /// <summary>DECISIONS 6.3: the driver then sends new photos (at most 5 submissions in all).</summary>
     public void RejectPickupEvidence(string reason, long customerId)
     {
-        if (OrderStatus != OrderStatus.PickedUp || Proof is null)
-            throw new DomainException("There is no pickup evidence to reject.");
-
-        Proof.Reject(reason);
+        var proof = EnsurePickupEvidenceToReview(customerId);
+        proof.Reject(reason);
         _statusHistories.Add(OrderStatusHistory.Create(OrderStatus, OrderStatus, ChangedByRole.Customer, customerId, reason));
+    }
+
+    private ProofOfDelivery EnsurePickupEvidenceToReview(long customerId)
+    {
+        EnsureCustomer(customerId);
+        if (OrderStatus != OrderStatus.PickedUp || Proof is not { ProofStatus: ProofStatus.Pending })
+            throw new DomainException("There are no pickup photos waiting for review.");
+        return Proof;
+    }
+
+    /// <summary>DECISIONS C10: refuses a customer other than the one who placed the order (ORDER_NOT_YOURS).</summary>
+    public void EnsureCustomer(long customerId)
+    {
+        if (customerId != CustomerId)
+            throw new DomainException("This order belongs to another customer.", "ORDER_NOT_YOURS");
+    }
+
+    /// <summary>
+    /// UC-CUS-19: the customer of the order confirms the cargo arrived, which completes it (GB-14). The driver's
+    /// wallet is settled in the same transaction by the caller.
+    /// </summary>
+    public void ConfirmReceipt(long customerId, decimal commissionRate, DateTimeOffset now)
+    {
+        EnsureCustomer(customerId);
+        Complete(commissionRate, ChangedByRole.Customer, customerId, now);
+    }
+
+    /// <summary>
+    /// UC-CUS-21, DECISIONS 7.3, B9: a complaint while Delivered and within 24 hours of delivery. The Dispatcher proposes
+    /// the amount later. "One open complaint per order" needs the refunds table, so the caller checks it; bumping
+    /// RowVersion makes a second complaint saved at the same time fail with 409.
+    /// </summary>
+    public Refund FileComplaint(
+        long customerId, string reason, IEnumerable<string>? evidenceUrls, decimal requestedAmount, DateTimeOffset now)
+    {
+        EnsureCustomer(customerId);
+        if (!CanReceiveComplaint(now))
+            throw new DomainException(
+                "A complaint is accepted only within 24 hours of delivery, before the order completes.", "COMPLAINT_WINDOW_CLOSED");
+        EnsureRefundAmount(requestedAmount);
+
+        RowVersion++;
+        return Refund.Request(Id, null, RefundSourceType.Complaint, reason, evidenceUrls, requestedAmount);
+    }
+
+    /// <summary>
+    /// UC-CUS-17, DECISIONS B9: the customer asks for a refund because of an incident on this order, whatever the
+    /// incident's state. "One open refund per incident" is checked by the caller; RowVersion guards a concurrent one.
+    /// </summary>
+    public Refund RequestIncidentRefund(
+        long customerId, long incidentId, string reason, IEnumerable<string>? evidenceUrls, decimal requestedAmount)
+    {
+        EnsureCustomer(customerId);
+        EnsureRefundAmount(requestedAmount);
+
+        RowVersion++;
+        return Refund.Request(Id, incidentId, RefundSourceType.Incident, reason, evidenceUrls, requestedAmount);
+    }
+
+    /// <summary>
+    /// UC-CUS-15, DECISIONS 2.2: once the driver has arrived the customer cannot cancel but reports an incident for a
+    /// Dispatcher (GB-17), while the order is Arrived, PickedUp or InTransit. After delivery a complaint is used (7.3).
+    /// </summary>
+    public InTransitIncident ReportIncidentByCustomer(
+        long customerId, IncidentType type, string description, IEnumerable<string>? photoUrls, decimal? latitude, decimal? longitude)
+    {
+        EnsureCustomer(customerId);
+        if (OrderStatus is not (OrderStatus.Arrived or OrderStatus.PickedUp or OrderStatus.InTransit))
+            throw new DomainException(
+                "An incident can be reported from the driver's arrival until delivery; after delivery, file a complaint.",
+                "INCIDENT_NOT_ALLOWED");
+
+        return InTransitIncident.Report(Id, customerId, type, description, photoUrls, latitude, longitude);
+    }
+
+    /// <summary>DECISIONS B9: more than 0 and at most what the order cost; larger compensation is handled outside the system.</summary>
+    private void EnsureRefundAmount(decimal requestedAmount)
+    {
+        if (requestedAmount <= 0 || requestedAmount > TotalFee)
+            throw new DomainException(
+                $"The amount requested must be more than 0 and at most the order total ({TotalFee:0} VND).", "REFUND_AMOUNT_INVALID");
+    }
+
+    /// <summary>
+    /// UC-CUS-25: the customer of the order rates its driver. Completed only, within 1 day (GB-20, 7.5); the
+    /// one-rating-per-order rule is the unique index on ratings.order_id.
+    /// </summary>
+    public Rating Rate(long customerId, int stars, string? comment, DateTimeOffset now)
+    {
+        EnsureCustomer(customerId);
+        var driverProfileId = DriverProfileId
+            ?? throw new DomainException("Only a completed trip with a driver can be rated.", "RATING_NOT_ALLOWED");
+        return Rating.Create(Id, customerId, driverProfileId, stars, comment, CompletedAt, now);
     }
 
     /// <summary>GB-12: a delivery photo and timestamp are required for Delivered.</summary>
@@ -209,6 +300,7 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         CompletedAt = now;
         CommissionRate = commissionRate;
         CommissionAmount = CommissionFor(commissionRate);
+        RowVersion++; // the customer and the auto-complete job racing: the later save is a 409, so the wallet is settled once
     }
 
     /// <summary>
@@ -229,6 +321,7 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     {
         TransitionTo(OrderStatus.Cancelled, by, userId, reason, now);
         CancellationReason = reason;
+        RowVersion++; // a driver accepting with a stale copy gets a 409 instead of reviving the order
     }
 
     /// <summary>
@@ -242,7 +335,8 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
             throw new DomainException("Only the customer who placed the order can cancel it.", "ORDER_NOT_YOURS");
         if (OrderStatus is not (OrderStatus.Pending or OrderStatus.Accepted))
             throw new DomainException(
-                "The driver has already arrived. Report an incident so a dispatcher can handle it.", "ORDER_NOT_CANCELLABLE");
+                "Only a Pending or Accepted order can be cancelled. Once the driver has arrived, report an incident instead.",
+                "ORDER_NOT_CANCELLABLE");
 
         Cancel(reason, ChangedByRole.Customer, customerId, now);
         return PaymentStatus == PaymentStatus.Paid ? TotalFee : 0;

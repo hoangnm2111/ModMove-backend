@@ -19,8 +19,10 @@ internal sealed class LogoutCommandHandler(
         if (user is null)
             return;
 
-        user.SetFcmToken(null);
-        await refreshTokens.RevokeAllForUserAsync(user.Id, clock.GetUtcNow(), cancellationToken); // one device per account (9.2)
+        // 9.2: only this device's token is cleared; another phone that registered later keeps its pushes.
+        if (!string.IsNullOrEmpty(request.FcmToken) && user.FcmToken == request.FcmToken)
+            user.SetFcmToken(null);
+        await refreshTokens.RevokeAllForUserAsync(user.Id, clock.GetUtcNow(), cancellationToken);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

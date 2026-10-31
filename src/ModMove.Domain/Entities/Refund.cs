@@ -56,6 +56,7 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
         EnsureStatus(RefundStatus.Requested);
         EnsureDispatcherStep();
         InfoRequestNote = note;
+        CustomerReply = null; // a new question waits for a new answer (7.4)
     }
 
     /// <summary>
@@ -122,9 +123,11 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
         RefundStatus = RefundStatus.Failed;
     }
 
-    /// <summary>UC-CUS-24: the customer withdraws a complaint that is still Requested.</summary>
+    /// <summary>UC-CUS-24: the customer drops a complaint or incident refund still under review. A cancellation refund is owed, so it stays.</summary>
     public void Withdraw()
     {
+        if (SourceType == RefundSourceType.Cancellation)
+            throw new DomainException("A cancellation refund cannot be withdrawn.");
         EnsureStatus(RefundStatus.Requested);
         RefundStatus = RefundStatus.Withdrawn;
     }
