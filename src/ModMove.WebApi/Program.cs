@@ -42,6 +42,19 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.SigningKey)),
         ClockSkew = TimeSpan.FromSeconds(30),
     });
+// DECISIONS B12: browsers cannot set headers on a WebSocket, so the hub reads the JWT from ?access_token=. Only on /hubs.
+// The URL then carries a token: never log full request URLs (HttpLogging, Information level for ASP.NET Core, proxies).
+builder.Services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme, bearer =>
+{
+    bearer.Events ??= new JwtBearerEvents();
+    bearer.Events.OnMessageReceived = context =>
+    {
+        var token = context.Request.Query["access_token"];
+        if (!string.IsNullOrEmpty(token) && context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+            context.Token = token;
+        return Task.CompletedTask;
+    };
+});
 
 // Enums travel as their names ("Pending"), the same form the database stores.
 builder.Services.AddControllers(options => options.Conventions.Add(new RoleConvention()))
@@ -116,6 +129,8 @@ app.UseAuthorization();
 app.UseRateLimiter();
 
 app.MapControllers();
+// The connection ends with its access token (15 min), so a lock or a deletion also ends what the user receives (B8).
+app.MapHub<TrackingHub>("/hubs/tracking", options => options.CloseOnAuthenticationExpiration = true);
 app.MapHealthChecks("/health");
 
 app.Run();

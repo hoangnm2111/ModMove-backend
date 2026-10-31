@@ -72,6 +72,18 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | PATCH | `api/admin/users/{id}/status` | Administrator | `{ status: Active \| Inactive \| Locked, reason }` → 204; Đổi trạng thái tài khoản kèm lý do bắt buộc (UC-ADM-06). Khi chuyển sang `Inactive` hoặc `Locked`, thu hồi mọi refresh token (`RevokeAllForUserAsync`) và xóa FCM token (DECISIONS B8, 8.2). Tự đổi tài khoản của chính mình → 422 `CANNOT_CHANGE_OWN_STATUS` (MSG65) |
 | POST | `api/admin/users/dispatchers` | Administrator | `{ fullName, phoneNumber, email, password }` → 201 `{ id }`; Tạo tài khoản Điều phối viên (`Role=Dispatcher`, `AccountStatus=Active`, `EmailVerified=true`) để đăng nhập ngay không cần OTP (UC-ADM-07, DECISIONS B7). Trùng email/SĐT → 409 (GB-01) |
 
+## Realtime: SignalR `/hubs/tracking` (DECISIONS B12, B17)
+
+Kết nối với JWT trên query string: `/hubs/tracking?access_token=<accessToken>` (WebSocket không đặt được header). Tài khoản không `Active` bị ngắt ngay khi kết nối. Kết nối tự đóng khi access token hết hạn: client lấy token mới (`refresh`) rồi kết nối lại và gọi lại `JoinOrder`. Lỗi trả về `HubException` có message bắt đầu bằng mã ổn định, ví dụ `ORDER_NOT_YOURS: ...`, `ACCOUNT_INACTIVE: ...`, `VALIDATION: ...`; riêng gọi method sai vai trò thì SignalR trả lỗi "unauthorized" chung, không có mã.
+
+| Hướng | Tên | Ai | Mô tả |
+|---|---|---|---|
+| client → server | `JoinOrder(orderId)` | Customer | Theo dõi đơn của mình (vào group `order-{id}`); đơn người khác → `ORDER_NOT_YOURS`. Kết nối lại thì gọi lại |
+| client → server | `SendLocation(latitude, longitude)` | Driver (đã duyệt) | Gửi GPS vài giây một lần. Server lưu vị trí cuối; ghi `driver_location_logs` khi đang có đơn (`Accepted`…`InTransit`) |
+| server → client | `LocationUpdated` | khách theo dõi đơn, Dispatcher | `{ driverProfileId, orderId?, latitude, longitude, at }`. Tới group `order-{id}` khi tài xế đang chở đơn đó; tới mọi Dispatcher khi tài xế `Online` (Dispatcher tự vào group `dispatchers` khi kết nối). Quá 5 phút không có GPS: coi là mất kết nối (6.4) |
+| server → client | `NotificationReceived` | mọi user (Dispatcher: thông báo chung) | `{ type, title, body, data }` (B17): cùng nội dung FCM, tới mọi kết nối của user. `type` ví dụ `ORDER_CANCELLED`, `PICKUP_APPROVED`, `PICKUP_REJECTED`, `ORDER_COMPLETED`; Dispatcher nhận `COMPLAINT_SUBMITTED`, `INCIDENT_REFUND_REQUESTED`, `REFUND_INFO_REPLIED`, `INCIDENT_REPORTED` |
+| server → client | `OrderStatusChanged` | | Dành sẵn (B12), chưa phát |
+
 ## Mã lỗi
 
 | `code` | HTTP | Khi nào |

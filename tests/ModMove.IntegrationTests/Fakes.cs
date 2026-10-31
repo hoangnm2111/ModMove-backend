@@ -98,6 +98,10 @@ internal sealed class InMemoryOrders : IShippingOrderRepository
     public Task<ShippingOrder?> GetWithProofAsync(long id, CancellationToken cancellationToken = default) =>
         GetByIdAsync(id, cancellationToken);
 
+    public Task<long?> GetActiveOrderIdForDriverAsync(long driverProfileId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(o => o.DriverProfileId == driverProfileId
+            && o.OrderStatus is OrderStatus.Accepted or OrderStatus.Arrived or OrderStatus.PickedUp or OrderStatus.InTransit)?.Id);
+
     public void Add(ShippingOrder aggregate)
     {
         if (aggregate.Id == 0)
@@ -198,6 +202,9 @@ internal sealed class InMemoryDriverProfiles : IDriverProfileRepository
         Task.FromResult(Items.FirstOrDefault(d => d.Id == id));
 
     public Task<DriverProfile?> GetByUserIdWithApplicationsAndVehicleAsync(long userId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(d => d.UserId == userId));
+
+    public Task<DriverProfile?> GetByUserIdAsync(long userId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(d => d.UserId == userId));
 
     public Task<DriverProfile?> GetByApplicationIdWithApplicationsAndVehicleAsync(long applicationId, CancellationToken cancellationToken = default) =>
@@ -401,6 +408,7 @@ internal sealed class TestApp
     public InMemoryDriverWallets DriverWallets { get; } = new();
     public InMemoryRatings Ratings { get; } = new();
     public InMemoryRepository<InTransitIncident> Incidents { get; } = new();
+    public InMemoryRepository<DriverLocationLog> LocationLogs { get; } = new();
     public CapturingRealtimeNotifier Realtime { get; } = new();
     public CapturingPushNotifications Push { get; } = new();
     public CountingUnitOfWork UnitOfWork { get; } = new();
@@ -438,6 +446,7 @@ internal sealed class TestApp
             .AddSingleton<IDriverWalletRepository>(DriverWallets)
             .AddSingleton<IRatingRepository>(Ratings)
             .AddSingleton<IRepository<InTransitIncident>>(Incidents)
+            .AddSingleton<IRepository<DriverLocationLog>>(LocationLogs)
             .AddSingleton<IRealtimeNotifier>(Realtime)
             .AddSingleton<IPushNotificationService>(Push)
             .AddSingleton<IUnitOfWork>(UnitOfWork)
