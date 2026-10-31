@@ -525,4 +525,78 @@ public class ShippingOrderTests
         Assert.Null(refund.ProposedAmount);
         Assert.Equal(version + 1, order.RowVersion);
     }
+
+    [Fact]
+    public void Customer_reports_an_incident_while_the_driver_has_the_order_2_2()
+    {
+        var order = PickedUpOrder();
+
+        var incident = order.ReportIncidentByCustomer(1, IncidentType.Other, "Tài xế đi sai đường", ["a.jpg"], 21.0m, 105.8m);
+
+        Assert.Equal((order.Id, 1L, IncidentType.Other), (incident.OrderId, incident.ReportedBy, incident.IncidentType));
+        Assert.Equal(IncidentResolutionStatus.Open, incident.ResolutionStatus);
+    }
+
+    [Fact]
+    public void Customer_reports_incidents_only_from_Arrived_to_InTransit_2_2()
+    {
+        var pending = Assert.Throws<DomainException>(() => NewOrder().ReportIncidentByCustomer(1, IncidentType.Other, "x", null, null, null));
+        var delivered = Assert.Throws<DomainException>(() => DeliveredOrder().ReportIncidentByCustomer(1, IncidentType.Other, "x", null, null, null));
+
+        Assert.Equal(("INCIDENT_NOT_ALLOWED", "INCIDENT_NOT_ALLOWED"), (pending.Code, delivered.Code));
+    }
+
+    [Fact]
+    public void Only_the_customer_of_the_order_reports_on_it_C10()
+    {
+        var error = Assert.Throws<DomainException>(() => PickedUpOrder().ReportIncidentByCustomer(2, IncidentType.Other, "x", null, null, null));
+
+        Assert.Equal("ORDER_NOT_YOURS", error.Code);
+    }
+
+    private static ShippingOrder OrderIn(OrderStatus status)
+    {
+        switch (status)
+        {
+            case OrderStatus.Pending: return NewOrder();
+            case OrderStatus.Accepted: return AcceptedOrder();
+            case OrderStatus.Arrived:
+                var arrived = AcceptedOrder();
+                arrived.ConfirmArrival(9, Now);
+                return arrived;
+            case OrderStatus.PickedUp: return PickedUpOrder();
+            case OrderStatus.InTransit:
+                var moving = PickedUpOrder();
+                moving.ApprovePickupEvidence(1, Now);
+                return moving;
+            case OrderStatus.Delivered: return DeliveredOrder();
+            case OrderStatus.Completed: return CompletedOrder();
+            default:
+                var cancelled = NewOrder();
+                cancelled.Cancel("x", ChangedByRole.System, null, Now);
+                return cancelled;
+        }
+    }
+
+    [Theory]
+    [InlineData(OrderStatus.Pending, false)]
+    [InlineData(OrderStatus.Accepted, false)]
+    [InlineData(OrderStatus.Arrived, true)]
+    [InlineData(OrderStatus.PickedUp, true)]
+    [InlineData(OrderStatus.InTransit, true)]
+    [InlineData(OrderStatus.Delivered, false)]
+    [InlineData(OrderStatus.Completed, false)]
+    [InlineData(OrderStatus.Cancelled, false)]
+    public void Customer_incident_is_allowed_exactly_from_Arrived_to_InTransit_2_2(OrderStatus status, bool allowed)
+    {
+        var order = OrderIn(status);
+        Assert.Equal(status, order.OrderStatus);
+
+        var error = Record.Exception(() => order.ReportIncidentByCustomer(1, IncidentType.Other, "x", null, null, null));
+
+        if (allowed)
+            Assert.Null(error);
+        else
+            Assert.Equal("INCIDENT_NOT_ALLOWED", Assert.IsType<DomainException>(error).Code);
+    }
 }
