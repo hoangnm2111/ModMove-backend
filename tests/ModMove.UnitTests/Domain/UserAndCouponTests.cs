@@ -280,4 +280,48 @@ public class UserAndCouponTests
         user.ChangeStatus(AccountStatus.Active);
         Assert.Equal(AccountStatus.Active, user.AccountStatus);
     }
+
+    [Fact]
+    public void Customer_withdraws_a_complaint_still_under_review_B9()
+    {
+        var refund = Refund.Request(1, null, RefundSourceType.Complaint, "Hàng vỡ", null, 100_000);
+
+        refund.Withdraw();
+
+        Assert.Equal(RefundStatus.Withdrawn, refund.RefundStatus);
+        Assert.Throws<DomainException>(refund.Withdraw);
+    }
+
+    [Fact]
+    public void A_cancellation_refund_cannot_be_withdrawn_B9()
+    {
+        var refund = Refund.Request(1, null, RefundSourceType.Cancellation, "Khách hủy", null, 180_000);
+
+        Assert.Throws<DomainException>(refund.Withdraw);
+        Assert.Equal(RefundStatus.Requested, refund.RefundStatus);
+    }
+
+    [Fact]
+    public void A_second_question_waits_for_a_new_answer_7_4()
+    {
+        var refund = Refund.Request(1, null, RefundSourceType.Complaint, "Hàng vỡ", null, 100_000);
+        refund.RequestMoreInfo("Chụp thêm ảnh");
+        refund.ReplyToInfoRequest("Đây", null);
+
+        refund.RequestMoreInfo("Chụp mặt đáy thùng");
+
+        Assert.Null(refund.CustomerReply);
+        Assert.Equal("Chụp mặt đáy thùng", refund.InfoRequestNote);
+    }
+
+    [Fact]
+    public void A_decided_refund_cannot_be_withdrawn()
+    {
+        var refund = Refund.Request(1, null, RefundSourceType.Complaint, "Hàng vỡ", null, 100_000);
+        refund.Propose(50_000, "Một phần", dispatcherId: 3);
+        refund.Approve(adminId: 4, Now);
+
+        Assert.Throws<DomainException>(refund.Withdraw);
+        Assert.Equal(RefundStatus.Approved, refund.RefundStatus);
+    }
 }

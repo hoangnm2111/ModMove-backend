@@ -52,6 +52,7 @@ public class InfrastructureWiringTests
         var services = new ServiceCollection().AddLogging().AddApplication().AddInfrastructure(Config());
         services.AddScoped<ICurrentUserService>(_ => new FakeCurrentUser(null));
         services.AddSingleton<IEmailSender>(new CapturingEmailSender()); // Program.cs adds LogOnlyEmailSender in Development
+        services.AddSingleton<IRealtimeNotifier>(new CapturingRealtimeNotifier()); // Program.cs adds the SignalR adapter
 
         // Development turns ValidateOnBuild on: a handler whose port has no registration stops the whole app.
         using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });

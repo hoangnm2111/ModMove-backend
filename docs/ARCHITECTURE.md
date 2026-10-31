@@ -58,7 +58,7 @@ src/
 └── ModMove.WebApi/                    # Tầng trình bày HTTP/WebSocket
     ├── Controllers/<Role>/            # Admin, Customer, Driver, Dispatcher, Account, Public, Webhooks (PayOS)
     │   └── ApiControllerBase.cs       # Controller mỏng: HTTP → Sender.Send(...)
-    ├── Hubs/                          # SignalR (GPS realtime)
+    ├── Hubs/                          # SignalR: TrackingHub + SignalRRealtimeNotifier (adapter IRealtimeNotifier)
     ├── Middlewares/                   # ExceptionHandlingMiddleware → ProblemDetails
     ├── Services/                      # CurrentUserService (đọc JWT claims)
     └── Program.cs                     # Composition root
@@ -82,7 +82,7 @@ Query handler **không được** inject `IRepository`/`IUnitOfWork`; architectu
 
 ## 5. Tách rời Client
 
-Backend chỉ cung cấp REST (`/api/...`) + SignalR + `/health`. WebApp và Mobile (Flutter/React Native) là các ứng dụng deploy riêng:
+Backend chỉ cung cấp REST (`/api/...`) + SignalR + `/health`. Web (React, cho Guest, Customer, Dispatcher, Admin) và Mobile (Flutter, một app cho Customer và Driver) là các ứng dụng deploy riêng (DECISIONS C11):
 - Origin được phép cấu hình trong `Cors:AllowedOrigins` (appsettings), không hardcode.
 - Mọi lỗi trả về cùng một format **RFC 7807 ProblemDetails** (`400` validation, `401` sai thông tin đăng nhập, `403`, `404`, `409` xung đột, `422` domain, `500`) kèm trường `code` ổn định để client rẽ nhánh. Bảng `code` đầy đủ ở [api/README.md](api/README.md). Muốn mã riêng: `throw new DomainException("...", "ORDER_NOT_CANCELLABLE")` rồi thêm mã vào bảng đó.
 
@@ -93,7 +93,8 @@ Backend chỉ cung cấp REST (`/api/...`) + SignalR + `/health`. WebApp và Mob
 - **Id** là số nguyên (`long`). **Enum** trả và nhận dạng chuỗi (`"Pending"`), giống giá trị lưu trong DB. **Tiền** là `decimal` VND. **Ngày giờ** ISO 8601, UTC.
 - **Phân trang** (query): `?page=1&pageSize=20`; trả `PagedResult<T>` (`items`, `pageNumber`, `pageSize`, `totalCount`).
 - **Use case mẫu để copy**: Command: `Features/Auth/Commands/Login`. Query: `Features/Catalog/Queries/GetVehicleTypes`. Controller: `Controllers/Public/AuthController`.
-- **Port ra ngoài** (`IFileStorage`, `IEmailSender`, `IPushNotificationService`, `IPaymentGateway`, `IMapService`, `IRealtimeNotifier`) khai báo ở `Application/Common/Interfaces/Ports.cs`; adapter ở `Infrastructure/ExternalServices/<Provider>`. Người sở hữu adapter được sửa chữ ký cho vừa dịch vụ thật.
+- **Port ra ngoài** (`IFileStorage`, `IEmailSender`, `IPushNotificationService`, `IPaymentGateway`, `IMapService`, `IRealtimeNotifier`) khai báo ở `Application/Common/Interfaces/Ports.cs`; adapter ở `Infrastructure/ExternalServices/<Provider>`. Ngoại lệ: adapter SignalR (`SignalRRealtimeNotifier`) nằm ở `WebApi/Hubs` cạnh `TrackingHub`, vì Infrastructure không được tham chiếu ASP.NET Core. Người sở hữu adapter được sửa chữ ký cho vừa dịch vụ thật.
+- **Thông báo** (B17): handler gọi `INotificationService.NotifyAsync(userId, Notification)` sau `SaveChangesAsync`; service tự gửi SignalR `NotificationReceived` và FCM (khi đã có adapter), lỗi gửi chỉ ghi log. Không gọi thẳng `IPushNotificationService`. Sự kiện của khách (8.3) dùng `notifications.NotifyCustomerAsync(order, CustomerEvent.X, ct)` (`Application/Common/Notifications/CustomerNotifications.cs`) để mọi module cùng câu chữ và `type`; mỗi lần đổi trạng thái đơn gọi thêm `PublishOrderStatusAsync(order, driverUserId, ct)` (B12 `OrderStatusChanged`).
 - **Repository riêng cho aggregate** khi cần `Include` hay truy vấn riêng: interface ở `Application/Common/Interfaces/Persistence`, class ở `Infrastructure/Persistence/Repositories`, đăng ký trong `DependencyInjection.cs` (mẫu: `IUserRepository`).
 
 ## 6. Mẫu thêm một use case

@@ -55,6 +55,8 @@ public static class DependencyInjection
         services.AddScoped<IPlatformSettingRepository, PlatformSettingRepository>();
         services.AddScoped<IDriverProfileRepository, DriverProfileRepository>();
         services.AddScoped<IDriverWalletRepository, DriverWalletRepository>();
+        services.AddScoped<IRefundRepository, RefundRepository>();
+        services.AddScoped<IRatingRepository, RatingRepository>();
 
         // Read side (Queries): raw connection for Dapper.
         services.AddSingleton<ISqlConnectionFactory>(new SqlConnectionFactory(connectionString));

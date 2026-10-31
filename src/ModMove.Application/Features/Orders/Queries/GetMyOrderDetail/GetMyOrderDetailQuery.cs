@@ -10,11 +10,19 @@ public sealed record OrderDetailResponse(
     string ReceiverName, string ReceiverPhone, decimal EstimatedDistanceKm, int EstimatedDurationMin, bool HasLoadingService,
     decimal DistanceFee, decimal ServiceFee, decimal DiscountAmount, decimal TotalFee,
     string PaymentMethod, string? PayerRole, string PaymentStatus, DateTimeOffset CreatedAt,
-    CargoResponse Cargo, DriverResponse? Driver, IReadOnlyList<StatusHistoryResponse> History);
+    CargoResponse Cargo, DriverResponse? Driver, ProofResponse? Proof, IReadOnlyList<StatusHistoryResponse> History);
 
 public sealed record CargoResponse(
     string CargoType, int Quantity, decimal WeightKg, int LengthCm, int WidthCm, int HeightCm,
     IReadOnlyList<string> PhotoUrls, string? SpecialNotes);
+
+/// <summary>
+/// Pickup and delivery photos; null until the driver sends pickup photos. ProofStatus Pending = waiting for the
+/// customer's review (UC-CUS-11, 12); PickupSubmissionCount counts towards the limit of 5 (DECISIONS 6.3).
+/// </summary>
+public sealed record ProofResponse(
+    IReadOnlyList<string> PickupPhotoUrls, string ProofStatus, int PickupSubmissionCount, string? RejectionReason,
+    string? DeliveryPhotoUrl, DateTimeOffset? DeliveredAt);
 
 public sealed record DriverResponse(string FullName, string PhoneNumber, string? LicensePlate);
 

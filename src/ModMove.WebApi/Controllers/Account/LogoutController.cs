@@ -5,11 +5,16 @@ namespace ModMove.WebApi.Controllers.Account;
 
 public sealed class LogoutController : ApiControllerBase
 {
-    /// <summary>Sign out on every device: refresh tokens are revoked and pushes stop; the client deletes its tokens.</summary>
+    /// <summary>
+    /// Sign out: every refresh token is revoked (9.1). The app sends <c>{ fcmToken }</c> so its pushes stop if that token
+    /// is still on file (9.2); the web sends no body. The client deletes its tokens.
+    /// </summary>
     [HttpPost]
-    public async Task<IActionResult> Logout(CancellationToken cancellationToken)
+    public async Task<IActionResult> Logout(
+        [FromBody(EmptyBodyBehavior = Microsoft.AspNetCore.Mvc.ModelBinding.EmptyBodyBehavior.Allow)] LogoutCommand? command,
+        CancellationToken cancellationToken)
     {
-        await Sender.Send(new LogoutCommand(), cancellationToken);
+        await Sender.Send(command ?? new LogoutCommand(), cancellationToken);
         return NoContent();
     }
 }
