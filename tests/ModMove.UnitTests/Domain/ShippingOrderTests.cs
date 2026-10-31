@@ -466,4 +466,63 @@ public class ShippingOrderTests
 
         Assert.Equal("RATING_WINDOW_CLOSED", error.Code);
     }
+
+    [Fact]
+    public void Customer_files_a_complaint_within_24_hours_of_delivery_7_3()
+    {
+        var order = DeliveredOrder();
+        var version = order.RowVersion;
+
+        var refund = order.FileComplaint(1, "Hàng vỡ", ["a.jpg"], 100_000, Now.AddHours(23));
+
+        Assert.Equal((RefundSourceType.Complaint, 100_000m, (long?)null), (refund.SourceType, refund.RequestedAmount, refund.IncidentId));
+        Assert.Null(refund.ProposedAmount); // the Dispatcher proposes (B9)
+        Assert.Equal(version + 1, order.RowVersion); // two complaints racing: the later save is a 409
+    }
+
+    [Fact]
+    public void Complaint_after_24_hours_or_before_delivery_is_refused_7_3()
+    {
+        var late = Assert.Throws<DomainException>(() => DeliveredOrder().FileComplaint(1, "x", null, 1_000, Now.AddHours(24)));
+        var early = Assert.Throws<DomainException>(() => AcceptedOrder().FileComplaint(1, "x", null, 1_000, Now));
+
+        Assert.Equal(("COMPLAINT_WINDOW_CLOSED", "COMPLAINT_WINDOW_CLOSED"), (late.Code, early.Code));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(180_001)]
+    public void Refund_request_is_above_zero_and_at_most_the_order_total_B9(int amount)
+    {
+        var order = DeliveredOrder(); // total 180,000
+
+        var complaint = Assert.Throws<DomainException>(() => order.FileComplaint(1, "x", null, amount, Now));
+        var incident = Assert.Throws<DomainException>(() => order.RequestIncidentRefund(1, 3, "x", null, amount));
+
+        Assert.Equal(("REFUND_AMOUNT_INVALID", "REFUND_AMOUNT_INVALID"), (complaint.Code, incident.Code));
+    }
+
+    [Fact]
+    public void Only_the_customer_of_the_order_asks_for_a_refund_C10()
+    {
+        var order = DeliveredOrder();
+
+        var complaint = Assert.Throws<DomainException>(() => order.FileComplaint(2, "x", null, 1_000, Now));
+        var incident = Assert.Throws<DomainException>(() => order.RequestIncidentRefund(2, 3, "x", null, 1_000));
+
+        Assert.Equal(("ORDER_NOT_YOURS", "ORDER_NOT_YOURS"), (complaint.Code, incident.Code));
+    }
+
+    [Fact]
+    public void Incident_refund_points_at_the_incident_and_waits_for_the_dispatcher_B9()
+    {
+        var order = AcceptedOrder();
+        var version = order.RowVersion;
+
+        var refund = order.RequestIncidentRefund(1, incidentId: 3, "Xe hỏng, trễ 3 giờ", ["a.jpg"], 50_000);
+
+        Assert.Equal((RefundSourceType.Incident, (long?)3, 50_000m), (refund.SourceType, refund.IncidentId, refund.RequestedAmount));
+        Assert.Null(refund.ProposedAmount);
+        Assert.Equal(version + 1, order.RowVersion);
+    }
 }
