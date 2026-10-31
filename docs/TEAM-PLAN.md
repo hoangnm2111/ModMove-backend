@@ -86,6 +86,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [ ] JOB-PAY-01 (mã hết hạn sau 10 phút; hủy đơn PayOS vẫn `Unpaid` sau 30 phút từ `created_at`, 3.1), JOB-MATCH-01 (từ lúc tạo hoặc lúc trả, 3.2: `IsMatchingExpired`), JOB-ORDER-01 (`CanBeAutoCompleted`, rồi `order.Complete(rate, System, null, now)` + `OrderSettlement.SettleAsync` trong `Features/Orders` như ConfirmReceipt của Hiếu, để ví được tất toán giống nhau)
 - [ ] Báo cáo, doanh thu (8.1: tổng `commission_amount` của đơn `Completed`, giờ VN), xuất Excel (B16, xin duyệt package)
 - [ ] Thông báo cho tài xế theo bảng sự kiện 8.3, gọi qua `INotificationService` (B17)
+- [ ] Thông báo cho **khách** khi chính bước của Hoàng đổi trạng thái (8.3): nhận đơn `CustomerEvent.OrderAccepted`, đến điểm lấy `DriverArrived`, gửi ảnh lấy hàng `PickupPhotosToReview`, giao hàng `OrderDelivered`, JOB-ORDER-01 `OrderCompleted`, Admin duyệt/chi hoàn tiền `RefundDecided`: gọi `NotifyCustomerAsync`, và `PublishOrderStatusAsync` sau mỗi lần đổi trạng thái đơn (B12)
 
 ## 6. Huy: Dispatcher
 
@@ -95,6 +96,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 
 **Phase 2**
 - [ ] Quyết định xử lý sự cố (DIS-05), đổi tài xế (DIS-06, 7.2: tài xế mới đủ điều kiện như B5, đơn tiền mặt thêm GB-16), hủy đơn do sự cố (DIS-07: hàng cấm và khách vắng mặt ở điểm lấy không hoàn tiền, 4.3, 2.4; không có tài xế thay thế thì hoàn 100% đơn PayOS, 2.5), hủy sự cố (DIS-10)
+- [ ] Thông báo cho **khách** khi xử lý xong sự cố (8.3): `NotifyCustomerAsync(order, CustomerEvent.IncidentResolved, ct, detail)`, `detail` nói rõ quyết định; đổi tài xế hoặc hủy đơn thì gọi thêm `PublishOrderStatusAsync` (B12). Đổi tài xế: gọi cho **cả tài xế cũ và tài xế mới**, vì tài xế không vào group đơn
 - [ ] Hàng còn trên xe sau khi hủy: trả về hay giữ lại (2.6)
 - [ ] Hoàn tiền và khiếu nại (DIS-08, 09, 13..15, 17): đề xuất `proposed_amount ≤ requested_amount`, xin thêm thông tin (`RequestMoreInfo`, khách trả lời qua 7.4)
 - [ ] Không làm màn hình yêu cầu hỗ trợ (2.9)
