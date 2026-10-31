@@ -97,6 +97,19 @@ public class NotificationServiceTests
         Assert.Empty(push.Sent);
     }
 
+    [Fact]
+    public async Task Dispatchers_get_the_notice_over_SignalR_and_a_failure_is_swallowed()
+    {
+        var user = Customer(null);
+        var realtime = new CapturingRealtimeNotifier();
+        await Build(user, realtime, null).NotifyDispatchersAsync(Accepted, CancellationToken.None);
+        Assert.Equal(("dispatchers", RealtimeEvents.NotificationReceived), (realtime.Sent.Single().Target, realtime.Sent.Single().EventName));
+
+        var broken = new CapturingRealtimeNotifier { Fail = true };
+        await Build(user, broken, null).NotifyDispatchersAsync(Accepted, CancellationToken.None);
+        Assert.Empty(broken.Sent);
+    }
+
     private sealed class BrokenUsers : IUserRepository
     {
         private static Exception Down() => new InvalidOperationException("database is down");
