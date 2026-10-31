@@ -63,7 +63,7 @@ internal sealed class TripSetup
 
     public Notification SentToDriver()
     {
-        var sent = Assert.Single(App.Realtime.Sent);
+        var sent = Assert.Single(App.Realtime.Sent, x => x.EventName == RealtimeEvents.NotificationReceived);
         Assert.Equal(("user", Driver.Id.ToString(), RealtimeEvents.NotificationReceived), (sent.Target, sent.Id, sent.EventName));
         return Assert.IsType<Notification>(sent.Payload);
     }

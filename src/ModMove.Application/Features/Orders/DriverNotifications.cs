@@ -8,17 +8,23 @@ namespace ModMove.Application.Features.Orders;
 /// <summary>Customer-side order steps tell the assigned driver (DECISIONS B17: whoever changes the state notifies).</summary>
 internal static class DriverNotifications
 {
-    public static async Task NotifyDriverAsync(
-        this INotificationService notifications, IDriverProfileRepository driverProfiles, ShippingOrder order,
+    /// <summary>The user id of the order's driver, or null before a driver accepted it.</summary>
+    public static async Task<long?> DriverUserIdAsync(
+        this IDriverProfileRepository driverProfiles, ShippingOrder order, CancellationToken cancellationToken) =>
+        order.DriverProfileId is { } driverProfileId
+            ? (await driverProfiles.GetByIdAsync(driverProfileId, cancellationToken))?.UserId
+            : null;
+
+    public static Task NotifyDriverAsync(
+        this INotificationService notifications, long? driverUserId, ShippingOrder order,
         string type, string title, string body, CancellationToken cancellationToken, params (string Key, string Value)[] extra)
     {
-        if (order.DriverProfileId is not { } driverProfileId
-            || await driverProfiles.GetByIdAsync(driverProfileId, cancellationToken) is not { } driver)
-            return;
+        if (driverUserId is not { } userId)
+            return Task.CompletedTask;
 
         var data = new Dictionary<string, string> { ["orderId"] = order.Id.ToString(CultureInfo.InvariantCulture) };
         foreach (var (key, value) in extra)
             data[key] = value;
-        await notifications.NotifyAsync(driver.UserId, new Notification(type, title, body, data), cancellationToken);
+        return notifications.NotifyAsync(userId, new Notification(type, title, body, data), cancellationToken);
     }
 }

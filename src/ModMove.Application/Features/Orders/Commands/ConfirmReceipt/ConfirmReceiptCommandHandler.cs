@@ -30,7 +30,9 @@ internal sealed class ConfirmReceiptCommandHandler(
         // One save for the order and the wallet. Racing the auto-complete job, the later save is a 409 (RowVersion).
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        await notifications.NotifyDriverAsync(driverProfiles, order, "ORDER_COMPLETED",
+        var driverUserId = await driverProfiles.DriverUserIdAsync(order, cancellationToken);
+        await notifications.PublishOrderStatusAsync(order, driverUserId, cancellationToken);
+        await notifications.NotifyDriverAsync(driverUserId, order, "ORDER_COMPLETED",
             "Đơn đã hoàn thành", $"Khách đã xác nhận nhận hàng đơn {order.OrderCode}.", cancellationToken);
     }
 }
