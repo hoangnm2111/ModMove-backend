@@ -46,6 +46,8 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | POST | `api/customer/refunds/{id}/reply` | Customer | `{ reply (≤ 1000), photoUrls? }` → 204. Trả lời câu hỏi của Dispatcher (7.4); chưa có câu hỏi → `NO_INFO_REQUEST`; tổng ảnh > 5 → `TOO_MANY_PHOTOS` |
 | POST | `api/customer/refunds/{id}/withdraw` | Customer | → 204. Rút khiếu nại/hoàn sự cố còn `Requested`; hoàn do hủy không rút được (`BUSINESS_RULE`) |
 | GET | `api/customer/refunds`, `api/customer/refunds/{id}` | Customer | Hoàn tiền trên đơn của mình (hủy, sự cố, khiếu nại), mới nhất trước. `approvedAmount` chỉ có khi Admin đã duyệt (đề xuất của Dispatcher chưa phải số cuối); `waitingForYourReply` = Dispatcher đang chờ khách trả lời; chi tiết có `evidenceUrls`, `infoRequestNote`, `customerReply`. Hoàn của người khác → 404 |
+| POST | `api/customer/incidents` | Customer | `{ orderId, incidentType (VehicleBreakdown\|DamagedCargo\|Accident\|Other), description (≤ 1000), photoUrls? (≤ 5, Cloudinary), latitude?, longitude? }` → 201 `{ incidentId }`. Chỉ khi đơn của mình đang `Arrived`/`PickedUp`/`InTransit` (`INCIDENT_NOT_ALLOWED`; sau khi giao dùng khiếu nại); "trễ", "sai tuyến" ghi là `Other` (7.1). Dispatcher nhận `INCIDENT_REPORTED` |
+| GET | `api/customer/incidents` | Customer | `?page=1&pageSize=20` → `PagedResult` sự cố trên đơn của mình (khách hay tài xế báo), mới nhất trước: `{ id, orderId, orderCode, incidentType, description, photoUrls, reportedByYou, resolutionStatus, resolutionDecision, resolutionNote, createdAt, resolvedAt }` (UC-CUS-16) |
 | POST | `api/customer/orders/{id}/cancel` | Customer | `{ reason }` (≤ 500) → 204. Chỉ khi `Pending`/`Accepted` (`ORDER_NOT_CANCELLABLE`); đơn người khác → `ORDER_NOT_YOURS`. Đơn PayOS đã trả: tạo hoàn tiền Cancellation 100% chờ Admin (B9). Không hoàn lượt coupon (B11). Đơn đã có tài xế: tài xế nhận thông báo `ORDER_CANCELLED` |
 | POST | `api/customer/uploads` | Customer | `multipart/form-data`, field `file`: một ảnh JPG/PNG ≤ 5 MB → `{ url }` (Cloudinary) dùng cho ảnh hàng khi tạo đơn |
 | GET | `api/admin/pricing` | Administrator | `{ vehicleTypes: [{ id, name, maxLoadWeightKg, baseFare, pricePerKm, minimumFare, isActive }], settings: { commissionRate, loadingFee, minCodDeposit, matchingRadiusKm } }`. Có cả loại xe đang tắt. `commissionRate` là phân số (0.10 = 10%) |
@@ -95,6 +97,7 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | `RATING_WINDOW_CLOSED` | 422 | Đánh giá quá 1 ngày sau hoàn tất |
 | `COMPLAINT_WINDOW_CLOSED` | 422 | Khiếu nại khi đơn chưa `Delivered` hoặc đã quá 24 giờ từ lúc giao (7.3) |
 | `REFUND_AMOUNT_INVALID` | 422 | Số tiền yêu cầu hoàn ≤ 0 hoặc lớn hơn tổng tiền đơn (B9) |
+| `INCIDENT_NOT_ALLOWED` | 422 | Khách báo sự cố khi đơn không ở `Arrived`/`PickedUp`/`InTransit` (2.2) |
 | `TOO_MANY_PHOTOS` | 422 | Bằng chứng hoàn tiền quá 5 ảnh |
 | `REFUND_NOT_FOR_DISPATCHER` | 422 | Dispatcher đề xuất số tiền hay xin thêm thông tin cho khoản hoàn do hủy (DECISIONS B9: đi thẳng tới Admin) |
 | `NO_INFO_REQUEST` | 422 | Trả lời khi Dispatcher chưa xin thêm thông tin |
