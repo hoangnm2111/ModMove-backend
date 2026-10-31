@@ -108,7 +108,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 | Cloudinary | `IFileStorage` | Hiếu | Đã làm |
 | PayOS | `IPaymentGateway` | Hoàng | Chưa |
 | FCM | `IPushNotificationService` | Hoàng | Chưa |
-| SignalR | `IRealtimeNotifier` | Hiếu | Adapter đã có (`WebApi/Hubs`); hub chưa map |
+| SignalR | `IRealtimeNotifier` | Hiếu | Đã làm (`WebApi/Hubs`, `/hubs/tracking`) |
 
 Khóa để trong `appsettings.Development.json` hoặc user-secrets, không commit. Package mới phải hỏi nhóm trước (đã duyệt: `CloudinaryDotNet`, `Microsoft.Extensions.Http`).
 
