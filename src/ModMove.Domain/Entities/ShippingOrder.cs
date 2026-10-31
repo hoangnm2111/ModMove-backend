@@ -238,6 +238,22 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         return Refund.Request(Id, incidentId, RefundSourceType.Incident, reason, evidenceUrls, requestedAmount);
     }
 
+    /// <summary>
+    /// UC-CUS-15, DECISIONS 2.2: once the driver has arrived the customer cannot cancel but reports an incident for a
+    /// Dispatcher (GB-17), while the order is Arrived, PickedUp or InTransit. After delivery a complaint is used (7.3).
+    /// </summary>
+    public InTransitIncident ReportIncidentByCustomer(
+        long customerId, IncidentType type, string description, IEnumerable<string>? photoUrls, decimal? latitude, decimal? longitude)
+    {
+        EnsureCustomer(customerId);
+        if (OrderStatus is not (OrderStatus.Arrived or OrderStatus.PickedUp or OrderStatus.InTransit))
+            throw new DomainException(
+                "An incident can be reported from the driver's arrival until delivery; after delivery, file a complaint.",
+                "INCIDENT_NOT_ALLOWED");
+
+        return InTransitIncident.Report(Id, customerId, type, description, photoUrls, latitude, longitude);
+    }
+
     /// <summary>DECISIONS B9: more than 0 and at most what the order cost; larger compensation is handled outside the system.</summary>
     private void EnsureRefundAmount(decimal requestedAmount)
     {
