@@ -19,4 +19,10 @@ public sealed class RefundRepository(ApplicationDbContext dbContext)
             r => r.IncidentId == incidentId
                 && (r.RefundStatus == RefundStatus.Requested || r.RefundStatus == RefundStatus.Approved),
             cancellationToken);
+
+    public Task<Refund?> GetOpenForIncidentAsync(long incidentId, CancellationToken cancellationToken = default) =>
+        Set.OrderByDescending(r => r.Id).FirstOrDefaultAsync(
+            r => r.IncidentId == incidentId
+                && (r.RefundStatus == RefundStatus.Requested || r.RefundStatus == RefundStatus.Approved),
+            cancellationToken);
 }

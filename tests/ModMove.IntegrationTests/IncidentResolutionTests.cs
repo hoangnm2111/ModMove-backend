@@ -1,0 +1,255 @@
+using ModMove.Application.Common.Exceptions;
+using ModMove.Application.Common.Interfaces;
+using ModMove.Application.Features.Incidents.Commands.CancelIncident;
+using ModMove.Application.Features.Incidents.Commands.CancelOrderByIncident;
+using ModMove.Application.Features.Incidents.Commands.ReassignIncidentDriver;
+using ModMove.Application.Features.Incidents.Commands.ResolveIncidentContinue;
+using ModMove.Application.Features.Incidents.Commands.StartIncidentHandling;
+using ModMove.Domain.Entities;
+using ModMove.Domain.Enums;
+using ModMove.Domain.Exceptions;
+
+namespace ModMove.IntegrationTests;
+
+/// <summary>
+/// UC-DIS-05, UC-DIS-06, UC-DIS-07, UC-DIS-10: Dispatcher incident handling, driver reassignment,
+/// order cancellation due to incident, and incident cancellation through the real MediatR pipeline.
+/// </summary>
+public class IncidentResolutionTests
+{
+    [Fact]
+    public async Task StartHandling_MovesOpenIncidentToInProgress_AndAssignsDispatcher()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit();
+        var incident = s.Incident(order);
+
+        await s.App.Sender.Send(new StartIncidentHandlingCommand(incident.Id));
+
+        Assert.Equal(IncidentResolutionStatus.InProgress, incident.ResolutionStatus);
+        Assert.Equal(s.Dispatcher.Id, incident.HandledBy);
+        Assert.Equal(1, s.App.UnitOfWork.Saves);
+    }
+
+    [Fact]
+    public async Task StartHandling_AlreadyHandledByAnotherDispatcher_Throws409Conflict()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit();
+        var incident = s.Incident(order);
+        var otherDispatcher = User.Create("Điều phối 2", "0900000099", "disp2@x.vn", "h", UserRole.Dispatcher, emailVerified: true);
+        s.App.Users.Add(otherDispatcher);
+        incident.StartHandling(otherDispatcher.Id);
+
+        await Assert.ThrowsAsync<ConflictException>(() =>
+            s.App.Sender.Send(new StartIncidentHandlingCommand(incident.Id)));
+    }
+
+    [Fact]
+    public async Task ResolveContinue_FromOpenOrOwnInProgress_ResolvesIncident_KeepsOrderStatus_AndNotifiesBothParties()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit();
+        var incident = s.Incident(order);
+
+        await s.App.Sender.Send(new ResolveIncidentContinueCommand(incident.Id, "  Xe đã sửa xong, tiếp tục giao  "));
+
+        Assert.Equal(IncidentResolutionStatus.Resolved, incident.ResolutionStatus);
+        Assert.Equal(IncidentDecision.ContinueTrip, incident.ResolutionDecision);
+        Assert.Equal("Xe đã sửa xong, tiếp tục giao", incident.ResolutionNote);
+        Assert.Equal(s.Dispatcher.Id, incident.HandledBy);
+        Assert.Equal(DispatcherSetup.Now, incident.ResolvedAt);
+        Assert.Equal(OrderStatus.InTransit, order.OrderStatus);
+
+        var toCustomer = Assert.Single(s.SentTo(s.Customer));
+        Assert.Equal("INCIDENT_RESOLVED", toCustomer.Type);
+        Assert.Contains("Xe đã sửa xong, tiếp tục giao", toCustomer.Body);
+
+        var toDriver = Assert.Single(s.SentTo(s.Driver));
+        Assert.Equal("INCIDENT_DECIDED", toDriver.Type);
+        Assert.Equal("ContinueTrip", toDriver.Data!["decision"]);
+    }
+
+    [Fact]
+    public async Task ResolveContinue_WhenHeldByAnotherDispatcher_Throws409Conflict()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit();
+        var incident = s.Incident(order);
+        incident.StartHandling(dispatcherId: 999);
+
+        await Assert.ThrowsAsync<ConflictException>(() =>
+            s.App.Sender.Send(new ResolveIncidentContinueCommand(incident.Id, "Tiếp tục")));
+    }
+
+    [Fact]
+    public async Task ReassignDriver_EligibleReplacement_MovesOrderBackToAccepted_ResetsPickupProof_AndNotifiesCustomerAndBothDrivers()
+    {
+        var s = new DispatcherSetup();
+        var order = s.PickedUp();
+        order.RejectPickupEvidence("Ảnh mờ", s.Customer.Id);
+        var incident = s.Incident(order);
+        var (newDriverUser, newProfile, _) = s.ReplacementDriver();
+
+        await s.App.Sender.Send(new ReassignIncidentDriverCommand(incident.Id, newProfile.Id, "  Đổi xe thay thế  "));
+
+        Assert.Equal(OrderStatus.Accepted, order.OrderStatus);
+        Assert.Equal(newProfile.Id, order.DriverProfileId);
+        Assert.Equal(0, order.Proof!.PickupSubmissionCount);
+        Assert.Equal(IncidentResolutionStatus.Resolved, incident.ResolutionStatus);
+        Assert.Equal(IncidentDecision.ReassignDriver, incident.ResolutionDecision);
+        Assert.Equal("Đổi xe thay thế", incident.ResolutionNote);
+
+        // Customer notified
+        var toCustomer = Assert.Single(s.SentTo(s.Customer));
+        Assert.Equal("INCIDENT_RESOLVED", toCustomer.Type);
+
+        // Both old driver and new driver receive INCIDENT_DECIDED AND OrderStatusChanged (TEAM-PLAN L102, B12)
+        Assert.Single(s.SentTo(s.Driver), n => n.Type == "INCIDENT_DECIDED");
+        Assert.Single(s.SentTo(newDriverUser), n => n.Type == "INCIDENT_DECIDED");
+
+        var statusToUsers = s.App.Realtime.Sent
+            .Where(x => x is { Target: "user", EventName: RealtimeEvents.OrderStatusChanged })
+            .Select(x => x.Id)
+            .ToList();
+        Assert.Contains(s.Driver.Id.ToString(), statusToUsers);
+        Assert.Contains(newDriverUser.Id.ToString(), statusToUsers);
+    }
+
+    [Fact]
+    public async Task ReassignDriver_RejectsStaleGps_WrongVehicleType_OutsideRadius_BusyDriver_OrLowCodDeposit()
+    {
+        var s = new DispatcherSetup();
+        var cashOrder = s.InTransit(PaymentMethod.Cash);
+        var incident = s.Incident(cashOrder);
+
+        // 1. Stale GPS (> 5 minutes, DECISIONS 6.4)
+        var (_, staleGps, _) = s.ReplacementDriver("3", locationAt: DispatcherSetup.Now.AddMinutes(-6));
+        var ex1 = await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(new ReassignIncidentDriverCommand(incident.Id, staleGps.Id, "Đổi tài xế")));
+        Assert.Equal("DRIVER_NOT_ELIGIBLE", ex1.Code);
+
+        // 2. Wrong vehicle type (DECISIONS B5, 7.2)
+        var (_, wrongType, _) = s.ReplacementDriver("4", vehicleTypeId: 2);
+        var ex2 = await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(new ReassignIncidentDriverCommand(incident.Id, wrongType.Id, "Đổi tài xế")));
+        Assert.Equal("DRIVER_NOT_ELIGIBLE", ex2.Code);
+
+        // 3. Outside 5 km radius
+        var (_, farAway, _) = s.ReplacementDriver("5", latitude: 21.20m, longitude: 105.99m);
+        var ex3 = await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(new ReassignIncidentDriverCommand(incident.Id, farAway.Id, "Đổi tài xế")));
+        Assert.Equal("DRIVER_NOT_ELIGIBLE", ex3.Code);
+
+        // 4. Busy with another active order (GB-09)
+        var (busyUser, busyProfile, _) = s.ReplacementDriver("6");
+        var otherOrder = ShippingOrder.Create(
+            "MM20261020099", s.Customer.Id, vehicleTypeId: 1, couponId: null,
+            "A", 21.0m, 105.8m, "B", 21.1m, 105.9m, "Bình", "0912345678",
+            5m, 15, false, 100_000, 0, 0, PaymentMethod.Cash, PayerRole.Sender,
+            CargoDetail.Create("BOX", 1, 10, 30, 30, 30, ["a.jpg"], null), DispatcherSetup.Now);
+        otherOrder.Accept(busyProfile.Id, busyUser.Id, DispatcherSetup.Now);
+        s.App.Orders.Add(otherOrder);
+        var ex4 = await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(new ReassignIncidentDriverCommand(incident.Id, busyProfile.Id, "Đổi tài xế")));
+        Assert.Equal("DRIVER_NOT_ELIGIBLE", ex4.Code);
+
+        // 5. Insufficient COD deposit (< 200,000 VND for cash order, GB-16)
+        var (_, lowDeposit, _) = s.ReplacementDriver("7", deposit: 100_000);
+        var ex5 = await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(new ReassignIncidentDriverCommand(incident.Id, lowDeposit.Id, "Đổi tài xế")));
+        Assert.Equal("DRIVER_NOT_ELIGIBLE", ex5.Code);
+    }
+
+    [Fact]
+    public async Task CancelOrderByIncident_InTransitWithoutCargoDisposition_ThrowsCargoDispositionRequired()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit(PaymentMethod.PayOS);
+        var incident = s.Incident(order);
+
+        var ex = await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(new CancelOrderByIncidentCommand(incident.Id, "Không có xe thay thế", Refund: true, CargoDisposition: null)));
+
+        Assert.Equal("CARGO_DISPOSITION_REQUIRED", ex.Code);
+    }
+
+    [Fact]
+    public async Task CancelOrderByIncident_PaidPayOsMidTrip_CancelsOrder_RecordsDisposition_AndCreatesFullCancellationRefund()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit(PaymentMethod.PayOS);
+        var incident = s.Incident(order);
+
+        await s.App.Sender.Send(new CancelOrderByIncidentCommand(
+            incident.Id, "Xe hỏng nặng không có xe thay", Refund: true, CargoDisposition.ReturnToPickup));
+
+        Assert.Equal(OrderStatus.Cancelled, order.OrderStatus);
+        Assert.Contains("ReturnToPickup", order.CancellationReason);
+        Assert.Equal(IncidentResolutionStatus.Resolved, incident.ResolutionStatus);
+        Assert.Equal(IncidentDecision.CancelOrder, incident.ResolutionDecision);
+        Assert.Contains("ReturnToPickup", incident.ResolutionNote);
+
+        var refund = Assert.Single(s.App.Refunds.Items);
+        Assert.Equal(RefundSourceType.Cancellation, refund.SourceType);
+        Assert.Equal(incident.Id, refund.IncidentId);
+        Assert.Equal(order.TotalFee, refund.RequestedAmount);
+        Assert.Equal(order.TotalFee, refund.ProposedAmount);
+
+        Assert.Single(s.SentTo(s.Customer), n => n.Type == "INCIDENT_RESOLVED");
+        Assert.Single(s.SentTo(s.Driver), n => n.Type == "INCIDENT_DECIDED");
+    }
+
+    [Fact]
+    public async Task CancelOrderByIncident_CashOrderRequestingRefund_ThrowsRefundNotAllowed()
+    {
+        var s = new DispatcherSetup();
+        var cashOrder = s.Arrived(PaymentMethod.Cash);
+        var incident = s.Incident(cashOrder, IncidentType.Other);
+
+        var ex = await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(new CancelOrderByIncidentCommand(incident.Id, "Sự cố", Refund: true)));
+
+        Assert.Equal("REFUND_NOT_ALLOWED", ex.Code);
+    }
+
+    [Fact]
+    public async Task CancelOrderByIncident_CustomerFaultNoRefund_ProposesZeroOnExistingRequestedIncidentRefund()
+    {
+        var s = new DispatcherSetup();
+        var order = s.Arrived(PaymentMethod.PayOS);
+        var incident = s.Incident(order, IncidentType.Other);
+        var customerRefund = s.IncidentRefund(order, incident, requested: 100_000);
+
+        await s.App.Sender.Send(new CancelOrderByIncidentCommand(incident.Id, "Hàng cấm tại điểm lấy", Refund: false));
+
+        Assert.Equal(OrderStatus.Cancelled, order.OrderStatus);
+        Assert.Single(s.App.Refunds.Items);
+        Assert.Equal(0m, customerRefund.ProposedAmount);
+        Assert.Equal(s.Dispatcher.Id, customerRefund.ProposedBy);
+    }
+
+    [Fact]
+    public async Task CancelIncident_CancelsIncident_ProposesZeroOnOpenRequestedIncidentRefund_AndNotifiesCustomerAndDriver()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit(PaymentMethod.PayOS);
+        var incident = s.Incident(order, IncidentType.Other);
+        var openRefund = s.IncidentRefund(order, incident, requested: 80_000);
+
+        await s.App.Sender.Send(new CancelIncidentCommand(incident.Id, "  Báo cáo nhầm  "));
+
+        Assert.Equal(IncidentResolutionStatus.Cancelled, incident.ResolutionStatus);
+        Assert.Equal("Báo cáo nhầm", incident.ResolutionNote);
+        Assert.Equal(s.Dispatcher.Id, incident.HandledBy);
+        Assert.Equal(OrderStatus.InTransit, order.OrderStatus);
+
+        Assert.Equal(0m, openRefund.ProposedAmount);
+        Assert.Equal(s.Dispatcher.Id, openRefund.ProposedBy);
+        Assert.Contains("Báo cáo nhầm", openRefund.ProposalReason);
+
+        Assert.Single(s.SentTo(s.Customer), n => n.Type == "INCIDENT_RESOLVED");
+        Assert.Single(s.SentTo(s.Driver), n => n.Type == "INCIDENT_DECIDED");
+    }
+}
+

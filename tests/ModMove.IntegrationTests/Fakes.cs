@@ -138,6 +138,9 @@ internal sealed class InMemoryRefunds : IRefundRepository
     public Task<bool> HasOpenRefundForIncidentAsync(long incidentId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.Any(r => r.IncidentId == incidentId && r.RefundStatus is RefundStatus.Requested or RefundStatus.Approved));
 
+    public Task<Refund?> GetOpenForIncidentAsync(long incidentId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.LastOrDefault(r => r.IncidentId == incidentId && r.RefundStatus is RefundStatus.Requested or RefundStatus.Approved));
+
     public Task<Refund?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(r => r.Id == id));
 
@@ -444,6 +447,7 @@ internal sealed class TestApp
             .AddSingleton<IShippingOrderRepository>(Orders)
             .AddSingleton<IRefreshTokenRepository>(RefreshTokens)
             .AddSingleton<IRepository<SupportRequest>>(SupportRequests)
+            .AddSingleton<IRepository<Refund>>(Refunds)
             .AddSingleton<IRefundRepository>(Refunds)
             .AddSingleton<IDriverProfileRepository>(DriverProfiles)
             .AddSingleton<IDriverWalletRepository>(DriverWallets)
