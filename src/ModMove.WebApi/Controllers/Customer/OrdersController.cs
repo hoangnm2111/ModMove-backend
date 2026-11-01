@@ -21,7 +21,7 @@ public sealed class OrdersController : ApiControllerBase
     public Task<OrderDetailResponse> GetById(long id, CancellationToken cancellationToken) =>
         Sender.Send(new GetMyOrderDetailQuery(id), cancellationToken);
 
-    /// <summary>Book a cash order (UC-GST-17). Price is computed again server-side, the same way as the fare estimate.</summary>
+    /// <summary>Book a cash or PayOS order (UC-GST-17). Price is computed again server-side; a different expectedTotalFee → 422 FARE_CHANGED.</summary>
     [HttpPost]
     public async Task<IActionResult> Create(CreateOrderCommand command, CancellationToken cancellationToken)
     {
