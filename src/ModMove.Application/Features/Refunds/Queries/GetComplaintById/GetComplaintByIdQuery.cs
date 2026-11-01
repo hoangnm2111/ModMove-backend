@@ -56,7 +56,8 @@ public sealed record ComplaintCargoDetails(
     int LengthCm,
     int WidthCm,
     int HeightCm,
-    string? SpecialNotes);
+    string? SpecialNotes,
+    IReadOnlyList<string> PhotoUrls);
 
 public sealed record ComplaintCustomerDetails(
     long Id,

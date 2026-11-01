@@ -24,7 +24,7 @@ internal sealed class GetComplaintByIdQueryHandler(ISqlConnectionFactory connect
                o.total_fee AS TotalFee, o.delivered_at AS DeliveredAt, o.completed_at AS CompletedAt,
                c.cargo_type AS CargoType, c.quantity AS CargoQuantity, c.weight_kg AS CargoWeightKg,
                c.length_cm AS CargoLengthCm, c.width_cm AS CargoWidthCm, c.height_cm AS CargoHeightCm,
-               c.special_notes AS CargoSpecialNotes,
+                c.special_notes AS CargoSpecialNotes, c.photo_urls AS CargoPhotoUrlsJson,
                cust.id AS CustomerId, cust.full_name AS CustomerName, cust.phone_number AS CustomerPhone,
                dp.id AS DriverProfileId, drv_user.id AS DriverUserId, drv_user.full_name AS DriverFullName, drv_user.phone_number AS DriverPhone,
                v.license_plate AS LicensePlate, vt.name AS VehicleTypeName,
@@ -92,7 +92,7 @@ internal sealed class GetComplaintByIdQueryHandler(ISqlConnectionFactory connect
             ? new ComplaintCargoDetails(
                 row.CargoType, row.CargoQuantity ?? 0, row.CargoWeightKg ?? 0,
                 row.CargoLengthCm ?? 0, row.CargoWidthCm ?? 0, row.CargoHeightCm ?? 0,
-                row.CargoSpecialNotes)
+                row.CargoSpecialNotes, SqlHelpers.ParseJsonList(row.CargoPhotoUrlsJson))
             : null;
 
         var order = new ComplaintOrderDetails(
@@ -150,29 +150,78 @@ internal sealed class GetComplaintByIdQueryHandler(ISqlConnectionFactory connect
             order, customer, driver, evidence, rating, incidents, histories);
     }
 
-    private sealed record Row(
-        long Id, long OrderId, string OrderCode, string OrderStatus,
-        string Reason, string? EvidenceUrlsJson,
-        decimal RequestedAmount, decimal? ProposedAmount,
-        string? ProposalReason, long? ProposedById, string? ProposedByName,
-        string? InfoRequestNote, string? CustomerReply,
-        string RefundStatus, string? BankReferenceCode,
-        DateTime? DecidedAt, DateTime? ProcessedAt, DateTime CreatedAt,
-        string PickupAddress, string DropoffAddress, string PaymentMethod, string PaymentStatus,
-        decimal TotalFee, DateTime? DeliveredAt, DateTime? CompletedAt,
-        string? CargoType, int? CargoQuantity, decimal? CargoWeightKg,
-        int? CargoLengthCm, int? CargoWidthCm, int? CargoHeightCm, string? CargoSpecialNotes,
-        long CustomerId, string CustomerName, string CustomerPhone,
-        long? DriverProfileId, long? DriverUserId, string? DriverFullName, string? DriverPhone,
-        string? LicensePlate, string? VehicleTypeName,
-        string? PickupPhotoUrlsJson, string? DeliveryPhotoUrl, DateTime? DeliveryCompletionTime, string? ProofStatus,
-        int? RatingStars, string? ReviewComment, DateTime? RatingCreatedAt);
+    private sealed class Row
+    {
+        public long Id { get; init; }
+        public long OrderId { get; init; }
+        public string OrderCode { get; init; } = "";
+        public string OrderStatus { get; init; } = "";
+        public string Reason { get; init; } = "";
+        public string? EvidenceUrlsJson { get; init; }
+        public decimal RequestedAmount { get; init; }
+        public decimal? ProposedAmount { get; init; }
+        public string? ProposalReason { get; init; }
+        public long? ProposedById { get; init; }
+        public string? ProposedByName { get; init; }
+        public string? InfoRequestNote { get; init; }
+        public string? CustomerReply { get; init; }
+        public string RefundStatus { get; init; } = "";
+        public string? BankReferenceCode { get; init; }
+        public DateTime? DecidedAt { get; init; }
+        public DateTime? ProcessedAt { get; init; }
+        public DateTime CreatedAt { get; init; }
+        public string PickupAddress { get; init; } = "";
+        public string DropoffAddress { get; init; } = "";
+        public string PaymentMethod { get; init; } = "";
+        public string PaymentStatus { get; init; } = "";
+        public decimal TotalFee { get; init; }
+        public DateTime? DeliveredAt { get; init; }
+        public DateTime? CompletedAt { get; init; }
+        public string? CargoType { get; init; }
+        public int? CargoQuantity { get; init; }
+        public decimal? CargoWeightKg { get; init; }
+        public int? CargoLengthCm { get; init; }
+        public int? CargoWidthCm { get; init; }
+        public int? CargoHeightCm { get; init; }
+        public string? CargoSpecialNotes { get; init; }
+        public string? CargoPhotoUrlsJson { get; init; }
+        public long CustomerId { get; init; }
+        public string CustomerName { get; init; } = "";
+        public string CustomerPhone { get; init; } = "";
+        public long? DriverProfileId { get; init; }
+        public long? DriverUserId { get; init; }
+        public string? DriverFullName { get; init; }
+        public string? DriverPhone { get; init; }
+        public string? LicensePlate { get; init; }
+        public string? VehicleTypeName { get; init; }
+        public string? PickupPhotoUrlsJson { get; init; }
+        public string? DeliveryPhotoUrl { get; init; }
+        public DateTime? DeliveryCompletionTime { get; init; }
+        public string? ProofStatus { get; init; }
+        public int? RatingStars { get; init; }
+        public string? ReviewComment { get; init; }
+        public DateTime? RatingCreatedAt { get; init; }
+    }
 
-    private sealed record HistoryRow(
-        long Id, string? FromStatus, string ToStatus, string ChangedByRole,
-        long? ChangedByUserId, string? ChangedByUserName, string? Note, DateTime CreatedAt);
+    private sealed class HistoryRow
+    {
+        public long Id { get; init; }
+        public string? FromStatus { get; init; }
+        public string ToStatus { get; init; } = "";
+        public string ChangedByRole { get; init; } = "";
+        public long? ChangedByUserId { get; init; }
+        public string? ChangedByUserName { get; init; }
+        public string? Note { get; init; }
+        public DateTime CreatedAt { get; init; }
+    }
 
-    private sealed record IncidentRow(
-        long Id, string IncidentType, string Description,
-        string ResolutionStatus, string? ResolutionDecision, DateTime CreatedAt);
+    private sealed class IncidentRow
+    {
+        public long Id { get; init; }
+        public string IncidentType { get; init; } = "";
+        public string Description { get; init; } = "";
+        public string ResolutionStatus { get; init; } = "";
+        public string? ResolutionDecision { get; init; }
+        public DateTime CreatedAt { get; init; }
+    }
 }

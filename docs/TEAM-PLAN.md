@@ -91,17 +91,17 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 ## 6. Huy: Dispatcher
 
 **Phase 1**
-- [x] Mở rộng `DemoDataSeeder` (chỉ Development): các đơn ở mọi trạng thái (`MMDEMO001` - `MMDEMO010`), 5 sự cố, 5 khiếu nại (DemoOperationsSeeder)
+- [x] Mở rộng `DemoDataSeeder` (chỉ Development): các đơn ở mọi trạng thái (`MMDEMO001` - `MMDEMO013`), 5 sự cố, 5 khiếu nại, hoàn tiền sự cố và 2 tài xế phụ có GPS (DemoOperationsSeeder)
 - [x] Danh sách, chi tiết sự cố (DIS-03, 04)
 - [x] Danh sách, chi tiết và xác minh khiếu nại (DIS-11, 12, 13)
-- [x] Xử lý khiếu nại (DIS-14, 15, 08, 09, 17): xin thêm thông tin (`RequestComplaintInfo`), đề xuất hoàn tiền `proposed_amount ≤ requested_amount` lên Admin duyệt (`ProposeComplaintResolution`)
-- [ ] Giám sát đơn và tài xế (DIS-01, 16)
+- [x] Xử lý khiếu nại và hoàn tiền sự cố (DIS-14, 15, 08, 09, 17): xin thêm thông tin (`RequestComplaintInfo`, `RequestIncidentRefundInfo` gửi `REFUND_INFO_REQUESTED`), đề xuất hoàn tiền `proposed_amount ≤ requested_amount` lên Admin duyệt (`ProposeComplaintResolution`, `ProposeIncidentRefundResolution`)
+- [x] Giám sát đơn và tài xế, danh sách ca đã xử lý (DIS-01, 16)
 
 **Phase 2**
-- [ ] Quyết định xử lý sự cố (DIS-05), đổi tài xế (DIS-06, 7.2: tài xế mới đủ điều kiện như B5, đơn tiền mặt thêm GB-16), hủy đơn do sự cố (DIS-07: hàng cấm và khách vắng mặt ở điểm lấy không hoàn tiền, 4.3, 2.4; không có tài xế thay thế thì hoàn 100% đơn PayOS, 2.5), hủy sự cố (DIS-10)
-- [ ] Thông báo cho **khách** khi xử lý xong sự cố (8.3): `NotifyCustomerAsync(order, CustomerEvent.IncidentResolved, ct, detail)`, `detail` nói rõ quyết định; đổi tài xế hoặc hủy đơn thì gọi thêm `PublishOrderStatusAsync` (B12). Đổi tài xế: gọi cho **cả tài xế cũ và tài xế mới**, vì tài xế không vào group đơn
-- [ ] Hàng còn trên xe sau khi hủy: trả về hay giữ lại (2.6)
-- [ ] Không làm màn hình yêu cầu hỗ trợ (2.9)
+- [x] Quyết định xử lý sự cố (DIS-05), đổi tài xế (DIS-06, 7.2: tài xế mới đủ điều kiện như B5, đơn tiền mặt thêm GB-16), hủy đơn do sự cố (DIS-07: hàng cấm và khách vắng mặt ở điểm lấy không hoàn tiền, 4.3, 2.4; không có tài xế thay thế thì hoàn 100% đơn PayOS, 2.5), hủy sự cố (DIS-10)
+- [x] Thông báo cho **khách** khi xử lý xong sự cố (8.3): `NotifyCustomerAsync(order, CustomerEvent.IncidentResolved, ct, detail)`, `detail` nói rõ quyết định; đổi tài xế hoặc hủy đơn thì gọi thêm `PublishOrderStatusAsync` (B12). Đổi tài xế: gọi cho **cả tài xế cũ và tài xế mới**, vì tài xế không vào group đơn
+- [x] Hàng còn trên xe sau khi hủy: trả về hay giữ lại (2.6)
+- [x] Không làm màn hình yêu cầu hỗ trợ (2.9)
 
 ## 7. Dịch vụ ngoài
 

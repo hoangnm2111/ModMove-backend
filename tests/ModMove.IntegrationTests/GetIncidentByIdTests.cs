@@ -57,6 +57,7 @@ public class GetIncidentByIdTests
         table.Columns.Add("CargoWidthCm", typeof(int));
         table.Columns.Add("CargoHeightCm", typeof(int));
         table.Columns.Add("CargoSpecialNotes", typeof(string));
+        table.Columns.Add("CargoPhotoUrlsJson", typeof(string));
 
         // Customer fields
         table.Columns.Add("CustomerId", typeof(long));
@@ -70,6 +71,12 @@ public class GetIncidentByIdTests
         table.Columns.Add("DriverPhone", typeof(string));
         table.Columns.Add("LicensePlate", typeof(string));
         table.Columns.Add("VehicleTypeName", typeof(string));
+
+        // Proof of delivery
+        table.Columns.Add("PickupPhotoUrlsJson", typeof(string));
+        table.Columns.Add("DeliveryPhotoUrl", typeof(string));
+        table.Columns.Add("DeliveryCompletionTime", typeof(DateTime));
+        table.Columns.Add("ProofStatus", typeof(string));
 
         return table;
     }
@@ -93,8 +100,14 @@ public class GetIncidentByIdTests
         var table = new DataTable();
         table.Columns.Add("Id", typeof(long));
         table.Columns.Add("SourceType", typeof(string));
+        table.Columns.Add("Reason", typeof(string));
+        table.Columns.Add("EvidenceUrlsJson", typeof(string));
         table.Columns.Add("RequestedAmount", typeof(decimal));
         table.Columns.Add("ProposedAmount", typeof(decimal));
+        table.Columns.Add("ProposalReason", typeof(string));
+        table.Columns.Add("ProposedById", typeof(long));
+        table.Columns.Add("InfoRequestNote", typeof(string));
+        table.Columns.Add("CustomerReply", typeof(string));
         table.Columns.Add("RefundStatus", typeof(string));
         table.Columns.Add("CreatedAt", typeof(DateTime));
         return table;
@@ -123,9 +136,10 @@ public class GetIncidentByIdTests
             10.7769m, 106.7009m, "Resolved", "ContinueTrip", "Đã thay lốp phụ",
             4L, "Tài xế Demo", "Driver", 2L, "Dispatcher ModMove", now.AddMinutes(45), now,
             "12 Nguyễn Huệ, Q1", "45 Lê Văn Việt, Thủ Đức", "Cash", "Paid", 180000m, DBNull.Value,
-            "Gia dụng", 2, 50m, 60, 40, 30, "Hàng dễ vỡ",
+            "Gia dụng", 2, 50m, 60, 40, 30, "Hàng dễ vỡ", "[\"cargo1\",\"cargo2\"]",
             3L, "Khách hàng Demo", "0900000003",
-            1L, 4L, "Tài xế Demo", "0900000004", "51C-123.45", "Xe tải 1 tấn");
+            1L, 4L, "Tài xế Demo", "0900000004", "51C-123.45", "Xe tải 1 tấn",
+            "[\"pick1\",\"pick2\"]", "pod1", now.AddMinutes(40), "Verified");
         sql.Results.Enqueue(incidentTable);
 
         var historyTable = CreateHistoriesTable();
@@ -134,7 +148,9 @@ public class GetIncidentByIdTests
         sql.Results.Enqueue(historyTable);
 
         var refundTable = CreateRefundTable();
-        refundTable.Rows.Add(501L, "Incident", 50000m, 30000m, "Requested", now.AddMinutes(30));
+        refundTable.Rows.Add(
+            501L, "Incident", "Hàng hư", "[\"e1\",\"e2\"]", 50000m, 30000m, "Hoàn 60%", 2L,
+            "Xin ảnh đáy", "Đã gửi ảnh", "Requested", now.AddMinutes(30));
         sql.Results.Enqueue(refundTable);
 
         var res = await SenderWith(sql).Send(new GetIncidentByIdQuery(1));
@@ -169,6 +185,14 @@ public class GetIncidentByIdTests
         Assert.Equal("Gia dụng", res.Order.Cargo!.CargoType);
         Assert.Equal(2, res.Order.Cargo.Quantity);
         Assert.Equal(50m, res.Order.Cargo.WeightKg);
+        Assert.Equal(["cargo1", "cargo2"], res.Order.Cargo.PhotoUrls);
+
+        // Pickup and delivery evidence
+        Assert.NotNull(res.Proof);
+        Assert.Equal(["pick1", "pick2"], res.Proof!.PickupPhotoUrls);
+        Assert.Equal("pod1", res.Proof.DeliveryPhotoUrl);
+        Assert.Equal("Verified", res.Proof.ProofStatus);
+        Assert.Equal(TimeSpan.Zero, res.Proof.DeliveryCompletionTime!.Value.Offset);
 
         // Customer & Driver
         Assert.Equal("Khách hàng Demo", res.Customer.FullName);
@@ -186,6 +210,12 @@ public class GetIncidentByIdTests
         Assert.Equal(501, res.Refund!.Id);
         Assert.Equal(50000m, res.Refund.RequestedAmount);
         Assert.Equal(30000m, res.Refund.ProposedAmount);
+        Assert.Equal("Hàng hư", res.Refund.Reason);
+        Assert.Equal(["e1", "e2"], res.Refund.EvidenceUrls);
+        Assert.Equal("Hoàn 60%", res.Refund.ProposalReason);
+        Assert.Equal(2, res.Refund.ProposedById);
+        Assert.Equal("Xin ảnh đáy", res.Refund.InfoRequestNote);
+        Assert.Equal("Đã gửi ảnh", res.Refund.CustomerReply);
     }
 
     [Fact]
@@ -200,9 +230,10 @@ public class GetIncidentByIdTests
             DBNull.Value, DBNull.Value, "Open", DBNull.Value, DBNull.Value,
             3L, "Khách hàng Demo", "Customer", DBNull.Value, DBNull.Value, DBNull.Value, now,
             "A", "B", "PayOS", "Unpaid", 100000m, DBNull.Value,
-            DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value,
+            DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value,
             3L, "Khách hàng Demo", "0900000003",
-            DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value);
+            DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value,
+            DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value);
         sql.Results.Enqueue(incidentTable);
 
         var historyTable = CreateHistoriesTable();
@@ -217,6 +248,7 @@ public class GetIncidentByIdTests
         Assert.Empty(res.PhotoUrls);
         Assert.Null(res.Driver);
         Assert.Null(res.Order.Cargo);
+        Assert.Null(res.Proof);
         Assert.Null(res.Refund);
         Assert.Empty(res.StatusHistories);
     }

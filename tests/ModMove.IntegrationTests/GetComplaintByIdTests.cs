@@ -57,6 +57,7 @@ public class GetComplaintByIdTests
         table.Columns.Add("CargoWidthCm", typeof(int));
         table.Columns.Add("CargoHeightCm", typeof(int));
         table.Columns.Add("CargoSpecialNotes", typeof(string));
+        table.Columns.Add("CargoPhotoUrlsJson", typeof(string));
 
         // Customer
         table.Columns.Add("CustomerId", typeof(long));
@@ -134,7 +135,7 @@ public class GetComplaintByIdTests
             240000m, 120000m, "Hư hỏng 50%", 2L, "Dispatcher ModMove",
             "Cần thêm ảnh mặt đáy", "Đã gửi thêm ảnh", "Requested", DBNull.Value, DBNull.Value, DBNull.Value, now,
             "12 Nguyễn Huệ, Q1", "45 Lê Văn Việt, Thủ Đức", "PayOS", "Paid", 240000m, now.AddHours(-1), DBNull.Value,
-            "Tủ gỗ", 1, 40m, 120, 60, 80, "Cẩn thận",
+            "Tủ gỗ", 1, 40m, 120, 60, 80, "Cẩn thận", "[\"cargo1\",\"cargo2\"]",
             3L, "Khách hàng Demo", "0900000003",
             1L, 4L, "Tài xế Demo", "0900000004", "51C-123.45", "Xe tải 1 tấn",
             "[\"p_img1\",\"p_img2\"]", "d_img1", now.AddHours(-1), "Verified",
@@ -162,6 +163,10 @@ public class GetComplaintByIdTests
         Assert.Equal("ProposedToAdmin", res.Stage);
         Assert.Equal(2, res.ProposedById);
         Assert.Equal("Dispatcher ModMove", res.ProposedByName);
+
+        // Cargo as the customer declared it, to compare with the pickup and delivery photos (UC-DIS-13)
+        Assert.NotNull(res.Order.Cargo);
+        Assert.Equal(["cargo1", "cargo2"], res.Order.Cargo!.PhotoUrls);
 
         // Verification evidence
         Assert.NotNull(res.VerificationEvidence);

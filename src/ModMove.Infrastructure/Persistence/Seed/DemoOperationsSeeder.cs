@@ -22,15 +22,38 @@ internal static class DemoOperationsSeeder
         var vehicleType = await db.Set<VehicleType>().OrderBy(v => v.MaxLoadWeightKg).FirstAsync(ct);
         var people = new People(admin, dispatcher, customer, driverUser, driver);
 
+        // Keep the primary demo driver Online with a fresh GPS point so the Dispatcher live map shows an active-trip marker.
+        if (driver.ApprovalStatus == ApprovalStatus.Approved && driver.OnlineStatus != OnlineStatus.Online)
+            driver.GoOnline();
+        driver.UpdateLocation(10.8012m, 106.7130m, now.AddMinutes(-1));
+
+        // Extra approved drivers for UC-DIS-01 (online map) and UC-DIS-06 (replacement drivers near MMDEMO001):
+        // - driver2: idle, Online, fresh GPS (~0.5 km from MMDEMO001) and 500k deposit => eligible replacement & visible on map.
+        // - driver3: idle, Online, stale GPS (12 min old, DECISIONS 6.4) => hidden from map and replacement candidates.
+        await EnsureExtraDriverAsync(
+            db, admin, vehicleType, driverUser.PasswordHash,
+            "Tài xế Thay thế", "0900000005", "driver2@modmove.local",
+            "079090000002", "790000000002", "51C-222.22",
+            10.8050m, 106.7150m, now.AddMinutes(-1), now, ct);
+
+        await EnsureExtraDriverAsync(
+            db, admin, vehicleType, driverUser.PasswordHash,
+            "Tài xế Mất GPS", "0900000006", "driver3@modmove.local",
+            "079090000003", "790000000003", "51C-333.33",
+            10.8030m, 106.7140m, now.AddMinutes(-12), now, ct);
+
+        await db.SaveChangesAsync(ct);
+
         // Incidents: every resolution status, both reporters, several types (DECISIONS 7.1: only 4 types).
         var i1 = await EnsureOrderAsync(db, people, vehicleType, "MMDEMO001", OrderStatus.InTransit, PaymentMethod.Cash, 180_000m, now, ct);
         await EnsureIncidentAsync(db, i1, driverUser.Id, IncidentType.VehicleBreakdown,
             "Xe bị nổ lốp trên đường, cần hỗ trợ đổi xe.", 10.8012m, 106.7130m, incident => { }, ct);
 
         var i2 = await EnsureOrderAsync(db, people, vehicleType, "MMDEMO002", OrderStatus.PickedUp, PaymentMethod.PayOS, 220_000m, now, ct);
-        await EnsureIncidentAsync(db, i2, customer.Id, IncidentType.DamagedCargo,
+        var inc2 = await EnsureIncidentAsync(db, i2, customer.Id, IncidentType.DamagedCargo,
             "Khách thấy hàng bị móp khi tài xế bốc lên xe.", null, null,
             incident => incident.StartHandling(dispatcher.Id), ct);
+        await EnsureIncidentRefundAsync(db, i2, inc2, "Yêu cầu bồi thường phần vỏ thùng bị móp khi bốc xếp.", 100_000m, ct);
 
         var i3 = await EnsureOrderAsync(db, people, vehicleType, "MMDEMO003", OrderStatus.InTransit, PaymentMethod.Cash, 150_000m, now, ct);
         await EnsureIncidentAsync(db, i3, driverUser.Id, IncidentType.Accident,
@@ -80,6 +103,66 @@ internal static class DemoOperationsSeeder
                 refund.RejectRefund(admin.Id, now);
             }, ct);
         await EnsureRatingAsync(db, c5, customer.Id, driver.Id, 2, "Tài xế nói chuyện cộc lốc.", now, ct);
+
+        // Cover remaining statuses (Pending, Accepted, Cancelled) so UC-DIS-01 monitoring tabs have all 8 statuses.
+        await EnsureOrderAsync(db, people, vehicleType, "MMDEMO011", OrderStatus.Pending, PaymentMethod.Cash, 170_000m, now, ct);
+        await EnsureOrderAsync(db, people, vehicleType, "MMDEMO012", OrderStatus.Accepted, PaymentMethod.PayOS, 195_000m, now, ct);
+        await EnsureOrderAsync(db, people, vehicleType, "MMDEMO013", OrderStatus.Cancelled, PaymentMethod.Cash, 160_000m, now, ct);
+    }
+
+    private static async Task EnsureExtraDriverAsync(
+        ApplicationDbContext db, User admin, VehicleType vehicleType, string passwordHash,
+        string fullName, string phone, string email,
+        string citizenId, string licenseNo, string plate,
+        decimal latitude, decimal longitude, DateTimeOffset locationAt, DateTimeOffset now, CancellationToken ct)
+    {
+        var user = await db.Set<User>().FirstOrDefaultAsync(u => u.Email == email || u.PhoneNumber == phone, ct);
+        if (user is null)
+        {
+            user = User.Create(fullName, phone, email, passwordHash, UserRole.Driver, emailVerified: true);
+            db.Add(user);
+            await db.SaveChangesAsync(ct);
+        }
+
+        var profile = await db.Set<DriverProfile>()
+            .Include(d => d.Vehicle)
+            .Include(d => d.Applications)
+            .FirstOrDefaultAsync(d => d.UserId == user.Id, ct);
+
+        if (profile is null)
+        {
+            profile = DriverProfile.Create(user.Id, citizenId, licenseNo, Photo, Photo);
+            db.Add(profile);
+            await db.SaveChangesAsync(ct);
+        }
+
+        if (profile.Vehicle is null)
+        {
+            var application = DriverApplication.Create(
+                profile.Id, profile.NextVersionNumber(), vehicleType.Id, citizenId, licenseNo,
+                plate, vehicleType.MaxLoadWeightKg, Enumerable.Repeat(Photo, 5), now);
+            profile.Submit(application);
+            application.Approve(admin.Id, now);
+
+            profile.Approve(Vehicle.Create(
+                profile.Id, vehicleType.Id, plate, vehicleType.MaxLoadWeightKg,
+                $"{vehicleType.CargoBedLengthCm}x{vehicleType.CargoBedWidthCm}x{vehicleType.CargoBedHeightCm}",
+                Photo, Photo, Photo));
+            profile.LinkBankAccount("Vietcombank", phone, fullName.ToUpperInvariant());
+            await db.SaveChangesAsync(ct);
+        }
+
+        if (!await db.Set<DriverWallet>().AnyAsync(w => w.DriverProfileId == profile.Id, ct))
+        {
+            var wallet = DriverWallet.Create(profile.Id);
+            wallet.TopUpDeposit(500_000m);
+            db.Add(wallet);
+            await db.SaveChangesAsync(ct);
+        }
+
+        if (profile.ApprovalStatus == ApprovalStatus.Approved && profile.OnlineStatus != OnlineStatus.Online)
+            profile.GoOnline();
+        profile.UpdateLocation(latitude, longitude, locationAt);
     }
 
     private static async Task<ShippingOrder> EnsureOrderAsync(
@@ -100,6 +183,14 @@ internal static class DemoOperationsSeeder
 
         if (method == PaymentMethod.PayOS)
             order.MarkPaid(now);
+
+        if (target == OrderStatus.Cancelled)
+        {
+            order.Cancel("Khách hủy đơn trước khi ghép tài xế.", ChangedByRole.Customer, people.Customer.Id, now);
+            db.Add(order);
+            await db.SaveChangesAsync(ct);
+            return order;
+        }
 
         // A Completed order is shown as finished two days ago, so the Delivered ones stay inside the complaint window.
         var at = target == OrderStatus.Completed ? now.AddDays(-2) : now;
@@ -123,16 +214,30 @@ internal static class DemoOperationsSeeder
         return order;
     }
 
-    private static async Task EnsureIncidentAsync(
+    private static async Task<InTransitIncident> EnsureIncidentAsync(
         ApplicationDbContext db, ShippingOrder order, long reporterId, IncidentType type, string description,
         decimal? latitude, decimal? longitude, Action<InTransitIncident> advance, CancellationToken ct)
     {
-        if (await db.Set<InTransitIncident>().AnyAsync(i => i.OrderId == order.Id, ct))
-            return;
+        var existing = await db.Set<InTransitIncident>().FirstOrDefaultAsync(i => i.OrderId == order.Id, ct);
+        if (existing is not null)
+            return existing;
 
         var incident = InTransitIncident.Report(order.Id, reporterId, type, description, [Photo], latitude, longitude);
         advance(incident);
         db.Add(incident);
+        await db.SaveChangesAsync(ct);
+        return incident;
+    }
+
+    private static async Task EnsureIncidentRefundAsync(
+        ApplicationDbContext db, ShippingOrder order, InTransitIncident incident, string reason, decimal requestedAmount,
+        CancellationToken ct)
+    {
+        if (await db.Set<Refund>().AnyAsync(r => r.IncidentId == incident.Id && r.SourceType == RefundSourceType.Incident, ct))
+            return;
+
+        var refund = Refund.Request(order.Id, incident.Id, RefundSourceType.Incident, reason, [Photo], requestedAmount);
+        db.Add(refund);
         await db.SaveChangesAsync(ct);
     }
 

@@ -31,8 +31,9 @@ public sealed record IncidentDetailResponse(
     IncidentOrderDetails Order,
     IncidentCustomerDetails Customer,
     IncidentDriverDetails? Driver,
+    IncidentProofEvidence? Proof,
     IReadOnlyList<IncidentOrderStatusHistoryItem> StatusHistories,
-    IncidentRefundSummary? Refund);
+    IncidentRefundDetails? Refund);
 
 public sealed record IncidentOrderDetails(
     long Id,
@@ -53,7 +54,8 @@ public sealed record IncidentCargoDetails(
     int LengthCm,
     int WidthCm,
     int HeightCm,
-    string? SpecialNotes);
+    string? SpecialNotes,
+    IReadOnlyList<string> PhotoUrls);
 
 public sealed record IncidentCustomerDetails(
     long Id,
@@ -78,10 +80,24 @@ public sealed record IncidentOrderStatusHistoryItem(
     string? Note,
     DateTimeOffset CreatedAt);
 
-public sealed record IncidentRefundSummary(
+/// <summary>Pickup photos of the driver and the delivery photo, to compare with the cargo the customer declared (UC-DIS-13).</summary>
+public sealed record IncidentProofEvidence(
+    IReadOnlyList<string> PickupPhotoUrls,
+    string? DeliveryPhotoUrl,
+    DateTimeOffset? DeliveryCompletionTime,
+    string ProofStatus);
+
+/// <summary>The refund requested because of the incident, with what the Dispatcher needs to review it (UC-DIS-08, 09, 14).</summary>
+public sealed record IncidentRefundDetails(
     long Id,
     string SourceType,
+    string Reason,
+    IReadOnlyList<string> EvidenceUrls,
     decimal RequestedAmount,
     decimal? ProposedAmount,
+    string? ProposalReason,
+    long? ProposedById,
+    string? InfoRequestNote,
+    string? CustomerReply,
     string RefundStatus,
     DateTimeOffset CreatedAt);
