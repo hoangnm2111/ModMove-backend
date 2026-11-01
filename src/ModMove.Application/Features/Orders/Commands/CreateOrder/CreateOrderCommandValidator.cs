@@ -17,8 +17,13 @@ internal sealed class CreateOrderCommandValidator : AbstractValidator<CreateOrde
         RuleFor(x => x.ReceiverPhone).ValidPhone();
         RuleFor(x => x.CouponCode).MaximumLength(50);
         RuleFor(x => x.ProhibitedGoodsCommitment).Equal(true).WithMessage("Confirm that the cargo has no prohibited goods.");
+        RuleFor(x => x.PaymentMethod).IsInEnum();
         RuleFor(x => x.PayerRole).NotNull().When(x => x.PaymentMethod == PaymentMethod.Cash)
             .WithMessage("A cash order must say who pays: sender or receiver.");
+        RuleFor(x => x.PayerRole).Null().When(x => x.PaymentMethod == PaymentMethod.PayOS)
+            .WithMessage("A PayOS order is paid online by the customer: leave payerRole empty.");
+        RuleFor(x => x.ExpectedTotalFee).GreaterThanOrEqualTo(0).Must(fee => fee % 1 == 0)
+            .When(x => x.ExpectedTotalFee is not null).WithMessage("'Expected Total Fee' must be a whole VND amount, 0 or more.");
 
         RuleFor(x => x.Cargo).NotNull();
         When(x => x.Cargo is not null, () =>

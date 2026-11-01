@@ -15,6 +15,22 @@ public class FareCalculatorTests
     private static Coupon Welcome20k() => Coupon.Create("WELCOME20K", 20_000, 100_000, Now.AddDays(-1), Now.AddYears(1), 1_000);
 
     [Fact]
+    public void Quote_without_an_expected_total_is_accepted() =>
+        new FareQuote(170_000, 0, 0, 170_000).EnsureMatches(null);
+
+    [Fact]
+    public void Quote_matching_the_expected_total_is_accepted() =>
+        new FareQuote(170_000, 0, 0, 170_000).EnsureMatches(170_000);
+
+    [Fact]
+    public void Quote_different_from_the_expected_total_is_FARE_CHANGED_4_4()
+    {
+        var error = Assert.Throws<DomainException>(() => new FareQuote(170_000, 0, 0, 170_000).EnsureMatches(160_000));
+
+        Assert.Equal("FARE_CHANGED", error.Code);
+    }
+
+    [Fact]
     public void Distance_fee_is_base_plus_per_km_B1() =>
         Assert.Equal(new FareQuote(170_000, 0, 0, 170_000), FareCalculator.Calculate(Van(), 12m, null, null, Now));
 
@@ -35,6 +51,17 @@ public class FareCalculatorTests
     [Fact]
     public void Odd_km_rounds_to_the_dong() =>
         Assert.Equal(173_457m, FareCalculator.Calculate(Van(), 12.34565m, null, null, Now).DistanceFee); // 50,000 + 123,456.5
+
+    [Fact]
+    public void Odd_loading_fee_and_coupon_round_to_the_dong()
+    {
+        var coupon = Coupon.Create("ODD", 20_000.4m, 100_000, Now.AddDays(-1), Now.AddYears(1), 1_000);
+
+        var fare = FareCalculator.Calculate(Van(), 12m, 100_000.5m, coupon, Now);
+
+        // 170,000 + 100,001 − 20,000: every part and the total are whole VND, so the client can send it back exactly.
+        Assert.Equal(new FareQuote(170_000, 100_001, 20_000, 250_001), fare);
+    }
 
     [Fact]
     public void Coupon_below_its_minimum_is_rejected_GB21()
