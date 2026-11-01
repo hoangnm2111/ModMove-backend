@@ -76,8 +76,19 @@ internal sealed class ListComplaintsQueryHandler(ISqlConnectionFactory connectio
         return new PagedResult<ComplaintListItemResponse>(items, request.Page, request.PageSize, total);
     }
 
-    private sealed record Row(
-        long Id, long OrderId, string OrderCode, string CustomerName, string Reason,
-        decimal RequestedAmount, decimal? ProposedAmount, string Stage, string RefundStatus,
-        DateTime? DeliveredAt, DateTime CreatedAt, int TotalCount);
+    private sealed class Row
+    {
+        public long Id { get; init; }
+        public long OrderId { get; init; }
+        public string OrderCode { get; init; } = "";
+        public string CustomerName { get; init; } = "";
+        public string Reason { get; init; } = "";
+        public decimal RequestedAmount { get; init; }
+        public decimal? ProposedAmount { get; init; }
+        public string Stage { get; init; } = "";
+        public string RefundStatus { get; init; } = "";
+        public DateTime? DeliveredAt { get; init; }
+        public DateTime CreatedAt { get; init; }
+        public int TotalCount { get; init; }
+    }
 }

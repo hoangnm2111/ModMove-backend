@@ -14,6 +14,9 @@ namespace ModMove.IntegrationTests;
 internal sealed class FakeSql : ISqlConnectionFactory
 {
     public DataTable Result { get; set; } = new();
+
+    /// <summary>Tables for handlers that run several queries in turn: each query takes the next one, then falls back to <see cref="Result"/>.</summary>
+    public Queue<DataTable> Results { get; } = new();
     public object? ScalarResult { get; set; }
     public Func<string, IReadOnlyDictionary<string, object?>, DataTable?>? CustomQuery { get; set; }
     public string LastSql { get; private set; } = "";
@@ -73,6 +76,8 @@ internal sealed class FakeSql : ISqlConnectionFactory
         {
             sql.LastSql = CommandText;
             sql.LastParameters = DbParameterCollection.Cast<DbParameter>().ToDictionary(p => p.ParameterName, p => p.Value);
+            if (sql.Results.Count > 0)
+                return sql.Results.Dequeue().CreateDataReader();
             if (sql.CustomQuery is not null)
             {
                 var custom = sql.CustomQuery(CommandText, sql.LastParameters);

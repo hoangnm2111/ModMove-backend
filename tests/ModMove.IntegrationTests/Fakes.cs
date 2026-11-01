@@ -138,6 +138,9 @@ internal sealed class InMemoryRefunds : IRefundRepository
     public Task<bool> HasOpenRefundForIncidentAsync(long incidentId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.Any(r => r.IncidentId == incidentId && r.RefundStatus is RefundStatus.Requested or RefundStatus.Approved));
 
+    public Task<Refund?> GetOpenForIncidentAsync(long incidentId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.LastOrDefault(r => r.IncidentId == incidentId && r.RefundStatus is RefundStatus.Requested or RefundStatus.Approved));
+
     public Task<Refund?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(r => r.Id == id));
 
@@ -406,9 +409,6 @@ internal sealed class TestApp
     public InMemoryOrders Orders { get; } = new();
     public InMemoryRefreshTokens RefreshTokens { get; } = new();
     public InMemoryRepository<SupportRequest> SupportRequests { get; } = new();
-<<<<<<< HEAD
-    public InMemoryRepository<Refund> Refunds { get; } = new();
-=======
     public InMemoryRefunds Refunds { get; } = new();
     public InMemoryDriverProfiles DriverProfiles { get; } = new();
     public InMemoryDriverWallets DriverWallets { get; } = new();
@@ -417,7 +417,6 @@ internal sealed class TestApp
     public InMemoryRepository<DriverLocationLog> LocationLogs { get; } = new();
     public CapturingRealtimeNotifier Realtime { get; } = new();
     public CapturingPushNotifications Push { get; } = new();
->>>>>>> origin/develop
     public CountingUnitOfWork UnitOfWork { get; } = new();
     public CapturingEmailSender Email { get; } = new();
     public FakeFileStorage Files { get; } = new();
@@ -448,9 +447,7 @@ internal sealed class TestApp
             .AddSingleton<IShippingOrderRepository>(Orders)
             .AddSingleton<IRefreshTokenRepository>(RefreshTokens)
             .AddSingleton<IRepository<SupportRequest>>(SupportRequests)
-<<<<<<< HEAD
             .AddSingleton<IRepository<Refund>>(Refunds)
-=======
             .AddSingleton<IRefundRepository>(Refunds)
             .AddSingleton<IDriverProfileRepository>(DriverProfiles)
             .AddSingleton<IDriverWalletRepository>(DriverWallets)
@@ -459,7 +456,6 @@ internal sealed class TestApp
             .AddSingleton<IRepository<DriverLocationLog>>(LocationLogs)
             .AddSingleton<IRealtimeNotifier>(Realtime)
             .AddSingleton<IPushNotificationService>(Push)
->>>>>>> origin/develop
             .AddSingleton<IUnitOfWork>(UnitOfWork)
             .AddSingleton<IPasswordHasher>(new FakeHasher())
             .AddSingleton<IJwtTokenService>(new FakeTokens())

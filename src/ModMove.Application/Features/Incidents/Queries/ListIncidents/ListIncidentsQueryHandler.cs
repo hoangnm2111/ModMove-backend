@@ -64,8 +64,21 @@ internal sealed class ListIncidentsQueryHandler(ISqlConnectionFactory connection
         return new PagedResult<IncidentListItemResponse>(items, request.Page, request.PageSize, total);
     }
 
-    private sealed record Row(
-        long Id, long OrderId, string OrderCode, string OrderStatus, string IncidentType, string Description,
-        long ReportedById, string ReporterName, string ReporterRole, string ResolutionStatus,
-        long? HandledById, string? HandledByName, DateTime CreatedAt, int TotalCount);
+    private sealed class Row
+    {
+        public long Id { get; init; }
+        public long OrderId { get; init; }
+        public string OrderCode { get; init; } = "";
+        public string OrderStatus { get; init; } = "";
+        public string IncidentType { get; init; } = "";
+        public string Description { get; init; } = "";
+        public long ReportedById { get; init; }
+        public string ReporterName { get; init; } = "";
+        public string ReporterRole { get; init; } = "";
+        public string ResolutionStatus { get; init; } = "";
+        public long? HandledById { get; init; }
+        public string? HandledByName { get; init; }
+        public DateTime CreatedAt { get; init; }
+        public int TotalCount { get; init; }
+    }
 }
