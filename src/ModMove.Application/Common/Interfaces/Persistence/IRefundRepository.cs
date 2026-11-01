@@ -12,4 +12,7 @@ public interface IRefundRepository : IRepository<Refund>
 
     /// <summary>DECISIONS B9: one open refund per incident (Requested or Approved).</summary>
     Task<bool> HasOpenRefundForIncidentAsync(long incidentId, CancellationToken cancellationToken = default);
+
+    /// <summary>The refund still open (Requested or Approved) for an incident, or null; the Dispatcher works on it (UC-DIS-08, 14).</summary>
+    Task<Refund?> GetOpenForIncidentAsync(long incidentId, CancellationToken cancellationToken = default);
 }
