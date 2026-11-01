@@ -77,11 +77,37 @@ internal sealed class InMemoryOrders : IShippingOrderRepository
     /// <summary>Customers that still have an order neither Completed nor Cancelled.</summary>
     public HashSet<long> CustomersWithOpenOrders { get; } = [];
 
+    /// <summary>Set to true to pretend an order is between Accepted and Delivered (DECISIONS C8).</summary>
+    public bool HasOrdersInProgress { get; set; }
+
     public Task<bool> HasOpenOrdersForCustomerAsync(long customerId, CancellationToken cancellationToken = default) =>
         Task.FromResult(CustomersWithOpenOrders.Contains(customerId));
 
-    public Task<ShippingOrder?> GetByIdAsync(long id, CancellationToken cancellationToken = default) => Task.FromResult<ShippingOrder?>(null);
-    public void Add(ShippingOrder aggregate) { }
+    public Task<bool> HasOrdersInProgressAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(HasOrdersInProgress);
+
+    /// <summary>Orders added by commands; CreatedAt stays unset unless a test stamps it like the database would.</summary>
+    public List<ShippingOrder> Items { get; } = [];
+
+    public Task<int> CountCreatedBetweenAsync(DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Count(o => o.CreatedAt >= fromUtc && o.CreatedAt < toUtc));
+
+    public Task<ShippingOrder?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(o => o.Id == id));
+
+    public Task<ShippingOrder?> GetWithProofAsync(long id, CancellationToken cancellationToken = default) =>
+        GetByIdAsync(id, cancellationToken);
+
+    public Task<long?> GetActiveOrderIdForDriverAsync(long driverProfileId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(o => o.DriverProfileId == driverProfileId
+            && o.OrderStatus is OrderStatus.Accepted or OrderStatus.Arrived or OrderStatus.PickedUp or OrderStatus.InTransit)?.Id);
+
+    public void Add(ShippingOrder aggregate)
+    {
+        if (aggregate.Id == 0)
+            TestIds.Set(aggregate, Items.Count + 1);
+        Items.Add(aggregate);
+    }
     public void Update(ShippingOrder aggregate) { }
     public void Remove(ShippingOrder aggregate) { }
 }
@@ -99,6 +125,119 @@ internal sealed class InMemoryRepository<T> : IRepository<T> where T : ModMove.D
     }
     public void Update(T aggregate) { }
     public void Remove(T aggregate) => Items.Remove(aggregate);
+}
+
+internal sealed class InMemoryRefunds : IRefundRepository
+{
+    public List<Refund> Items { get; } = [];
+
+    public Task<bool> HasOpenComplaintAsync(long orderId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Any(r => r.OrderId == orderId && r.SourceType == RefundSourceType.Complaint
+            && r.RefundStatus is RefundStatus.Requested or RefundStatus.Approved));
+
+    public Task<bool> HasOpenRefundForIncidentAsync(long incidentId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Any(r => r.IncidentId == incidentId && r.RefundStatus is RefundStatus.Requested or RefundStatus.Approved));
+
+    public Task<Refund?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(r => r.Id == id));
+
+    public void Add(Refund aggregate)
+    {
+        if (aggregate.Id == 0)
+            TestIds.Set(aggregate, Items.Count + 1);
+        Items.Add(aggregate);
+    }
+    public void Update(Refund aggregate) { }
+    public void Remove(Refund aggregate) => Items.Remove(aggregate);
+}
+
+internal sealed class InMemoryRatings : IRatingRepository
+{
+    public List<Rating> Items { get; } = [];
+
+    public Task<bool> ExistsForOrderAsync(long orderId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Any(r => r.OrderId == orderId));
+
+    public Task<Rating?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(r => r.Id == id));
+
+    public void Add(Rating aggregate)
+    {
+        if (aggregate.Id == 0)
+            TestIds.Set(aggregate, Items.Count + 1);
+        Items.Add(aggregate);
+    }
+    public void Update(Rating aggregate) { }
+    public void Remove(Rating aggregate) => Items.Remove(aggregate);
+}
+
+internal sealed class InMemoryCoupons : ICouponRepository
+{
+    public List<Coupon> Items { get; } = [];
+
+    public Task<Coupon?> GetByCodeAsync(string code, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(c => c.DiscountCode.Equals(code, StringComparison.OrdinalIgnoreCase)));
+
+    public Task<Coupon?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(c => c.Id == id));
+
+    public void Add(Coupon aggregate)
+    {
+        if (aggregate.Id == 0)
+            TestIds.Set(aggregate, Items.Count + 1);
+        Items.Add(aggregate);
+    }
+    public void Update(Coupon aggregate) { }
+    public void Remove(Coupon aggregate) => Items.Remove(aggregate);
+}
+
+internal sealed class InMemoryDriverProfiles : IDriverProfileRepository
+{
+    public List<DriverProfile> Items { get; } = [];
+
+    public Task<DriverProfile?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(d => d.Id == id));
+
+    public Task<DriverProfile?> GetByIdWithApplicationsAndVehicleAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(d => d.Id == id));
+
+    public Task<DriverProfile?> GetByUserIdWithApplicationsAndVehicleAsync(long userId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(d => d.UserId == userId));
+
+    public Task<DriverProfile?> GetByUserIdAsync(long userId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(d => d.UserId == userId));
+
+    public Task<DriverProfile?> GetByApplicationIdWithApplicationsAndVehicleAsync(long applicationId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(d => d.Applications.Any(a => a.Id == applicationId)));
+
+    public void Add(DriverProfile aggregate)
+    {
+        if (aggregate.Id == 0)
+            TestIds.Set(aggregate, Items.Count + 1);
+        Items.Add(aggregate);
+    }
+    public void Update(DriverProfile aggregate) { }
+    public void Remove(DriverProfile aggregate) => Items.Remove(aggregate);
+}
+
+internal sealed class InMemoryDriverWallets : IDriverWalletRepository
+{
+    public List<DriverWallet> Items { get; } = [];
+
+    public Task<DriverWallet?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(w => w.Id == id));
+
+    public Task<DriverWallet?> GetByDriverProfileIdAsync(long driverProfileId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(w => w.DriverProfileId == driverProfileId));
+
+    public void Add(DriverWallet aggregate)
+    {
+        if (aggregate.Id == 0)
+            TestIds.Set(aggregate, Items.Count + 1);
+        Items.Add(aggregate);
+    }
+    public void Update(DriverWallet aggregate) { }
+    public void Remove(DriverWallet aggregate) => Items.Remove(aggregate);
 }
 
 internal sealed class InMemoryRefreshTokens : IRefreshTokenRepository
@@ -125,8 +264,13 @@ internal sealed class CountingUnitOfWork : IUnitOfWork
 {
     public int Saves { get; private set; }
 
+    /// <summary>Pretends a unique index lost a race, like ApplicationDbContext turning a duplicate key into 409.</summary>
+    public bool ThrowConflictOnSave { get; set; }
+
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        if (ThrowConflictOnSave)
+            throw new ModMove.Application.Common.Exceptions.ConflictException("A record with the same unique value already exists.");
         Saves++;
         return Task.FromResult(1);
     }
@@ -165,6 +309,86 @@ internal sealed class CapturingEmailSender : IEmailSender
     public string LastCode() => Regex.Match(Sent[^1].Body, "<b>([0-9]{6})</b>").Groups[1].Value;
 }
 
+internal sealed class CapturingPushNotifications : IPushNotificationService
+{
+    public List<(string Token, string Title, string Body, IReadOnlyDictionary<string, string>? Data)> Sent { get; } = [];
+
+    /// <summary>Set to true to act like FCM being down.</summary>
+    public bool Fail { get; set; }
+
+    public Task SendAsync(
+        string deviceToken, string title, string body,
+        IReadOnlyDictionary<string, string>? data, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (Fail)
+            throw new HttpRequestException("FCM is down");
+        Sent.Add((deviceToken, title, body, data));
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>Records SignalR pushes: Target is "user", "order" or "dispatchers"; Id is the user or order id.</summary>
+internal sealed class CapturingRealtimeNotifier : IRealtimeNotifier
+{
+    public List<(string Target, string? Id, string EventName, object Payload)> Sent { get; } = [];
+
+    /// <summary>Set to true to act like the SignalR backplane failing.</summary>
+    public bool Fail { get; set; }
+
+    /// <summary>Set to true to fail only sends to order groups.</summary>
+    public bool FailOrderGroups { get; set; }
+
+    public Task SendToOrderAsync(long orderId, string eventName, object payload, CancellationToken cancellationToken) =>
+        Record("order", orderId.ToString(), eventName, payload, cancellationToken);
+
+    public Task SendToUserAsync(long userId, string eventName, object payload, CancellationToken cancellationToken) =>
+        Record("user", userId.ToString(), eventName, payload, cancellationToken);
+
+    public Task SendToDispatchersAsync(string eventName, object payload, CancellationToken cancellationToken) =>
+        Record("dispatchers", null, eventName, payload, cancellationToken);
+
+    private Task Record(string target, string? id, string eventName, object payload, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (Fail || (FailOrderGroups && target == "order"))
+            throw new InvalidOperationException("SignalR is down");
+        Sent.Add((target, id, eventName, payload));
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>Stands in for Google Maps: every address geocodes to a point, every trip has <see cref="Route"/>.</summary>
+internal sealed class FakeMapService : IMapService
+{
+    public const string UnknownAddress = "nowhere";
+
+    public RouteInfo Route { get; set; } = new(12m, 30);
+
+    public Task<GeoPoint> GeocodeAsync(string address, CancellationToken cancellationToken) =>
+        address == UnknownAddress
+            ? throw new ModMove.Domain.Exceptions.DomainException("Address not found.", "ADDRESS_NOT_FOUND")
+            : Task.FromResult(new GeoPoint(21.0285m, 105.8542m));
+
+    public Task<RouteInfo> GetRouteAsync(GeoPoint from, GeoPoint to, CancellationToken cancellationToken) => Task.FromResult(Route);
+}
+
+/// <summary>Stands in for Cloudinary; the team's cloud is called "demo" here.</summary>
+internal sealed class FakeFileStorage : IFileStorage
+{
+    public const string CloudName = "demo";
+
+    public List<(string FileName, string Folder)> Uploaded { get; } = [];
+
+    public Task<string> UploadImageAsync(Stream content, string fileName, string folder, CancellationToken cancellationToken)
+    {
+        Uploaded.Add((fileName, folder));
+        return Task.FromResult($"https://res.cloudinary.com/{CloudName}/image/upload/{folder}/{Uploaded.Count}.jpg");
+    }
+
+    public bool IsOwnedUrl(string url) => url.StartsWith($"https://res.cloudinary.com/{CloudName}/", StringComparison.Ordinal);
+}
+
 internal sealed class FakeCurrentUser(long? userId) : ICurrentUserService
 {
     public long? UserId { get; } = userId;
@@ -182,9 +406,25 @@ internal sealed class TestApp
     public InMemoryOrders Orders { get; } = new();
     public InMemoryRefreshTokens RefreshTokens { get; } = new();
     public InMemoryRepository<SupportRequest> SupportRequests { get; } = new();
+<<<<<<< HEAD
     public InMemoryRepository<Refund> Refunds { get; } = new();
+=======
+    public InMemoryRefunds Refunds { get; } = new();
+    public InMemoryDriverProfiles DriverProfiles { get; } = new();
+    public InMemoryDriverWallets DriverWallets { get; } = new();
+    public InMemoryRatings Ratings { get; } = new();
+    public InMemoryRepository<InTransitIncident> Incidents { get; } = new();
+    public InMemoryRepository<DriverLocationLog> LocationLogs { get; } = new();
+    public CapturingRealtimeNotifier Realtime { get; } = new();
+    public CapturingPushNotifications Push { get; } = new();
+>>>>>>> origin/develop
     public CountingUnitOfWork UnitOfWork { get; } = new();
     public CapturingEmailSender Email { get; } = new();
+    public FakeFileStorage Files { get; } = new();
+    public FakeMapService Maps { get; } = new();
+    public InMemoryCoupons Coupons { get; } = new();
+    public InMemoryRepository<VehicleType> VehicleTypes { get; } = new();
+    public InMemoryPlatformSettings Settings { get; } = new();
     public MutableTime Time { get; } = new(Start);
     public ISender Sender { get; }
 
@@ -208,11 +448,27 @@ internal sealed class TestApp
             .AddSingleton<IShippingOrderRepository>(Orders)
             .AddSingleton<IRefreshTokenRepository>(RefreshTokens)
             .AddSingleton<IRepository<SupportRequest>>(SupportRequests)
+<<<<<<< HEAD
             .AddSingleton<IRepository<Refund>>(Refunds)
+=======
+            .AddSingleton<IRefundRepository>(Refunds)
+            .AddSingleton<IDriverProfileRepository>(DriverProfiles)
+            .AddSingleton<IDriverWalletRepository>(DriverWallets)
+            .AddSingleton<IRatingRepository>(Ratings)
+            .AddSingleton<IRepository<InTransitIncident>>(Incidents)
+            .AddSingleton<IRepository<DriverLocationLog>>(LocationLogs)
+            .AddSingleton<IRealtimeNotifier>(Realtime)
+            .AddSingleton<IPushNotificationService>(Push)
+>>>>>>> origin/develop
             .AddSingleton<IUnitOfWork>(UnitOfWork)
             .AddSingleton<IPasswordHasher>(new FakeHasher())
             .AddSingleton<IJwtTokenService>(new FakeTokens())
             .AddSingleton<IEmailSender>(Email)
+            .AddSingleton<IFileStorage>(Files)
+            .AddSingleton<IMapService>(Maps)
+            .AddSingleton<ICouponRepository>(Coupons)
+            .AddSingleton<IRepository<VehicleType>>(VehicleTypes)
+            .AddSingleton<IPlatformSettings>(Settings)
             .AddSingleton<ICurrentUserService>(new FakeCurrentUser(signedInUserId))
             .AddSingleton<TimeProvider>(Time)
             .BuildServiceProvider()

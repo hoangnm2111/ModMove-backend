@@ -1,0 +1,29 @@
+using ModMove.Application.Common.Messaging;
+
+namespace ModMove.Application.Features.Orders.Queries.GetMyOrderDetail;
+
+/// <summary>CUS-10: one of the signed-in customer's orders. Someone else's order is 404, so its existence is not revealed.</summary>
+public sealed record GetMyOrderDetailQuery(long OrderId) : IQuery<OrderDetailResponse>;
+
+public sealed record OrderDetailResponse(
+    long Id, string OrderCode, string OrderStatus, string PickupAddress, string DropoffAddress, string VehicleTypeName,
+    string ReceiverName, string ReceiverPhone, decimal EstimatedDistanceKm, int EstimatedDurationMin, bool HasLoadingService,
+    decimal DistanceFee, decimal ServiceFee, decimal DiscountAmount, decimal TotalFee,
+    string PaymentMethod, string? PayerRole, string PaymentStatus, DateTimeOffset CreatedAt,
+    CargoResponse Cargo, DriverResponse? Driver, ProofResponse? Proof, IReadOnlyList<StatusHistoryResponse> History);
+
+public sealed record CargoResponse(
+    string CargoType, int Quantity, decimal WeightKg, int LengthCm, int WidthCm, int HeightCm,
+    IReadOnlyList<string> PhotoUrls, string? SpecialNotes);
+
+/// <summary>
+/// Pickup and delivery photos; null until the driver sends pickup photos. ProofStatus Pending = waiting for the
+/// customer's review (UC-CUS-11, 12); PickupSubmissionCount counts towards the limit of 5 (DECISIONS 6.3).
+/// </summary>
+public sealed record ProofResponse(
+    IReadOnlyList<string> PickupPhotoUrls, string ProofStatus, int PickupSubmissionCount, string? RejectionReason,
+    string? DeliveryPhotoUrl, DateTimeOffset? DeliveredAt);
+
+public sealed record DriverResponse(string FullName, string PhoneNumber, string? LicensePlate);
+
+public sealed record StatusHistoryResponse(string? FromStatus, string ToStatus, string ChangedByRole, string? Note, DateTimeOffset ChangedAt);

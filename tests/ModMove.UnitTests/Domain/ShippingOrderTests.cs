@@ -53,6 +53,39 @@ public class ShippingOrderTests
         Assert.Equal(1, order.RowVersion);
     }
 
+    // A save that lost the race must fail with 409, whichever of the two writers saved first.
+    [Fact]
+    public void Cancelling_bumps_row_version_so_a_late_accept_cannot_revive_the_order()
+    {
+        var order = NewOrder();
+
+        order.CancelByCustomer(1, "Đổi ý", Now);
+
+        Assert.Equal(1, order.RowVersion);
+    }
+
+    [Fact]
+    public void Marking_paid_bumps_row_version_so_a_cancel_cannot_miss_the_payment()
+    {
+        var order = NewOrder();
+
+        order.MarkPaid(Now);
+
+        Assert.Equal(1, order.RowVersion);
+    }
+
+    [Fact]
+    public void A_cancelled_order_cannot_be_cancelled_again()
+    {
+        var order = NewOrder();
+        order.CancelByCustomer(1, "Đổi ý", Now);
+
+        var error = Assert.Throws<DomainException>(() => order.CancelByCustomer(1, "Lần hai", Now));
+
+        Assert.Equal("ORDER_NOT_CANCELLABLE", error.Code);
+        Assert.Equal("Đổi ý", order.CancellationReason);
+    }
+
     [Fact]
     public void Accept_twice_is_rejected_GB08()
     {
@@ -316,5 +349,254 @@ public class ShippingOrderTests
 
         Assert.Equal("ORDER_CANCELLED", error.Code);
         Assert.NotEqual(PaymentStatus.Paid, order.PaymentStatus);
+    }
+
+    private static ShippingOrder PickedUpOrder()
+    {
+        var order = AcceptedOrder();
+        order.ConfirmArrival(9, Now);
+        order.ConfirmPickup(["1.jpg", "2.jpg"], 9, Now);
+        return order;
+    }
+
+    [Fact]
+    public void Only_the_customer_of_the_order_reviews_the_pickup_photos_C10()
+    {
+        var order = PickedUpOrder();
+
+        var approve = Assert.Throws<DomainException>(() => order.ApprovePickupEvidence(customerId: 2, Now));
+        var reject = Assert.Throws<DomainException>(() => order.RejectPickupEvidence("mờ", customerId: 2));
+
+        Assert.Equal(("ORDER_NOT_YOURS", "ORDER_NOT_YOURS"), (approve.Code, reject.Code));
+        Assert.Equal(ProofStatus.Pending, order.Proof!.ProofStatus);
+    }
+
+    [Fact]
+    public void Rejected_photos_cannot_be_approved_until_the_driver_sends_new_ones_6_3()
+    {
+        var order = PickedUpOrder();
+        order.RejectPickupEvidence("mờ", customerId: 1);
+
+        Assert.Throws<DomainException>(() => order.ApprovePickupEvidence(1, Now));
+        Assert.Throws<DomainException>(() => order.RejectPickupEvidence("lại", 1));
+
+        order.ConfirmPickup(["3.jpg", "4.jpg"], 9, Now);
+        order.ApprovePickupEvidence(1, Now);
+        Assert.Equal(OrderStatus.InTransit, order.OrderStatus);
+    }
+
+    [Fact]
+    public void Customer_confirming_receipt_completes_the_order_with_commission_CUS19()
+    {
+        var order = DeliveredOrder();
+        var version = order.RowVersion;
+
+        order.ConfirmReceipt(customerId: 1, commissionRate: 0.10m, Now.AddHours(1));
+
+        Assert.Equal(OrderStatus.Completed, order.OrderStatus);
+        Assert.Equal(Now.AddHours(1), order.CompletedAt);
+        Assert.Equal(18_000m, order.CommissionAmount);
+        Assert.Equal(ChangedByRole.Customer, order.StatusHistories.Last().ChangedByRole);
+        Assert.Equal(version + 1, order.RowVersion); // the auto-complete job racing the customer gets a 409
+    }
+
+    [Fact]
+    public void Only_the_customer_of_the_order_confirms_receipt_C10()
+    {
+        var order = DeliveredOrder();
+
+        var error = Assert.Throws<DomainException>(() => order.ConfirmReceipt(customerId: 2, 0.10m, Now));
+
+        Assert.Equal("ORDER_NOT_YOURS", error.Code);
+        Assert.Equal(OrderStatus.Delivered, order.OrderStatus);
+    }
+
+    [Fact]
+    public void Receipt_can_only_be_confirmed_once_delivered()
+    {
+        var order = PickedUpOrder();
+
+        Assert.Throws<DomainException>(() => order.ConfirmReceipt(1, 0.10m, Now));
+    }
+
+    private static ShippingOrder CompletedOrder()
+    {
+        var order = DeliveredOrder();
+        order.Complete(0.10m, ChangedByRole.System, null, Now);
+        return order;
+    }
+
+    [Fact]
+    public void Customer_rates_the_driver_of_a_completed_order_GB20()
+    {
+        var order = CompletedOrder();
+
+        var rating = order.Rate(customerId: 1, stars: 5, "Tốt", Now.AddHours(2));
+
+        Assert.Equal((order.Id, 1L, 5L, 5), (rating.OrderId, rating.CustomerId, rating.DriverProfileId, rating.RatingStars));
+        Assert.Equal("Tốt", rating.ReviewComment);
+    }
+
+    [Fact]
+    public void Only_the_customer_of_the_order_rates_it_C10()
+    {
+        var order = CompletedOrder();
+
+        var error = Assert.Throws<DomainException>(() => order.Rate(customerId: 2, 5, null, Now));
+
+        Assert.Equal("ORDER_NOT_YOURS", error.Code);
+    }
+
+    [Fact]
+    public void An_order_that_is_not_completed_cannot_be_rated_GB20()
+    {
+        var order = DeliveredOrder();
+
+        var error = Assert.Throws<DomainException>(() => order.Rate(1, 5, null, Now));
+
+        Assert.Equal("RATING_NOT_ALLOWED", error.Code);
+    }
+
+    [Fact]
+    public void Rating_window_is_one_day_after_completion_7_5()
+    {
+        var order = CompletedOrder();
+
+        var error = Assert.Throws<DomainException>(() => order.Rate(1, 5, null, Now.AddDays(1).AddMinutes(1)));
+
+        Assert.Equal("RATING_WINDOW_CLOSED", error.Code);
+    }
+
+    [Fact]
+    public void Customer_files_a_complaint_within_24_hours_of_delivery_7_3()
+    {
+        var order = DeliveredOrder();
+        var version = order.RowVersion;
+
+        var refund = order.FileComplaint(1, "Hàng vỡ", ["a.jpg"], 100_000, Now.AddHours(23));
+
+        Assert.Equal((RefundSourceType.Complaint, 100_000m, (long?)null), (refund.SourceType, refund.RequestedAmount, refund.IncidentId));
+        Assert.Null(refund.ProposedAmount); // the Dispatcher proposes (B9)
+        Assert.Equal(version + 1, order.RowVersion); // two complaints racing: the later save is a 409
+    }
+
+    [Fact]
+    public void Complaint_after_24_hours_or_before_delivery_is_refused_7_3()
+    {
+        var late = Assert.Throws<DomainException>(() => DeliveredOrder().FileComplaint(1, "x", null, 1_000, Now.AddHours(24)));
+        var early = Assert.Throws<DomainException>(() => AcceptedOrder().FileComplaint(1, "x", null, 1_000, Now));
+
+        Assert.Equal(("COMPLAINT_WINDOW_CLOSED", "COMPLAINT_WINDOW_CLOSED"), (late.Code, early.Code));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(180_001)]
+    public void Refund_request_is_above_zero_and_at_most_the_order_total_B9(int amount)
+    {
+        var order = DeliveredOrder(); // total 180,000
+
+        var complaint = Assert.Throws<DomainException>(() => order.FileComplaint(1, "x", null, amount, Now));
+        var incident = Assert.Throws<DomainException>(() => order.RequestIncidentRefund(1, 3, "x", null, amount));
+
+        Assert.Equal(("REFUND_AMOUNT_INVALID", "REFUND_AMOUNT_INVALID"), (complaint.Code, incident.Code));
+    }
+
+    [Fact]
+    public void Only_the_customer_of_the_order_asks_for_a_refund_C10()
+    {
+        var order = DeliveredOrder();
+
+        var complaint = Assert.Throws<DomainException>(() => order.FileComplaint(2, "x", null, 1_000, Now));
+        var incident = Assert.Throws<DomainException>(() => order.RequestIncidentRefund(2, 3, "x", null, 1_000));
+
+        Assert.Equal(("ORDER_NOT_YOURS", "ORDER_NOT_YOURS"), (complaint.Code, incident.Code));
+    }
+
+    [Fact]
+    public void Incident_refund_points_at_the_incident_and_waits_for_the_dispatcher_B9()
+    {
+        var order = AcceptedOrder();
+        var version = order.RowVersion;
+
+        var refund = order.RequestIncidentRefund(1, incidentId: 3, "Xe hỏng, trễ 3 giờ", ["a.jpg"], 50_000);
+
+        Assert.Equal((RefundSourceType.Incident, (long?)3, 50_000m), (refund.SourceType, refund.IncidentId, refund.RequestedAmount));
+        Assert.Null(refund.ProposedAmount);
+        Assert.Equal(version + 1, order.RowVersion);
+    }
+
+    [Fact]
+    public void Customer_reports_an_incident_while_the_driver_has_the_order_2_2()
+    {
+        var order = PickedUpOrder();
+
+        var incident = order.ReportIncidentByCustomer(1, IncidentType.Other, "Tài xế đi sai đường", ["a.jpg"], 21.0m, 105.8m);
+
+        Assert.Equal((order.Id, 1L, IncidentType.Other), (incident.OrderId, incident.ReportedBy, incident.IncidentType));
+        Assert.Equal(IncidentResolutionStatus.Open, incident.ResolutionStatus);
+    }
+
+    [Fact]
+    public void Customer_reports_incidents_only_from_Arrived_to_InTransit_2_2()
+    {
+        var pending = Assert.Throws<DomainException>(() => NewOrder().ReportIncidentByCustomer(1, IncidentType.Other, "x", null, null, null));
+        var delivered = Assert.Throws<DomainException>(() => DeliveredOrder().ReportIncidentByCustomer(1, IncidentType.Other, "x", null, null, null));
+
+        Assert.Equal(("INCIDENT_NOT_ALLOWED", "INCIDENT_NOT_ALLOWED"), (pending.Code, delivered.Code));
+    }
+
+    [Fact]
+    public void Only_the_customer_of_the_order_reports_on_it_C10()
+    {
+        var error = Assert.Throws<DomainException>(() => PickedUpOrder().ReportIncidentByCustomer(2, IncidentType.Other, "x", null, null, null));
+
+        Assert.Equal("ORDER_NOT_YOURS", error.Code);
+    }
+
+    private static ShippingOrder OrderIn(OrderStatus status)
+    {
+        switch (status)
+        {
+            case OrderStatus.Pending: return NewOrder();
+            case OrderStatus.Accepted: return AcceptedOrder();
+            case OrderStatus.Arrived:
+                var arrived = AcceptedOrder();
+                arrived.ConfirmArrival(9, Now);
+                return arrived;
+            case OrderStatus.PickedUp: return PickedUpOrder();
+            case OrderStatus.InTransit:
+                var moving = PickedUpOrder();
+                moving.ApprovePickupEvidence(1, Now);
+                return moving;
+            case OrderStatus.Delivered: return DeliveredOrder();
+            case OrderStatus.Completed: return CompletedOrder();
+            default:
+                var cancelled = NewOrder();
+                cancelled.Cancel("x", ChangedByRole.System, null, Now);
+                return cancelled;
+        }
+    }
+
+    [Theory]
+    [InlineData(OrderStatus.Pending, false)]
+    [InlineData(OrderStatus.Accepted, false)]
+    [InlineData(OrderStatus.Arrived, true)]
+    [InlineData(OrderStatus.PickedUp, true)]
+    [InlineData(OrderStatus.InTransit, true)]
+    [InlineData(OrderStatus.Delivered, false)]
+    [InlineData(OrderStatus.Completed, false)]
+    [InlineData(OrderStatus.Cancelled, false)]
+    public void Customer_incident_is_allowed_exactly_from_Arrived_to_InTransit_2_2(OrderStatus status, bool allowed)
+    {
+        var order = OrderIn(status);
+        Assert.Equal(status, order.OrderStatus);
+
+        var error = Record.Exception(() => order.ReportIncidentByCustomer(1, IncidentType.Other, "x", null, null, null));
+
+        if (allowed)
+            Assert.Null(error);
+        else
+            Assert.Equal("INCIDENT_NOT_ALLOWED", Assert.IsType<DomainException>(error).Code);
     }
 }

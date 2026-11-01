@@ -4,6 +4,7 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 
 ## Quy ước chung
 
+- **Client (DECISIONS C11):** web cho Guest, Customer, Dispatcher, Admin; app Flutter cho Customer và Driver.
 - **Route theo thư mục controller:** `api/public/*` không cần đăng nhập; `api/account/*` cần đăng nhập, mọi role; `api/customer/*`, `api/driver/*`, `api/dispatcher/*`, `api/admin/*` chỉ đúng role (Admin là role `Administrator`); `api/webhooks/*` cho PayOS.
 - **Xác thực:** header `Authorization: Bearer <accessToken>`. Access token sống 15 phút; hết hạn thì gọi `refresh` với `refreshToken` (30 ngày, dùng một lần) để lấy cặp mới. Gọi lại một refresh token đã được đổi sang cặp mới sẽ đăng xuất tài khoản trên mọi máy; token bị thu hồi do đăng xuất hay đổi mật khẩu chỉ bị từ chối (401).
 - **JSON:** enum là chuỗi (`"Pending"`), tiền là số VND, thời gian ISO 8601 UTC, phân trang `?page=1&pageSize=20` → `{ items, pageNumber, pageSize, totalCount }`.
@@ -26,11 +27,12 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | GET | `api/public/policies` | Ai cũng được | Chính sách (`code`, `name`, `description`) |
 | GET | `api/public/serviceinfo` | Ai cũng được | Giới thiệu, khu vực, lợi ích |
 | POST | `api/public/supportrequests` | Ai cũng được | `{ fullName, contact, content }` → 204 |
+| POST | `api/public/fareestimate` | Ai cũng được | `{ vehicleTypeId, pickupAddress, dropoffAddress, weightKg, lengthCm, widthCm, heightCm, hasLoadingService, couponCode? }` → `{ distanceKm, durationMinutes, distanceFee, serviceFee, discountAmount, totalFee }`. Kích thước là của món lớn nhất, khối lượng là cả đơn |
 | GET | `api/account/profile` | Đã đăng nhập | Hồ sơ của chính mình |
 | PUT | `api/account/profile` | Đã đăng nhập | `{ fullName, phoneNumber, avatarUrl }` → 204 |
-| PUT | `api/account/fcmtoken` | App mobile | `{ token }` → 204 |
+| PUT | `api/account/fcmtoken` | Chỉ app (web không dùng FCM, 9.2) | `{ token }` → 204; mỗi tài khoản giữ một token, máy đăng ký sau cùng thắng |
 | POST | `api/account/password` | Đã đăng nhập | `{ currentPassword, newPassword }` → 204; thu hồi mọi refresh token, mọi máy (cả máy đang dùng) phải đăng nhập lại |
-| POST | `api/account/logout` | Đã đăng nhập | 204; thu hồi mọi refresh token |
+| POST | `api/account/logout` | Đã đăng nhập | App: `{ fcmToken }`; web: không body → 204. Thu hồi mọi refresh token (9.1); chỉ xóa FCM token khi `fcmToken` gửi lên đúng là token đang lưu, máy đăng ký sau vẫn nhận thông báo (9.2) |
 | DELETE | `api/customer/account` | Customer | 204; tài khoản thành `Inactive` |
 | GET | `api/dispatcher/incidents` | Dispatcher | Danh sách sự cố (`status`, `incidentType`, `search`, `page`, `pageSize`) |
 | GET | `api/dispatcher/incidents/{id}` | Dispatcher | Chi tiết sự cố kèm đơn hàng, hàng hóa, tài xế, khách hàng, lịch sử, khoản hoàn |
@@ -38,6 +40,55 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | GET | `api/dispatcher/complaints/{id}` | Dispatcher | Chi tiết khiếu nại kèm POD, đánh giá đơn, lịch sử sự cố để đối soát |
 | POST | `api/dispatcher/complaints/{id}/request-info` | Dispatcher | `{ note }` → 204; xin thêm thông tin từ khách hàng |
 | POST | `api/dispatcher/complaints/{id}/proposal` | Dispatcher | `{ amount, reason }` → 204; gửi đề xuất hoàn tiền lên Admin duyệt |
+| POST | `api/customer/orders` | Customer | Tạo đơn **tiền mặt**: `{ vehicleTypeId, pickupAddress, dropoffAddress, receiverName, receiverPhone, cargo: { cargoType, quantity, weightKg, lengthCm, widthCm, heightCm, photoUrls[1..5], specialNotes? }, hasLoadingService, couponCode?, paymentMethod: "Cash", payerRole: Sender \| Receiver, prohibitedGoodsCommitment: true }` → 201 `{ orderId, orderCode, totalFee }`. Giá tính lại ở server như báo giá |
+| GET | `api/customer/orders` | Customer | `?page=1&pageSize=20&view=All\|Active\|History&search=` → `PagedResult` đơn của chính mình, mới nhất trước (`page` 1–10 000, `pageSize` ≤ 50; History = Completed/Cancelled) |
+| GET | `api/customer/orders/{id}` | Customer | Chi tiết đơn: phí, hàng (ảnh), tài xế (khi đã nhận), `proof` (ảnh lấy hàng, chỉ hiện nút duyệt khi `orderStatus == PickedUp` **và** `proofStatus == Pending`; sau khi đổi tài xế đơn về `Accepted` nhưng `proof` còn ảnh cũ, `pickupSubmissionCount`, `rejectionReason`, ảnh giao hàng; `null` trước khi lấy hàng), lịch sử trạng thái. Đơn người khác → 404 |
+| POST | `api/customer/orders/{id}/cancel` | Customer | `{ reason }` (≤ 500) → 204. Chỉ khi `Pending`/`Accepted` (`ORDER_NOT_CANCELLABLE`); đơn người khác → `ORDER_NOT_YOURS`. Đơn PayOS đã trả: tạo hoàn tiền Cancellation 100% chờ Admin (B9). Không hoàn lượt coupon (B11). Đơn đã có tài xế: tài xế nhận thông báo `ORDER_CANCELLED` |
+| POST | `api/customer/orders/{id}/pickup-evidence` | Customer | `{ approve, reason? }` → 204. Duyệt ảnh lấy hàng: đơn sang `InTransit` (GB-26). Từ chối: bắt buộc `reason` (≤ 500), đơn giữ `PickedUp`, tài xế chụp lại (tối đa 5 lần gửi, 6.3). Chỉ khi có ảnh đang chờ duyệt (`BUSINESS_RULE`); đơn người khác → `ORDER_NOT_YOURS`. Tài xế nhận `PICKUP_APPROVED`/`PICKUP_REJECTED` |
+| POST | `api/customer/orders/{id}/confirm-receipt` | Customer | → 204. Chỉ khi `Delivered`: đơn `Completed`, chốt hoa hồng `COMMISSION_RATE × total_fee` (M1) và cập nhật ví tài xế cùng lúc (PayOS: cộng thu nhập; tiền mặt: trừ hoa hồng từ ví cọc, GB-15). Đơn người khác → `ORDER_NOT_YOURS`; trùng với job tự hoàn tất → 409. Tài xế nhận `ORDER_COMPLETED` |
+| POST | `api/customer/ratings` | Customer | `{ orderId, stars (1–5), comment? (≤ 1000) }` → 201 `{ ratingId }`. Chỉ đơn `Completed` của chính mình (`RATING_NOT_ALLOWED`, `ORDER_NOT_YOURS`), trong 1 ngày sau hoàn tất (`RATING_WINDOW_CLOSED`, 7.5). Mỗi đơn một lần, không sửa (GB-20): lần hai → 409 `CONFLICT` |
+| GET | `api/customer/ratings` | Customer | `?page=1&pageSize=20` → `PagedResult` đánh giá đã gửi `{ id, orderId, orderCode, ratingStars, reviewComment, driverName, createdAt }`, mới nhất trước (UC-CUS-26) |
+| POST | `api/customer/refunds/complaints` | Customer | `{ orderId, reason (≤ 1000), evidenceUrls? (≤ 5, Cloudinary), requestedAmount (số nguyên VND) }` → 201 `{ refundId }`. Chỉ khi đơn `Delivered` và trong 24 giờ từ lúc giao (`COMPLAINT_WINDOW_CLOSED`, 7.3); số tiền > 0 và ≤ `total_fee` (`REFUND_AMOUNT_INVALID`, B9); mỗi đơn một khiếu nại mở (409); đơn người khác → `ORDER_NOT_YOURS`. Dispatcher nhận `COMPLAINT_SUBMITTED` |
+| POST | `api/customer/refunds/incidents` | Customer | `{ incidentId, reason, evidenceUrls?, requestedAmount }` → 201 `{ refundId }`. Sự cố thuộc đơn của mình, ở mọi trạng thái sự cố; mỗi sự cố một yêu cầu mở (409); cùng luật số tiền (B9) |
+| POST | `api/customer/refunds/{id}/reply` | Customer | `{ reply (≤ 1000), photoUrls? }` → 204. Trả lời câu hỏi của Dispatcher (7.4); chưa có câu hỏi → `NO_INFO_REQUEST`; tổng ảnh > 5 → `TOO_MANY_PHOTOS` |
+| POST | `api/customer/refunds/{id}/withdraw` | Customer | → 204. Rút khiếu nại/hoàn sự cố còn `Requested`; hoàn do hủy không rút được (`BUSINESS_RULE`) |
+| GET | `api/customer/refunds`, `api/customer/refunds/{id}` | Customer | Hoàn tiền trên đơn của mình (hủy, sự cố, khiếu nại), mới nhất trước. `approvedAmount` chỉ có khi Admin đã duyệt (đề xuất của Dispatcher chưa phải số cuối); `waitingForYourReply` = Dispatcher đang chờ khách trả lời; chi tiết có `evidenceUrls`, `infoRequestNote`, `customerReply`. Hoàn của người khác → 404 |
+| POST | `api/customer/incidents` | Customer | `{ orderId, incidentType (VehicleBreakdown\|DamagedCargo\|Accident\|Other), description (≤ 1000), photoUrls? (≤ 5, Cloudinary), latitude?, longitude? }` → 201 `{ incidentId }`. Chỉ khi đơn của mình đang `Arrived`/`PickedUp`/`InTransit` (`INCIDENT_NOT_ALLOWED`; sau khi giao dùng khiếu nại); "trễ", "sai tuyến" ghi là `Other` (7.1). Dispatcher nhận `INCIDENT_REPORTED` |
+| GET | `api/customer/incidents` | Customer | `?page=1&pageSize=20` → `PagedResult` sự cố trên đơn của mình (khách hay tài xế báo), mới nhất trước: `{ id, orderId, orderCode, incidentType, description, photoUrls, reportedByYou, resolutionStatus, resolutionDecision, resolutionNote, createdAt, resolvedAt }` (UC-CUS-16) |
+| POST | `api/customer/uploads` | Customer | `multipart/form-data`, field `file`: một ảnh JPG/PNG ≤ 5 MB → `{ url }` (Cloudinary) dùng cho ảnh hàng khi tạo đơn |
+| GET | `api/admin/pricing` | Administrator | `{ vehicleTypes: [{ id, name, maxLoadWeightKg, baseFare, pricePerKm, minimumFare, isActive }], settings: { commissionRate, loadingFee, minCodDeposit, matchingRadiusKm } }`. Có cả loại xe đang tắt. `commissionRate` là phân số (0.10 = 10%) |
+| PUT | `api/admin/pricing/vehicletypes/{id}` | Administrator | `{ baseFare, pricePerKm, minimumFare }` → 204; id lạ → 404. Đơn đã đặt giữ nguyên giá (DECISIONS 4.4) |
+| PATCH | `api/admin/pricing/vehicletypes/{id}/status` | Administrator | `{ isActive }` → 204; bật/tắt loại xe |
+| PUT | `api/admin/pricing/settings` | Administrator | `{ commissionRate?, loadingFee?, minCodDeposit?, matchingRadiusKm? }` → 204; trường bỏ trống = không đổi, phải có ít nhất một. Đổi `commissionRate` khi còn đơn đang chạy → 422 `COMMISSION_RATE_LOCKED` (DECISIONS C8) |
+| GET | `api/admin/masterdata` | Administrator | `?category={category}` → danh sách master data items (`id`, `category`, `code`, `name`, `description`, `isActive`) |
+| POST | `api/admin/masterdata` | Administrator | `{ category, code, name, description? }` → 201 `{ id }` |
+| PUT | `api/admin/masterdata/{id}` | Administrator | `{ name, description? }` → 204 |
+| PATCH | `api/admin/masterdata/{id}/status` | Administrator | `{ isActive }` → 204; bật/tắt mục danh mục |
+| GET | `api/admin/coupons` | Administrator | `?page=1&pageSize=20&isActive=true` → `{ items, pageNumber, pageSize, totalCount }` |
+| POST | `api/admin/coupons` | Administrator | `{ discountCode, discountValue, minimumOrderValue, validFrom, expiresAt, usageLimit? }` → 201 `{ id }` (GB-21) |
+| PATCH | `api/admin/coupons/{id}/status` | Administrator | `{ isActive }` → 204; bật/tắt coupon |
+| GET | `api/admin/driver-applications/pending` | Administrator | `?page=1&pageSize=20` → `{ items, pageNumber, pageSize, totalCount }`. Hàng đợi hồ sơ nộp chờ duyệt (sắp xếp nộp trước duyệt trước, UC-ADM-08) |
+| GET | `api/admin/driver-applications/{id}` | Administrator | Xem chi tiết hồ sơ tài xế: thông tin cá nhân, phương tiện, các link ảnh giấy tờ/xe, lịch sử nộp (UC-ADM-09) |
+| POST | `api/admin/driver-applications/{id}/approve` | Administrator | 204; Phê duyệt hồ sơ tài xế → trạng thái thành `Approved`, cập nhật/tạo thực thể Xe, tự động tạo Ví tài xế ban đầu nếu chưa có (Rule GB-16, TEAM-PLAN 74). Gửi push notification |
+| POST | `api/admin/driver-applications/{id}/reject` | Administrator | `{ reasons: ["Lý do 1", "Lý do 2"] }` → 204; Từ chối hồ sơ kèm danh sách lý do cụ thể từng mục (UC-ADM-09). Gửi push notification |
+| GET | `api/driver/onboarding/status` | Driver | `{ hasApplication, canSubmit, profileApprovalStatus, applicationId, latestVersionNumber, submittedAt, reviewedAt, vehicleTypeId, vehicleTypeName, licensePlate, maxLoadWeightKg, citizenIdNumber, driverLicenseNumber, documentUrls, rejectionReasons }`. Chưa nộp: `hasApplication=false`, `canSubmit=true`; `canSubmit=true` khi chưa có hồ sơ hoặc phiên bản mới nhất bị `Rejected` (UC-DRV-04) |
+| POST | `api/driver/onboarding` | Driver | `{ vehicleTypeId, citizenIdNumber, driverLicenseNumber, licensePlate, maxLoadWeightKg, documentUrls: [bằng lái mặt trước, mặt sau, đăng ký xe, đăng kiểm, ảnh xe] }` → 201 `{ id }` (id phiên bản mới). Mỗi lần nộp là một version mới (UC-DRV-03, DRV-05). Đang `Pending`/`Approved` → 422 `APPLICATION_NOT_EDITABLE`; CCCD, GPLX hoặc biển số đã dùng bởi tài xế khác → 409 (GB-01, GB-04); email chưa xác minh → 403 `EMAIL_NOT_VERIFIED` |
+| GET | `api/admin/users` | Administrator | `?page=1&pageSize=20&search=&role=&status=` → `{ items, pageNumber, pageSize, totalCount }`. Danh sách người dùng phân trang, lọc theo role (`Customer`, `Driver`, `Dispatcher`, `Administrator`), trạng thái (`Active`, `Inactive`, `Locked`), tìm kiếm theo tên/SĐT/email (UC-ADM-04) |
+| GET | `api/admin/users/{id}` | Administrator | Xem chi tiết hồ sơ tài khoản, trạng thái, thông tin tài xế/biển số xe (nếu là Driver) và thống kê đơn hàng (UC-ADM-05) |
+| PATCH | `api/admin/users/{id}/status` | Administrator | `{ status: Active \| Inactive \| Locked, reason }` → 204; Đổi trạng thái tài khoản kèm lý do bắt buộc (UC-ADM-06). Khi chuyển sang `Inactive` hoặc `Locked`, thu hồi mọi refresh token (`RevokeAllForUserAsync`) và xóa FCM token (DECISIONS B8, 8.2). Tự đổi tài khoản của chính mình → 422 `CANNOT_CHANGE_OWN_STATUS` (MSG65) |
+| POST | `api/admin/users/dispatchers` | Administrator | `{ fullName, phoneNumber, email, password }` → 201 `{ id }`; Tạo tài khoản Điều phối viên (`Role=Dispatcher`, `AccountStatus=Active`, `EmailVerified=true`) để đăng nhập ngay không cần OTP (UC-ADM-07, DECISIONS B7). Trùng email/SĐT → 409 (GB-01) |
+
+## Realtime: SignalR `/hubs/tracking` (DECISIONS B12, B17)
+
+Kết nối với JWT trên query string: `/hubs/tracking?access_token=<accessToken>` (WebSocket không đặt được header). Tài khoản không `Active` bị ngắt ngay khi kết nối. Kết nối tự đóng khi access token hết hạn: client lấy token mới (`refresh`) rồi kết nối lại và gọi lại `JoinOrder`. Lỗi trả về `HubException` có message bắt đầu bằng mã ổn định, ví dụ `ORDER_NOT_YOURS: ...`, `ACCOUNT_INACTIVE: ...`, `VALIDATION: ...`; riêng gọi method sai vai trò thì SignalR trả lỗi "unauthorized" chung, không có mã.
+
+| Hướng | Tên | Ai | Mô tả |
+|---|---|---|---|
+| client → server | `JoinOrder(orderId)` | Customer | Theo dõi đơn của mình (vào group `order-{id}`); đơn người khác → `ORDER_NOT_YOURS`. Kết nối lại thì gọi lại |
+| client → server | `SendLocation(latitude, longitude)` | Driver (đã duyệt) | Gửi GPS vài giây một lần. Server lưu vị trí cuối; ghi `driver_location_logs` khi đang có đơn (`Accepted`…`InTransit`) |
+| server → client | `LocationUpdated` | khách theo dõi đơn, Dispatcher | `{ driverProfileId, orderId?, latitude, longitude, at }`. Tới group `order-{id}` khi tài xế đang chở đơn đó; tới mọi Dispatcher khi tài xế `Online` (Dispatcher tự vào group `dispatchers` khi kết nối). Quá 5 phút không có GPS: coi là mất kết nối (6.4) |
+| server → client | `NotificationReceived` | mọi user (Dispatcher: thông báo chung) | `{ type, title, body, data }` (B17): cùng nội dung FCM, tới mọi kết nối của user. Khách (8.3): `ORDER_ACCEPTED`, `DRIVER_ARRIVED`, `PICKUP_PHOTOS_TO_REVIEW`, `ORDER_DELIVERED`, `ORDER_COMPLETED`, `INCIDENT_RESOLVED`, `REFUND_DECIDED`. Tài xế: `ORDER_CANCELLED`, `PICKUP_APPROVED`, `PICKUP_REJECTED`, `ORDER_COMPLETED`. Dispatcher: `COMPLAINT_SUBMITTED`, `INCIDENT_REFUND_REQUESTED`, `REFUND_INFO_REPLIED`, `INCIDENT_REPORTED`. `data.orderId` luôn có. `ORDER_COMPLETED` gửi cho cả khách và tài xế với nội dung khác: app (một app cho mọi role) xét thêm role của người đang đăng nhập |
+| server → client | `OrderStatusChanged` | khách theo dõi đơn, tài xế của đơn | `{ orderId, orderStatus }` sau mỗi lần đổi trạng thái đơn: tới group `order-{id}` và tới tài xế qua `Clients.User` (B12) |
 
 ## Mã lỗi
 
@@ -55,14 +106,29 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | `OTP_INVALID` | 422 | Mã OTP sai, hết hạn, đã dùng, hoặc đã nhập sai quá 5 lần |
 | `WRONG_PASSWORD` | 422 | Mật khẩu hiện tại sai khi đổi mật khẩu |
 | `ACCOUNT_HAS_OPEN_ORDERS` | 422 | Xóa tài khoản khi còn đơn chưa xong |
-| `ORDER_NOT_CANCELLABLE` | 422 | Khách hủy khi tài xế đã đến điểm lấy |
+| `ORDER_NOT_CANCELLABLE` | 422 | Khách hủy đơn không còn `Pending`/`Accepted` (tài xế đã đến, đã giao, đã hủy...) |
 | `ORDER_NOT_YOURS` | 422 | Thao tác (hủy, duyệt ảnh, xác nhận...) lên đơn của người khác (DECISIONS C10) |
 | `ORDER_CANCELLED` | 422 | Thanh toán về sau khi đơn đã hủy (cần hoàn tiền) |
 | `PICKUP_PHOTO_LIMIT` | 422 | Gửi ảnh lấy hàng lần thứ 6 |
 | `TOP_UP_TOO_SMALL` | 422 | Nạp cọc dưới 50.000đ |
 | `RATING_NOT_ALLOWED` | 422 | Đánh giá đơn chưa hoàn tất |
 | `RATING_WINDOW_CLOSED` | 422 | Đánh giá quá 1 ngày sau hoàn tất |
+| `COMPLAINT_WINDOW_CLOSED` | 422 | Khiếu nại khi đơn chưa `Delivered` hoặc đã quá 24 giờ từ lúc giao (7.3) |
+| `REFUND_AMOUNT_INVALID` | 422 | Số tiền yêu cầu hoàn ≤ 0 hoặc lớn hơn tổng tiền đơn (B9) |
+| `INCIDENT_NOT_ALLOWED` | 422 | Khách báo sự cố khi đơn không ở `Arrived`/`PickedUp`/`InTransit` (2.2) |
 | `TOO_MANY_PHOTOS` | 422 | Bằng chứng hoàn tiền quá 5 ảnh |
 | `REFUND_NOT_FOR_DISPATCHER` | 422 | Dispatcher đề xuất số tiền hay xin thêm thông tin cho khoản hoàn do hủy (DECISIONS B9: đi thẳng tới Admin) |
 | `NO_INFO_REQUEST` | 422 | Trả lời khi Dispatcher chưa xin thêm thông tin |
+| `PAYMENT_METHOD_NOT_SUPPORTED` | 422 | Tạo đơn PayOS khi Phase 1 chỉ nhận tiền mặt |
+| `ADDRESS_NOT_FOUND` | 422 | Google Maps không tìm thấy địa chỉ lấy hoặc giao |
+| `ROUTE_NOT_FOUND` | 422 | Không có đường bộ giữa điểm lấy và điểm giao |
+| `VEHICLE_TOO_SMALL` | 422 | Khối lượng đơn vượt tải hoặc món lớn nhất không lọt thùng loại xe đã chọn (GB-10, 4.2) |
+| `COUPON_NOT_FOUND` | 422 | Mã giảm giá không tồn tại |
+| `COUPON_INACTIVE` | 422 | Mã giảm giá đang tắt |
+| `COUPON_EXPIRED` | 422 | Mã giảm giá chưa tới hạn hoặc đã hết hạn |
+| `COUPON_LIMIT_REACHED` | 422 | Mã giảm giá đã hết lượt |
+| `COUPON_MIN_ORDER_NOT_MET` | 422 | Đơn chưa đạt giá trị tối thiểu của mã (so với cước trước giảm, gồm phí bốc xếp) |
+| `COMMISSION_RATE_LOCKED` | 422 | Admin đổi tỷ lệ hoa hồng khi còn đơn từ `Accepted` tới trước `Completed` (DECISIONS C8) |
+| `APPLICATION_NOT_EDITABLE` | 422 | Tài xế nộp hồ sơ khi phiên bản mới nhất đang `Pending` hoặc đã `Approved` (MSG07) |
+| `CANNOT_CHANGE_OWN_STATUS` | 422 | Admin tự khóa hoặc vô hiệu hóa tài khoản của chính mình (UC-ADM-06, MSG65) |
 | `SERVER_ERROR` | 500 | Lỗi không lường trước (xem log theo `traceId`) |
