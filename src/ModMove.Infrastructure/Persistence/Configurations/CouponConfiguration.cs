@@ -12,6 +12,8 @@ internal sealed class CouponConfiguration : IEntityTypeConfiguration<Coupon>
         builder.Property(c => c.DiscountCode).HasMaxLength(30);
         builder.Property(c => c.DiscountValue).HasPrecision(15, 2);
         builder.Property(c => c.MinimumOrderValue).HasPrecision(15, 2);
+        // B11 / GB-21: two orders racing for the last use — the later save fails with 409 instead of both getting the discount.
+        builder.Property(c => c.UsedCount).IsConcurrencyToken();
 
         builder.HasIndex(c => c.DiscountCode).IsUnique();
     }

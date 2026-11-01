@@ -5,7 +5,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 | Người | Vai trò | Controllers |
 |---|---|---|
 | **Hiếu** | Guest, Customer, Auth và tài khoản dùng chung | `Public/`, `Customer/`, `Account/` |
-| **Hoàng** | Administrator, Driver (app tài xế), toàn bộ Payments | `Admin/`, `Driver/`, `Webhooks/` |
+| **Hoàng** | Administrator, Driver (màn hình tài xế trên app), toàn bộ Payments | `Admin/`, `Driver/`, `Webhooks/` |
 | **Huy** | Dispatcher | `Dispatcher/` |
 
 ## 1. Quy tắc làm việc
@@ -42,24 +42,25 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 ## 4. Hiếu: Guest / Customer
 
 **Phase 1**
-- [x] Auth: đăng ký Customer (`register`) và Driver (`register-driver`), OTP email, xác minh, đăng nhập, refresh token, quên/đặt lại/đổi mật khẩu, đăng xuất
+- [x] Auth: đăng ký Customer (`register`) , OTP email, xác minh, đăng nhập, refresh token, quên/đặt lại/đổi mật khẩu, đăng xuất
 - [x] Tài khoản: xem/sửa hồ sơ, FCM token, xóa tài khoản (`Inactive`, chặn khi còn đơn mở)
 - [x] Public: loại xe, chính sách, giới thiệu dịch vụ, gửi yêu cầu hỗ trợ
 - [x] Gửi email Gmail SMTP (Development không có SMTP thì ghi OTP ra log)
-- [ ] Google Maps (`IMapService`: Geocoding + Distance Matrix hoặc Routes API, DECISIONS 3.4) và `FareCalculator` (B1)
-- [ ] `POST api/public/fare-estimate`: loại xe, tải trọng và lọt thùng theo món lớn nhất (GB-10, 4.2: dùng `VehicleType.CanCarry`), phí bốc xếp, coupon (GB-21) với mã lỗi riêng `COUPON_NOT_FOUND`, `COUPON_INACTIVE`, `COUPON_EXPIRED`, `COUPON_LIMIT_REACHED`, `COUPON_MIN_ORDER_NOT_MET`
-- [ ] Cloudinary (`IFileStorage`) + `POST api/customer/uploads` (JPG/PNG ≤ 5 MB, GB-06); ảnh đại diện và ảnh hàng chỉ nhận URL thuộc domain Cloudinary của nhóm
-- [ ] Tạo đơn (GST-17): cam kết không hàng cấm (4.3), 1–5 ảnh, mã đơn `MMyyyyMMddNNN` giờ VN, coupon `used_count++` (B11), **chỉ tiền mặt** ở Phase 1; **không có sửa đơn** (4.1)
-- [ ] Danh sách, tìm, chi tiết, lịch sử đơn của khách (CUS-08..10, 20)
+- [x] Google Maps (`IMapService`: Geocoding + Distance Matrix hoặc Routes API, DECISIONS 3.4) và `FareCalculator` (B1)
+- [x] `POST api/public/fareestimate`: loại xe, tải trọng và lọt thùng theo món lớn nhất (GB-10, 4.2: dùng `VehicleType.CanCarry`), phí bốc xếp, coupon (GB-21) với mã lỗi riêng `COUPON_NOT_FOUND`, `COUPON_INACTIVE`, `COUPON_EXPIRED`, `COUPON_LIMIT_REACHED`, `COUPON_MIN_ORDER_NOT_MET`
+- [x] Cloudinary (`IFileStorage`) + `POST api/customer/uploads` (JPG/PNG ≤ 5 MB, GB-06); ảnh đại diện và ảnh hàng chỉ nhận URL thuộc domain Cloudinary của nhóm
+- [x] Tạo đơn (GST-17): cam kết không hàng cấm (4.3), 1–5 ảnh, mã đơn `MMyyyyMMddNNN` giờ VN, coupon `used_count++` (B11), **chỉ tiền mặt** ở Phase 1; **không có sửa đơn** (4.1)
+- [x] Danh sách, tìm, chi tiết, lịch sử đơn của khách (CUS-08..10, 20)
 
 **Phase 2**
-- [ ] Hủy đơn qua `ShippingOrder.CancelByCustomer` (chỉ Pending/Accepted) + tạo hoàn tiền Cancellation cho Admin (3.3)
-- [ ] Duyệt/từ chối ảnh lấy hàng (GB-26, tối đa 5 lần gửi: 6.3), xác nhận nhận hàng (CUS-19)
-- [ ] Tracking: `TrackingHub` SignalR (B12), đọc `access_token` trên query string cho `/hubs`
-- [ ] Phía khách của sự cố, hoàn tiền, khiếu nại (CUS-15..18, 21..24; 7.3, 7.4 `ReplyToInfoRequest`) — cùng tuần với Huy
-- [ ] Đánh giá (CUS-25, 26; trong 1 ngày sau hoàn tất, 7.5)
-- [ ] Nối thanh toán PayOS vào đặt đơn qua `CreateOrderPayment` của Hoàng (B10, 3.1)
-- [ ] Gửi thông báo cho khách theo bảng sự kiện 8.3
+- [x] Hủy đơn qua `ShippingOrder.CancelByCustomer` (chỉ Pending/Accepted) + tạo hoàn tiền Cancellation cho Admin (3.3)
+- [x] Duyệt/từ chối ảnh lấy hàng (GB-26, tối đa 5 lần gửi: 6.3), xác nhận nhận hàng (CUS-19)
+- [x] Tracking: `TrackingHub` SignalR theo B12: `access_token` trên query string; `JoinOrder` kiểm tra đơn là của khách (`ORDER_NOT_YOURS`); `SendLocation` phát tới `order-{id}` và group `dispatchers`; Dispatcher tự vào `dispatchers` theo role
+- [x] Phía khách của sự cố, hoàn tiền, khiếu nại (CUS-15..18, 21..24; 7.3, 7.4 `ReplyToInfoRequest`) — cùng tuần với Huy
+- [x] Đánh giá (CUS-25, 26; trong 1 ngày sau hoàn tất, 7.5)
+- [ ] Nối thanh toán PayOS vào đặt đơn qua `CreateOrderPayment` của Hoàng (B10, 3.1) (chờ Hoàng merge vào `develop`; hiện tạo đơn PayOS vẫn trả `PAYMENT_METHOD_NOT_SUPPORTED`)
+- [x] `INotificationService` (B17): gửi FCM tới app và SignalR `NotificationReceived` qua `Clients.User`; không lưu lịch sử. Gửi thông báo cho khách theo bảng sự kiện 8.3
+- [x] Logout nhận kèm FCM token của app, chỉ xóa token nếu khớp token đang lưu (9.2)
 
 **Phase 3**
 - [ ] JOB-GPS-01 (xóa GPS log quá 30 ngày)
@@ -75,16 +76,17 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [ ] Adapter PayOS và FCM
 
 **Phase 2**
-- [ ] Thanh toán PayOS (CUS-27, nạp cọc DRV-21 ≥ 50.000đ), tạo lại mã khi hết 10 phút (3.1), webhook (sai chữ ký → từ chối, gọi trùng → idempotent), `ShippingOrder.MarkPaid(now)`
+- [ ] Thanh toán PayOS (CUS-27, nạp cọc DRV-21 ≥ 50.000đ), tạo lại mã khi hết 10 phút (3.1), `CreateOrderPayment` nhận `platform` (`Web` | `App`) và chọn `returnUrl` từ cấu hình `PayOS:ReturnUrls:*`, client không gửi URL (3.1), webhook (sai chữ ký → từ chối, gọi trùng → idempotent), `ShippingOrder.MarkPaid(now)`
 - [ ] Matching (DRV-08..10, B5): đơn PayOS chỉ hiện khi đã trả; GB-08/09; đơn tiền mặt cần ví cọc ≥ `MIN_COD_DEPOSIT` và ≥ hoa hồng của đơn (GB-16: `DriverWallet.CanReceiveCod(minDeposit, order.CommissionFor(rate))`, dùng cả khi đổi tài xế); ẩn tài xế mất GPS quá 5 phút (6.4)
 - [ ] Trips (DRV-11..16, 18, 19): không có hủy từ tài xế (6.1); không có người nhận thì vẫn giao và gửi POD (2.7)
 - [ ] Ví (DRV-17, 20..23): thu COD, rút tiền không tối thiểu (5.1), thu nhập = `DriverEarning`
 - [ ] Admin duyệt hoàn tiền (cả hoàn tiền do hủy không qua Dispatcher, 3.3) và chi trả tay; duyệt rút tiền (ADM-24)
 
 **Phase 3**
-- [ ] JOB-PAY-01 (mã hết hạn sau 10 phút; hủy đơn PayOS vẫn `Unpaid` sau 30 phút từ `created_at`, 3.1), JOB-MATCH-01 (từ lúc tạo hoặc lúc trả, 3.2: `IsMatchingExpired`), JOB-ORDER-01 (`CanBeAutoCompleted`)
+- [ ] JOB-PAY-01 (mã hết hạn sau 10 phút; hủy đơn PayOS vẫn `Unpaid` sau 30 phút từ `created_at`, 3.1), JOB-MATCH-01 (từ lúc tạo hoặc lúc trả, 3.2: `IsMatchingExpired`), JOB-ORDER-01 (`CanBeAutoCompleted`, rồi `order.Complete(rate, System, null, now)` + `OrderSettlement.SettleAsync` trong `Features/Orders` như ConfirmReceipt của Hiếu, để ví được tất toán giống nhau)
 - [ ] Báo cáo, doanh thu (8.1: tổng `commission_amount` của đơn `Completed`, giờ VN), xuất Excel (B16, xin duyệt package)
-- [ ] Thông báo cho tài xế theo bảng sự kiện 8.3
+- [ ] Thông báo cho tài xế theo bảng sự kiện 8.3, gọi qua `INotificationService` (B17)
+- [ ] Thông báo cho **khách** khi chính bước của Hoàng đổi trạng thái (8.3): nhận đơn `CustomerEvent.OrderAccepted`, đến điểm lấy `DriverArrived`, gửi ảnh lấy hàng `PickupPhotosToReview`, giao hàng `OrderDelivered`, JOB-ORDER-01 `OrderCompleted`, Admin duyệt/chi hoàn tiền `RefundDecided`: gọi `NotifyCustomerAsync`, và `PublishOrderStatusAsync` sau mỗi lần đổi trạng thái đơn (B12)
 
 ## 6. Huy: Dispatcher
 
@@ -97,6 +99,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 
 **Phase 2**
 - [ ] Quyết định xử lý sự cố (DIS-05), đổi tài xế (DIS-06, 7.2: tài xế mới đủ điều kiện như B5, đơn tiền mặt thêm GB-16), hủy đơn do sự cố (DIS-07: hàng cấm và khách vắng mặt ở điểm lấy không hoàn tiền, 4.3, 2.4; không có tài xế thay thế thì hoàn 100% đơn PayOS, 2.5), hủy sự cố (DIS-10)
+- [ ] Thông báo cho **khách** khi xử lý xong sự cố (8.3): `NotifyCustomerAsync(order, CustomerEvent.IncidentResolved, ct, detail)`, `detail` nói rõ quyết định; đổi tài xế hoặc hủy đơn thì gọi thêm `PublishOrderStatusAsync` (B12). Đổi tài xế: gọi cho **cả tài xế cũ và tài xế mới**, vì tài xế không vào group đơn
 - [ ] Hàng còn trên xe sau khi hủy: trả về hay giữ lại (2.6)
 - [ ] Không làm màn hình yêu cầu hỗ trợ (2.9)
 
@@ -105,11 +108,11 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 | Dịch vụ | Port | Ai làm | Trạng thái |
 |---|---|---|---|
 | Gmail SMTP | `IEmailSender` | Hiếu | Đã làm |
-| Google Maps | `IMapService` | Hiếu | Chưa |
-| Cloudinary | `IFileStorage` | Hiếu | Chưa |
+| Google Maps | `IMapService` | Hiếu | Đã làm |
+| Cloudinary | `IFileStorage` | Hiếu | Đã làm |
 | PayOS | `IPaymentGateway` | Hoàng | Chưa |
 | FCM | `IPushNotificationService` | Hoàng | Chưa |
-| SignalR | `IRealtimeNotifier` | Hiếu | Chưa |
+| SignalR | `IRealtimeNotifier` | Hiếu | Đã làm (`WebApi/Hubs`, `/hubs/tracking`) |
 
 Khóa để trong `appsettings.Development.json` hoặc user-secrets, không commit. Package mới phải hỏi nhóm trước (đã duyệt: `CloudinaryDotNet`, `Microsoft.Extensions.Http`).
 

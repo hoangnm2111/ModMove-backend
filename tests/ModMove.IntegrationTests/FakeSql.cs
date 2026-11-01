@@ -14,7 +14,8 @@ namespace ModMove.IntegrationTests;
 internal sealed class FakeSql : ISqlConnectionFactory
 {
     public DataTable Result { get; set; } = new();
-    public Queue<DataTable> Results { get; } = new();
+    public object? ScalarResult { get; set; }
+    public Func<string, IReadOnlyDictionary<string, object?>, DataTable?>? CustomQuery { get; set; }
     public string LastSql { get; private set; } = "";
     public IReadOnlyDictionary<string, object?> LastParameters { get; private set; } = new Dictionary<string, object?>();
 
@@ -45,16 +46,39 @@ internal sealed class FakeSql : ISqlConnectionFactory
         protected override DbParameterCollection DbParameterCollection { get; } = new Parameters();
         protected override DbTransaction? DbTransaction { get; set; }
         public override void Cancel() { }
-        public override int ExecuteNonQuery() => throw new NotSupportedException();
-        public override object? ExecuteScalar() => throw new NotSupportedException();
+        public override int ExecuteNonQuery()
+        {
+            sql.LastSql = CommandText;
+            sql.LastParameters = DbParameterCollection.Cast<DbParameter>().ToDictionary(p => p.ParameterName, p => p.Value);
+            return 1;
+        }
+
+        public override object? ExecuteScalar()
+        {
+            sql.LastSql = CommandText;
+            sql.LastParameters = DbParameterCollection.Cast<DbParameter>().ToDictionary(p => p.ParameterName, p => p.Value);
+            if (sql.ScalarResult is not null)
+                return sql.ScalarResult;
+            if (sql.Result.Rows.Count > 0 && sql.Result.Columns.Count > 0)
+                return sql.Result.Rows[0][0];
+            return sql.Result.Rows.Count;
+        }
+
+        public override Task<object?> ExecuteScalarAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(ExecuteScalar());
+
         public override void Prepare() { }
         protected override DbParameter CreateDbParameter() => new Parameter();
         protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior)
         {
             sql.LastSql = CommandText;
             sql.LastParameters = DbParameterCollection.Cast<DbParameter>().ToDictionary(p => p.ParameterName, p => p.Value);
-            if (sql.Results.Count > 0)
-                return sql.Results.Dequeue().CreateDataReader();
+            if (sql.CustomQuery is not null)
+            {
+                var custom = sql.CustomQuery(CommandText, sql.LastParameters);
+                if (custom is not null)
+                    return custom.CreateDataReader();
+            }
             return sql.Result.CreateDataReader();
         }
     }
