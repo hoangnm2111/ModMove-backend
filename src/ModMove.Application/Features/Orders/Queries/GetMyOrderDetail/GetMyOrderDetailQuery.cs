@@ -10,11 +10,12 @@ public sealed record OrderDetailResponse(
     string ReceiverName, string ReceiverPhone, decimal EstimatedDistanceKm, int EstimatedDurationMin, bool HasLoadingService,
     decimal DistanceFee, decimal ServiceFee, decimal DiscountAmount, decimal TotalFee,
     string PaymentMethod, string? PayerRole, string PaymentStatus, DateTimeOffset CreatedAt,
-    CargoResponse Cargo, DriverResponse? Driver, ProofResponse? Proof, IReadOnlyList<StatusHistoryResponse> History);
+    CargoResponse Cargo, DriverResponse? Driver, ProofResponse? Proof, IReadOnlyList<StatusHistoryResponse> History,
+    string? CouponCode, PaymentResponse? Payment);
 
 public sealed record CargoResponse(
     string CargoType, int Quantity, decimal WeightKg, int LengthCm, int WidthCm, int HeightCm,
-    IReadOnlyList<string> PhotoUrls, string? SpecialNotes);
+    IReadOnlyList<string> PhotoUrls, string? SpecialNotes, string? CargoTypeName);
 
 /// <summary>
 /// Pickup and delivery photos; null until the driver sends pickup photos. ProofStatus Pending = waiting for the
@@ -23,6 +24,13 @@ public sealed record CargoResponse(
 public sealed record ProofResponse(
     IReadOnlyList<string> PickupPhotoUrls, string ProofStatus, int PickupSubmissionCount, string? RejectionReason,
     string? DeliveryPhotoUrl, DateTimeOffset? DeliveredAt);
+
+/// <summary>
+/// The latest PayOS payment attempt (UC-CUS-27); null for a cash order or before a payment link exists. CheckoutUrl only while
+/// the link can still be paid; IsExpired = Pending but past ExpiresAt, so the client offers a new code (DECISIONS 3.1).
+/// </summary>
+public sealed record PaymentResponse(
+    string TransactionStatus, string? CheckoutUrl, DateTimeOffset? ExpiresAt, DateTimeOffset? PaidAt, bool IsExpired);
 
 public sealed record DriverResponse(string FullName, string PhoneNumber, string? LicensePlate);
 

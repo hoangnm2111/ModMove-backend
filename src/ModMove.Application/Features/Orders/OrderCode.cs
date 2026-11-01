@@ -18,4 +18,8 @@ public static class OrderCode
         var start = new DateTimeOffset(local.Year, local.Month, local.Day, 0, 0, 0, VietnamOffset).ToUniversalTime();
         return (start, start.AddDays(1));
     }
+
+    /// <summary>00:00 Vietnam time of <paramref name="day"/>, in UTC (the database stores UTC).</summary>
+    public static DateTimeOffset VietnamDayStartUtc(DateOnly day) =>
+        new DateTimeOffset(day.ToDateTime(TimeOnly.MinValue), VietnamOffset).ToUniversalTime();
 }

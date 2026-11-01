@@ -7,6 +7,7 @@ using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Features.Orders.Queries.GetMyOrderDetail;
 using ModMove.Application.Features.Orders.Queries.GetMyOrders;
+using ModMove.Domain.Enums;
 
 namespace ModMove.IntegrationTests;
 
@@ -15,6 +16,7 @@ public class MyOrdersQueryTests
 {
     private const long CustomerId = 7;
     private static readonly DateTime Created = new(2026, 10, 20, 8, 0, 0, DateTimeKind.Unspecified);
+    private static readonly DateTimeOffset Now = new(2026, 10, 20, 9, 0, 0, TimeSpan.Zero);
 
     private sealed class Db
     {
@@ -24,6 +26,8 @@ public class MyOrdersQueryTests
         public DataTable Cargo { get; set; } = CargoRows();
         public DataTable History { get; set; } = HistoryRows();
         public DataTable Proof { get; set; } = NoRows(ProofRows());
+        public DataTable Payment { get; set; } = NoRows(PaymentRows("Pending", Now.AddMinutes(5)));
+        public MutableTime Time { get; } = new(Now);
         public List<(string Sql, IReadOnlyDictionary<string, object?> Parameters)> Executed { get; } = [];
 
         public Db()
@@ -40,6 +44,8 @@ public class MyOrdersQueryTests
                     return History;
                 if (text.Contains("FROM proof_of_deliveries"))
                     return Proof;
+                if (text.Contains("FROM payment_transactions"))
+                    return Payment;
                 return Orders;
             };
         }
@@ -49,6 +55,7 @@ public class MyOrdersQueryTests
             .AddApplication()
             .AddSingleton<ISqlConnectionFactory>(Sql)
             .AddSingleton<ICurrentUserService>(new FakeCurrentUser(CustomerId))
+            .AddSingleton<TimeProvider>(Time)
             .BuildServiceProvider()
             .GetRequiredService<ISender>();
 
@@ -76,7 +83,8 @@ public class MyOrdersQueryTests
             ("EstimatedDistanceKm", typeof(decimal), 12m), ("EstimatedDurationMin", typeof(int), 30),
             ("HasLoadingService", typeof(bool), true), ("DistanceFee", typeof(decimal), 170_000m), ("ServiceFee", typeof(decimal), 100_000m),
             ("DiscountAmount", typeof(decimal), 20_000m), ("PayerRole", typeof(string), "Sender"),
-            ("DriverName", typeof(string), null), ("DriverPhone", typeof(string), null), ("LicensePlate", typeof(string), null));
+            ("DriverName", typeof(string), null), ("DriverPhone", typeof(string), null), ("LicensePlate", typeof(string), null),
+            ("CouponCode", typeof(string), "GIAM20K"));
         if (count == 0)
             table.Rows.Clear();
         return table;
@@ -85,7 +93,8 @@ public class MyOrdersQueryTests
     private static DataTable CargoRows() => Table(
         ("CargoType", typeof(string), "FURNITURE"), ("Quantity", typeof(int), 2), ("WeightKg", typeof(decimal), 100m),
         ("LengthCm", typeof(int), 100), ("WidthCm", typeof(int), 100), ("HeightCm", typeof(int), 100),
-        ("PhotoUrls", typeof(string), """["https://res.cloudinary.com/demo/a.jpg"]"""), ("SpecialNotes", typeof(string), "Dễ vỡ"));
+        ("PhotoUrls", typeof(string), """["https://res.cloudinary.com/demo/a.jpg"]"""), ("SpecialNotes", typeof(string), "Dễ vỡ"),
+        ("CargoTypeName", typeof(string), "Đồ nội thất"));
 
     private static DataTable ProofRows() => Table(
         ("PickupPhotoUrls", typeof(string), """["https://res.cloudinary.com/demo/p1.jpg","https://res.cloudinary.com/demo/p2.jpg"]"""),
@@ -97,6 +106,10 @@ public class MyOrdersQueryTests
         table.Rows.Clear();
         return table;
     }
+
+    private static DataTable PaymentRows(string status, DateTimeOffset expiresAt, DateTime? paidAt = null) => Table(
+        ("TransactionStatus", typeof(string), status), ("CheckoutUrl", typeof(string), "https://pay.payos.vn/web/abc"),
+        ("ExpiresAt", typeof(DateTime), expiresAt.UtcDateTime), ("PaidAt", typeof(DateTime), paidAt));
 
     private static DataTable HistoryRows() => Table(
         ("FromStatus", typeof(string), null), ("ToStatus", typeof(string), "Pending"), ("ChangedByRole", typeof(string), "Customer"),
@@ -148,6 +161,86 @@ public class MyOrdersQueryTests
 
         Assert.Equal(@"%50\%\_off%", db.OrdersQuery().Parameters["Pattern"]);
     }
+
+    [Theory]
+    [InlineData(OrderView.Completed, "Completed")]
+    [InlineData(OrderView.Cancelled, "Cancelled")]
+    public async Task Completed_and_cancelled_are_separate_views_CUS08(OrderView view, string expected)
+    {
+        var db = new Db();
+
+        await db.Sender().Send(new GetMyOrdersQuery(View: view));
+
+        var (sql, parameters) = db.OrdersQuery();
+        Assert.Equal(expected, parameters["View"]);
+        Assert.Contains($"@View = '{expected}'", sql);
+    }
+
+    [Fact]
+    public async Task List_item_shows_the_receiver_CUS08()
+    {
+        var item = (await new Db().Sender().Send(new GetMyOrdersQuery())).Items.Single();
+
+        Assert.Equal(("Bình", "0912345678"), (item.ReceiverName, item.ReceiverPhone));
+    }
+
+    [Fact]
+    public async Task Filters_are_parameters_CUS09()
+    {
+        var db = new Db();
+
+        await db.Sender().Send(new GetMyOrdersQuery(
+            Status: OrderStatus.InTransit, FromDate: new DateOnly(2026, 10, 20), ToDate: new DateOnly(2026, 10, 21), ReceiverPhone: "0912"));
+
+        var (sql, parameters) = db.OrdersQuery();
+        Assert.Contains("o.order_status = @Status", sql);
+        Assert.Contains("o.created_at >= @FromUtc", sql);
+        Assert.Contains("o.created_at < @ToUtc", sql);
+        Assert.Contains("o.receiver_phone LIKE @PhonePattern", sql);
+        Assert.Equal("InTransit", parameters["Status"]);
+        Assert.Equal("%0912%", parameters["PhonePattern"]);
+        // Vietnam days (UTC+7): from 20/10 00:00 VN up to, not including, 22/10 00:00 VN.
+        Assert.Equal(new DateTime(2026, 10, 19, 17, 0, 0, DateTimeKind.Utc), parameters["FromUtc"]);
+        Assert.Equal(new DateTime(2026, 10, 21, 17, 0, 0, DateTimeKind.Utc), parameters["ToUtc"]);
+    }
+
+    [Fact]
+    public async Task No_filters_bind_nulls()
+    {
+        var db = new Db();
+
+        await db.Sender().Send(new GetMyOrdersQuery());
+
+        var parameters = db.OrdersQuery().Parameters;
+        // Dapper sends a null parameter as DBNull.
+        Assert.All(["Status", "PhonePattern", "FromUtc", "ToUtc"], name => Assert.Equal(DBNull.Value, parameters[name]));
+    }
+
+    [Fact]
+    public async Task From_date_after_to_date_is_rejected() =>
+        await Assert.ThrowsAsync<ValidationException>(() => new Db().Sender().Send(
+            new GetMyOrdersQuery(FromDate: new DateOnly(2026, 10, 21), ToDate: new DateOnly(2026, 10, 20))));
+
+    [Theory]
+    [InlineData(1, 1, 1)]
+    [InlineData(9999, 12, 31)]
+    public async Task Out_of_range_date_is_rejected_not_a_server_error(int year, int month, int day)
+    {
+        var date = new DateOnly(year, month, day);
+
+        await Assert.ThrowsAsync<ValidationException>(() => new Db().Sender().Send(new GetMyOrdersQuery(FromDate: date)));
+        await Assert.ThrowsAsync<ValidationException>(() => new Db().Sender().Send(new GetMyOrdersQuery(ToDate: date)));
+    }
+
+    [Theory]
+    [InlineData("09a1")]
+    [InlineData("0912345678901234")]
+    public async Task Receiver_phone_filter_is_digits_up_to_15(string phone) =>
+        await Assert.ThrowsAsync<ValidationException>(() => new Db().Sender().Send(new GetMyOrdersQuery(ReceiverPhone: phone)));
+
+    [Fact]
+    public async Task Unknown_status_filter_is_rejected() =>
+        await Assert.ThrowsAsync<ValidationException>(() => new Db().Sender().Send(new GetMyOrdersQuery(Status: (OrderStatus)99)));
 
     [Fact]
     public async Task Huge_page_number_is_rejected_not_a_server_error() =>
@@ -213,6 +306,82 @@ public class MyOrdersQueryTests
         var order = await db.Sender().Send(new GetMyOrderDetailQuery(1));
 
         Assert.Empty(order.Proof!.PickupPhotoUrls);
+    }
+
+    [Fact]
+    public async Task Detail_shows_coupon_code_and_cargo_type_name_CUS10()
+    {
+        var order = await new Db().Sender().Send(new GetMyOrderDetailQuery(1));
+
+        Assert.Equal("GIAM20K", order.CouponCode);
+        Assert.Equal(("FURNITURE", "Đồ nội thất"), (order.Cargo.CargoType, order.Cargo.CargoTypeName));
+    }
+
+    [Fact]
+    public async Task Detail_has_no_payment_before_a_payos_link_exists()
+    {
+        var order = await new Db().Sender().Send(new GetMyOrderDetailQuery(1));
+
+        Assert.Null(order.Payment);
+    }
+
+    [Fact]
+    public async Task Detail_shows_the_open_payos_link_CUS27()
+    {
+        var db = new Db { Payment = PaymentRows("Pending", Now.AddMinutes(5)) };
+
+        var payment = (await db.Sender().Send(new GetMyOrderDetailQuery(1))).Payment!;
+
+        Assert.Equal(("Pending", "https://pay.payos.vn/web/abc", false), (payment.TransactionStatus, payment.CheckoutUrl, payment.IsExpired));
+        Assert.Equal(Now.AddMinutes(5), payment.ExpiresAt);
+        var (sql, parameters) = db.Executed.Last(e => e.Sql.Contains("FROM payment_transactions"));
+        Assert.Contains("payment_method = 'PayOS'", sql);
+        Assert.Equal(1L, parameters["OrderId"]);
+    }
+
+    [Fact]
+    public async Task Expired_payos_link_is_hidden_and_marked_expired_3_1()
+    {
+        var db = new Db { Payment = PaymentRows("Pending", Now.AddMinutes(-1)) };
+
+        var payment = (await db.Sender().Send(new GetMyOrderDetailQuery(1))).Payment!;
+
+        Assert.True(payment.IsExpired);
+        Assert.Null(payment.CheckoutUrl);
+    }
+
+    [Fact]
+    public async Task Transaction_marked_expired_is_expired_3_1()
+    {
+        var db = new Db { Payment = PaymentRows("Expired", Now.AddMinutes(-1)) };
+
+        var payment = (await db.Sender().Send(new GetMyOrderDetailQuery(1))).Payment!;
+
+        Assert.Equal(("Expired", true), (payment.TransactionStatus, payment.IsExpired));
+        Assert.Null(payment.CheckoutUrl);
+    }
+
+    [Fact]
+    public async Task Paid_transaction_shows_when_it_was_paid()
+    {
+        var paidAt = new DateTime(2026, 10, 20, 8, 30, 0, DateTimeKind.Unspecified);
+        var db = new Db { Payment = PaymentRows("Paid", Now.AddMinutes(-20), paidAt) };
+
+        var payment = (await db.Sender().Send(new GetMyOrderDetailQuery(1))).Payment!;
+
+        Assert.Equal(("Paid", false), (payment.TransactionStatus, payment.IsExpired));
+        Assert.Null(payment.CheckoutUrl);
+        Assert.Equal(new DateTimeOffset(paidAt, TimeSpan.Zero), payment.PaidAt);
+    }
+
+    [Fact]
+    public async Task Locked_account_cannot_read_an_order_B8()
+    {
+        var db = new Db { AccountStatus = "Locked" };
+
+        var error = await Assert.ThrowsAsync<ForbiddenAccessException>(() => db.Sender().Send(new GetMyOrderDetailQuery(1)));
+
+        Assert.Equal("ACCOUNT_INACTIVE", error.Code);
     }
 
     [Fact]
