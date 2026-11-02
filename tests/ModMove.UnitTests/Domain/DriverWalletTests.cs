@@ -57,12 +57,26 @@ public class DriverWalletTests
     }
 
     [Fact]
-    public void Commission_larger_than_deposit_is_rejected()
+    public void Commission_larger_than_deposit_leaves_a_negative_deposit_GB15()
     {
         var wallet = DriverWallet.Create(1);
         wallet.TopUpDeposit(50_000);
 
-        Assert.Throws<DomainException>(() => wallet.DeductCommissionFromDeposit(10, 60_000));
+        var tx = wallet.DeductCommissionFromDeposit(10, 60_000);
+
+        Assert.Equal(-10_000m, wallet.DepositBalance);
+        Assert.Equal(-10_000m, tx.BalanceAfter);
+    }
+
+    [Fact]
+    public void Negative_deposit_stops_the_driver_taking_cash_orders_GB16()
+    {
+        var wallet = DriverWallet.Create(1);
+        wallet.TopUpDeposit(50_000);
+
+        wallet.DeductCommissionFromDeposit(10, 60_000);
+
+        Assert.False(wallet.CanReceiveCod(minDeposit: 0, orderCommission: 0));
     }
 
     [Fact]
@@ -122,6 +136,18 @@ public class DriverWalletTests
         typeof(DriverWallet).GetProperty("WalletStatus")!.SetValue(wallet, WalletStatus.Frozen);
 
         Assert.Throws<DomainException>(() => wallet.TopUpDeposit(1_000));
+    }
+
+    [Fact]
+    public void Frozen_wallet_still_settles_a_finished_order_GB15()
+    {
+        var wallet = DriverWallet.Create(1);
+        typeof(DriverWallet).GetProperty("WalletStatus")!.SetValue(wallet, WalletStatus.Frozen);
+
+        wallet.CreditTripEarning(10, 100_000, 10_000);
+        wallet.DeductCommissionFromDeposit(11, 5_000);
+
+        Assert.Equal((90_000m, -5_000m), (wallet.EarningsBalance, wallet.DepositBalance));
     }
 
     [Fact]

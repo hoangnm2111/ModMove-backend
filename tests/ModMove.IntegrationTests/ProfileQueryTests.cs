@@ -23,10 +23,9 @@ public class ProfileQueryTests
         row.Columns.Add("PhoneNumber", typeof(string));
         row.Columns.Add("Email", typeof(string));
         row.Columns.Add("Role", typeof(string));
-        row.Columns.Add("AvatarUrl", typeof(string));
         row.Columns.Add("EmailVerified", typeof(bool));
         row.Columns.Add("AccountStatus", typeof(string));
-        row.Rows.Add(userId, "An", "0900000001", "an@x.vn", "Customer", DBNull.Value, true, status.ToString());
+        row.Rows.Add(userId, "An", "0900000001", "an@x.vn", "Customer", true, status.ToString());
         sql.Result = row;
 
         return new ServiceCollection()
@@ -46,7 +45,6 @@ public class ProfileQueryTests
         Assert.Equal(7, profile.Id);
         Assert.Equal("an@x.vn", profile.Email);
         Assert.Equal("Customer", profile.Role);
-        Assert.Null(profile.AvatarUrl);
         Assert.True(profile.EmailVerified);
     }
 

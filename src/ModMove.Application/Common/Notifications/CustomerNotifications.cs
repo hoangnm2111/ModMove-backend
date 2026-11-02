@@ -28,6 +28,9 @@ public enum CustomerEvent
 
     /// <summary>A refund was approved, rejected or paid out (Administrator).</summary>
     RefundDecided,
+
+    /// <summary>The System cancelled the order: not paid in time (JOB-PAY-01) or no driver found (JOB-MATCH-01).</summary>
+    OrderCancelled,
 }
 
 /// <summary>The same wording for every module: call <see cref="NotifyCustomerAsync"/> after SaveChangesAsync.</summary>
@@ -45,6 +48,7 @@ public static class CustomerNotifications
             $"Đơn {{0}} đã hoàn thành. Bạn có thể đánh giá tài xế trong {BusinessRules.RatingWindow.TotalHours:0} giờ."),
         [CustomerEvent.IncidentResolved] = ("INCIDENT_RESOLVED", "Sự cố đã được xử lý", "Sự cố của đơn {0} đã có kết quả."),
         [CustomerEvent.RefundDecided] = ("REFUND_DECIDED", "Kết quả hoàn tiền", "Yêu cầu hoàn tiền của đơn {0} đã có kết quả."),
+        [CustomerEvent.OrderCancelled] = ("ORDER_CANCELLED", "Đơn đã bị hủy", "Đơn {0} đã bị hủy."),
     };
 
     /// <summary>B17: FCM and SignalR NotificationReceived to the customer of <paramref name="order"/>; <paramref name="detail"/> is appended.</summary>

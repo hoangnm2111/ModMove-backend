@@ -21,4 +21,7 @@ public interface IRefundRepository : IRepository<Refund>
     /// proposed one. Rejected, Failed and Withdrawn refunds paid nothing and do not count.
     /// </summary>
     Task<decimal> GetClaimedTotalForOrderAsync(long orderId, CancellationToken cancellationToken = default);
+
+    /// <summary>DECISIONS B8: whether any order of the customer has a refund still open (Requested or Approved).</summary>
+    Task<bool> HasOpenForCustomerAsync(long customerId, CancellationToken cancellationToken = default);
 }

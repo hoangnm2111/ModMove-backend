@@ -18,7 +18,6 @@ internal sealed class GetUserDetailQueryHandler(ISqlConnectionFactory connection
             u.role AS Role,
             u.account_status AS AccountStatus,
             u.email_verified AS EmailVerified,
-            u.avatar_url AS AvatarUrl,
             u.created_at AS CreatedAt,
             u.updated_at AS UpdatedAt,
             dp.approval_status AS DriverApprovalStatus,

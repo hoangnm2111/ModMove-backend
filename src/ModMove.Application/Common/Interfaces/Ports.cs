@@ -14,7 +14,7 @@ public interface IFileStorage
 {
     Task<string> UploadImageAsync(Stream content, string fileName, string folder, CancellationToken cancellationToken);
 
-    /// <summary>True only for an https URL of the team's own Cloudinary cloud (avatars, cargo photos).</summary>
+    /// <summary>True only for an https URL of the team's own Cloudinary cloud (cargo, evidence and incident photos).</summary>
     bool IsOwnedUrl(string url);
 }
 

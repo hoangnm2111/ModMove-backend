@@ -13,7 +13,7 @@ internal sealed class GetMyProfileQueryHandler(ISqlConnectionFactory connectionF
 {
     private const string Sql = """
         SELECT id AS Id, full_name AS FullName, phone_number AS PhoneNumber, email AS Email,
-               role AS Role, avatar_url AS AvatarUrl, email_verified AS EmailVerified, account_status AS AccountStatus
+               role AS Role, email_verified AS EmailVerified, account_status AS AccountStatus
         FROM users
         WHERE id = @Id
         """;
@@ -29,9 +29,9 @@ internal sealed class GetMyProfileQueryHandler(ISqlConnectionFactory connectionF
         if (row.AccountStatus != nameof(AccountStatus.Active))
             throw CurrentUserExtensions.InactiveAccount();
 
-        return new ProfileResponse(row.Id, row.FullName, row.PhoneNumber, row.Email, row.Role, row.AvatarUrl, row.EmailVerified);
+        return new ProfileResponse(row.Id, row.FullName, row.PhoneNumber, row.Email, row.Role, row.EmailVerified);
     }
 
     private sealed record Row(
-        long Id, string FullName, string PhoneNumber, string Email, string Role, string? AvatarUrl, bool EmailVerified, string AccountStatus);
+        long Id, string FullName, string PhoneNumber, string Email, string Role, bool EmailVerified, string AccountStatus);
 }

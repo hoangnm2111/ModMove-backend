@@ -19,16 +19,15 @@ public class UsersTests
     private static TestApp SignedIn(User user, params User[] others) => TestApp.SignedInAs(user, others);
 
     [Fact]
-    public async Task Update_profile_changes_name_phone_and_avatar()
+    public async Task Update_profile_changes_name_and_phone()
     {
         var user = Customer();
         var app = SignedIn(user);
 
-        await app.Sender.Send(new UpdateMyProfileCommand(" An Tran ", "0911111111", "https://res.cloudinary.com/demo/a.jpg"));
+        await app.Sender.Send(new UpdateMyProfileCommand(" An Tran ", "0911111111"));
 
         Assert.Equal("An Tran", user.FullName);
         Assert.Equal("0911111111", user.PhoneNumber);
-        Assert.Equal("https://res.cloudinary.com/demo/a.jpg", user.AvatarUrl);
     }
 
     [Fact]
@@ -38,7 +37,7 @@ public class UsersTests
         var other = User.Create("Binh", "0922222222", "binh@x.vn", "h:x", UserRole.Driver, emailVerified: true);
         var app = SignedIn(user, other);
 
-        await Assert.ThrowsAsync<ConflictException>(() => app.Sender.Send(new UpdateMyProfileCommand("An", "0922222222", null)));
+        await Assert.ThrowsAsync<ConflictException>(() => app.Sender.Send(new UpdateMyProfileCommand("An", "0922222222")));
         Assert.Equal("0900000001", user.PhoneNumber);
     }
 
@@ -48,19 +47,9 @@ public class UsersTests
         var user = Customer();
         var app = SignedIn(user);
 
-        await app.Sender.Send(new UpdateMyProfileCommand("An Tran", "0900000001", null));
+        await app.Sender.Send(new UpdateMyProfileCommand("An Tran", "0900000001"));
 
         Assert.Equal("An Tran", user.FullName);
-    }
-
-    [Theory]
-    [InlineData("http://insecure.example/a.jpg")]
-    [InlineData("not a url")]
-    public async Task Avatar_must_be_an_https_url(string avatar)
-    {
-        var app = SignedIn(Customer());
-
-        await Assert.ThrowsAsync<ValidationException>(() => app.Sender.Send(new UpdateMyProfileCommand("An", "0900000001", avatar)));
     }
 
     [Fact]
@@ -101,6 +90,21 @@ public class UsersTests
 
         Assert.Equal("ACCOUNT_HAS_OPEN_ORDERS", error.Code);
         Assert.Equal(AccountStatus.Active, user.AccountStatus);
+    }
+
+    [Fact]
+    public async Task Account_with_an_open_refund_cannot_be_deleted_B8()
+    {
+        var user = Customer();
+        user.SetFcmToken("device-1");
+        var app = SignedIn(user);
+        app.Refunds.CustomersWithOpenRefunds.Add(user.Id);
+
+        var error = await Assert.ThrowsAsync<DomainException>(() => app.Sender.Send(new DeleteMyAccountCommand()));
+
+        Assert.Equal("ACCOUNT_HAS_OPEN_REFUNDS", error.Code);
+        Assert.Equal(AccountStatus.Active, user.AccountStatus);
+        Assert.Equal("device-1", user.FcmToken);
     }
 
     [Fact]

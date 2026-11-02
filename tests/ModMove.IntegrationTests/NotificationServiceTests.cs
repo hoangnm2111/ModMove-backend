@@ -133,14 +133,72 @@ public class NotificationServiceTests
         Assert.Single(realtime.Sent);
     }
 
+    private sealed class TimingOutPush : IPushNotificationService
+    {
+        public Task SendAsync(
+            string deviceToken, string title, string body, IReadOnlyDictionary<string, string>? data, CancellationToken cancellationToken) =>
+            throw new TaskCanceledException("FCM timed out");
+    }
+
+    private sealed class HangingPush : IPushNotificationService
+    {
+        public Task SendAsync(
+            string deviceToken, string title, string body, IReadOnlyDictionary<string, string>? data, CancellationToken cancellationToken) =>
+            Task.Delay(Timeout.Infinite, cancellationToken);
+    }
+
     [Fact]
-    public async Task Cancellation_is_not_swallowed()
+    public async Task The_client_leaving_does_not_stop_the_notification()
     {
         var user = Customer("device-1");
+        var realtime = new CapturingRealtimeNotifier();
+        var push = new CapturingPushNotifications();
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            Build(user, new CapturingRealtimeNotifier(), new CapturingPushNotifications()).NotifyAsync(user.Id, Accepted, cts.Token));
+        await Build(user, realtime, push).NotifyAsync(user.Id, Accepted, cts.Token);
+
+        Assert.Single(realtime.Sent);
+        Assert.Single(push.Sent);
+    }
+
+    [Fact]
+    public async Task The_client_leaving_does_not_stop_the_status_change_or_the_dispatcher_notice()
+    {
+        var user = Customer(null);
+        var realtime = new CapturingRealtimeNotifier();
+        var service = Build(user, realtime, null);
+        var order = ShippingOrder.Create(
+            "MM20261020001", user.Id, 1, null, "A", 21m, 105m, "B", 21m, 105m, "Bình", "0912345678",
+            12m, 30, false, 200_000, 0, 0, PaymentMethod.Cash, PayerRole.Sender,
+            CargoDetail.Create("FURNITURE", 1, 50, 100, 50, 50, ["a.jpg"], null), DateTimeOffset.UnixEpoch);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await service.PublishOrderStatusAsync(order, driverUserId: 9, cts.Token);
+        await service.NotifyDispatchersAsync(Accepted, cts.Token);
+
+        Assert.Equal(["order", "user", "dispatchers"], realtime.Sent.Select(x => x.Target));
+    }
+
+    [Fact]
+    public async Task A_push_timeout_does_not_fail_the_saved_action()
+    {
+        var user = Customer("device-1");
+        var realtime = new CapturingRealtimeNotifier();
+
+        await Build(user, realtime, new TimingOutPush()).NotifyAsync(user.Id, Accepted, CancellationToken.None);
+
+        Assert.Single(realtime.Sent);
+    }
+
+    [Fact]
+    public async Task A_push_that_hangs_gives_up_within_seconds()
+    {
+        var user = Customer("device-1");
+
+        await Build(user, new CapturingRealtimeNotifier(), new HangingPush())
+            .NotifyAsync(user.Id, Accepted, CancellationToken.None)
+            .WaitAsync(TimeSpan.FromSeconds(30));
     }
 }
