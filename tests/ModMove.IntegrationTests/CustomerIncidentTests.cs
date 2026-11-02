@@ -18,7 +18,7 @@ public class ReportIncidentByCustomerTests
     private const string Photo = "https://res.cloudinary.com/demo/image/upload/modmove/customers/1/a.jpg";
 
     [Fact]
-    public async Task Customer_reports_an_incident_and_dispatchers_are_told_GB17()
+    public async Task Customer_reports_an_incident_and_dispatchers_and_the_driver_are_told_GB17()
     {
         var s = new TripSetup();
         var order = s.PickedUp();
@@ -31,9 +31,13 @@ public class ReportIncidentByCustomerTests
         Assert.Equal((order.Id, s.Customer.Id, "Tài xế đi sai đường"), (incident.OrderId, incident.ReportedBy, incident.Description));
         Assert.Equal([Photo], incident.PhotoUrls!);
         Assert.Equal(1, s.App.UnitOfWork.Saves);
-        var sent = Assert.Single(s.App.Realtime.Sent);
-        Assert.Equal("dispatchers", sent.Target);
-        Assert.Equal("INCIDENT_REPORTED", Assert.IsType<Notification>(sent.Payload).Type);
+        var dispatchers = Assert.Single(s.App.Realtime.Sent, x => x.Target == "dispatchers");
+        Assert.Equal("INCIDENT_REPORTED", Assert.IsType<Notification>(dispatchers.Payload).Type);
+        var driver = Assert.Single(s.App.Realtime.Sent, x => x.Target == "user");
+        Assert.Equal(s.Driver.Id.ToString(), driver.Id);
+        var notification = Assert.IsType<Notification>(driver.Payload);
+        Assert.Equal("INCIDENT_REPORTED", notification.Type);
+        Assert.Equal((order.Id.ToString(), incident.Id.ToString()), (notification.Data!["orderId"], notification.Data["incidentId"]));
     }
 
     [Fact]

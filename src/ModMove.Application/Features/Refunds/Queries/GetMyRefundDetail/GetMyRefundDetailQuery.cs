@@ -7,10 +7,11 @@ public sealed record GetMyRefundDetailQuery(long RefundId) : IQuery<MyRefundDeta
 
 /// <summary>
 /// <see cref="ApprovedAmount"/> is null until an Administrator approves. <see cref="InfoRequestNote"/> is the
-/// Dispatcher's question; <see cref="CustomerReply"/> the answer (7.4).
+/// Dispatcher's question; <see cref="CustomerReply"/> the answer (7.4). <see cref="DecisionReason"/> is the Administrator's
+/// reason, null until they decide (CUS-23).
 /// </summary>
 public sealed record MyRefundDetailResponse(
-    long Id, long OrderId, string OrderCode, long? IncidentId, string SourceType, string RefundStatus, string Reason,
-    IReadOnlyList<string> EvidenceUrls, decimal RequestedAmount, decimal? ApprovedAmount,
+    long Id, long OrderId, string OrderCode, long? IncidentId, string SourceType, string RefundStatus, string Reason, string? ReasonCode,
+    IReadOnlyList<string> EvidenceUrls, decimal RequestedAmount, decimal? ApprovedAmount, string? DecisionReason,
     string? InfoRequestNote, string? CustomerReply, bool WaitingForYourReply,
     DateTimeOffset CreatedAt, DateTimeOffset? DecidedAt, DateTimeOffset? ProcessedAt);

@@ -38,7 +38,7 @@ public class CancelOrderTests
         return order;
     }
 
-    private static CancelOrderCommand Cancel(ShippingOrder order) => new(order.Id, "Đổi ý");
+    private static CancelOrderCommand Cancel(ShippingOrder order) => new(order.Id, "CHANGED_PLAN", "Đổi ý");
 
     [Fact]
     public async Task Pending_cash_order_is_cancelled_with_nothing_to_refund_2_1()
@@ -49,7 +49,7 @@ public class CancelOrderTests
         await s.App.Sender.Send(Cancel(order));
 
         Assert.Equal(OrderStatus.Cancelled, order.OrderStatus);
-        Assert.Equal("Đổi ý", order.CancellationReason);
+        Assert.Equal(("CHANGED_PLAN", "Đổi ý"), (order.CancellationReasonCode, order.CancellationReason));
         Assert.Empty(s.App.Refunds.Items);
         Assert.Equal(1, s.App.UnitOfWork.Saves);
     }
@@ -172,7 +172,7 @@ public class CancelOrderTests
     {
         var s = Build();
 
-        await Assert.ThrowsAsync<NotFoundException>(() => s.App.Sender.Send(new CancelOrderCommand(999, "Đổi ý")));
+        await Assert.ThrowsAsync<NotFoundException>(() => s.App.Sender.Send(new CancelOrderCommand(999, "CHANGED_PLAN")));
 
         Assert.Equal(0, s.App.UnitOfWork.Saves);
     }
@@ -194,7 +194,7 @@ public class CancelOrderTests
     {
         var app = new TestApp();
 
-        await Assert.ThrowsAsync<UnauthorizedException>(() => app.Sender.Send(new CancelOrderCommand(1, "Đổi ý")));
+        await Assert.ThrowsAsync<UnauthorizedException>(() => app.Sender.Send(new CancelOrderCommand(1, "CHANGED_PLAN")));
     }
 
     [Fact]
@@ -215,12 +215,12 @@ public class CancelOrderTests
     [InlineData("")]
     [InlineData("   ")]
     [InlineData(null)]
-    public async Task Reason_is_required(string? reason)
+    public async Task Reason_code_is_required(string? code)
     {
         var s = Build();
         var order = AddOrder(s, s.Customer.Id);
 
-        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new CancelOrderCommand(order.Id, reason!)));
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new CancelOrderCommand(order.Id, code!, "Đổi ý")));
     }
 
     [Fact]
@@ -229,6 +229,99 @@ public class CancelOrderTests
         var s = Build();
         var order = AddOrder(s, s.Customer.Id);
 
-        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new CancelOrderCommand(order.Id, new string('x', 501))));
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new CancelOrderCommand(order.Id, "CHANGED_PLAN", new string('x', 501))));
+    }
+
+    [Fact]
+    public async Task Code_alone_stores_the_name_from_the_list()
+    {
+        var s = Build();
+        var order = AddOrder(s, s.Customer.Id);
+
+        await s.App.Sender.Send(new CancelOrderCommand(order.Id, "CHANGED_PLAN"));
+
+        Assert.Equal(("CHANGED_PLAN", "Thay đổi kế hoạch"), (order.CancellationReasonCode, order.CancellationReason));
+    }
+
+    [Fact]
+    public async Task Cancellation_refund_keeps_the_reason_code()
+    {
+        var s = Build();
+        var order = AddOrder(s, s.Customer.Id, PaymentMethod.PayOS);
+        order.MarkPaid(Now);
+
+        await s.App.Sender.Send(new CancelOrderCommand(order.Id, "CHANGED_PLAN"));
+
+        var refund = Assert.Single(s.App.Refunds.Items);
+        Assert.Equal(("CHANGED_PLAN", "Thay đổi kế hoạch"), (refund.ReasonCode, refund.Reason));
+    }
+
+    [Fact]
+    public async Task Code_not_in_the_list_is_refused()
+    {
+        var s = Build();
+        var order = AddOrder(s, s.Customer.Id);
+
+        var error = await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new CancelOrderCommand(order.Id, "NOPE")));
+
+        Assert.Contains("ReasonCode", error.Errors.Keys);
+        Assert.Equal(OrderStatus.Pending, order.OrderStatus);
+    }
+
+    [Fact]
+    public async Task Code_switched_off_by_the_admin_is_refused()
+    {
+        var s = Build();
+        var order = AddOrder(s, s.Customer.Id);
+        s.App.MasterData.Items.Single(i => i.Code == "CHANGED_PLAN").SetActive(false);
+
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new CancelOrderCommand(order.Id, "CHANGED_PLAN")));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("  ")]
+    public async Task Other_needs_a_written_reason(string? reason)
+    {
+        var s = Build();
+        var order = AddOrder(s, s.Customer.Id);
+
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new CancelOrderCommand(order.Id, "OTHER", reason)));
+    }
+
+    [Theory]
+    [InlineData("other")]
+    [InlineData("ÓTHER")] // the database column ignores case and accents
+    public async Task Other_spelled_differently_still_needs_a_written_reason(string code)
+    {
+        var s = Build();
+        var order = AddOrder(s, s.Customer.Id);
+
+        var error = await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new CancelOrderCommand(order.Id, code)));
+
+        Assert.Contains("Reason", error.Errors.Keys);
+        Assert.Equal(OrderStatus.Pending, order.OrderStatus);
+    }
+
+    [Fact]
+    public async Task Code_is_stored_as_the_list_spells_it()
+    {
+        var s = Build();
+        var order = AddOrder(s, s.Customer.Id);
+
+        await s.App.Sender.Send(new CancelOrderCommand(order.Id, " changed_plan "));
+
+        Assert.Equal("CHANGED_PLAN", order.CancellationReasonCode);
+    }
+
+    [Fact]
+    public async Task Other_with_a_written_reason_is_accepted()
+    {
+        var s = Build();
+        var order = AddOrder(s, s.Customer.Id);
+
+        await s.App.Sender.Send(new CancelOrderCommand(order.Id, "OTHER", " Chuyển ngày "));
+
+        Assert.Equal(("OTHER", "Chuyển ngày"), (order.CancellationReasonCode, order.CancellationReason));
     }
 }

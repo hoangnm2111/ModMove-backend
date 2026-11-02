@@ -45,6 +45,7 @@ public class CreateOrderTests
         Assert.Equal(250_000m, result.TotalFee);
         Assert.Equal(1, order.CustomerId);
         Assert.Equal(TestApp.Start, order.WarrantyAcceptedAt);
+        Assert.Equal("FURNITURE", order.Cargo!.CargoType);
     }
 
     [Fact]
@@ -108,6 +109,31 @@ public class CreateOrderTests
     [InlineData(1000.5)]
     public async Task Expected_total_is_a_whole_non_negative_amount(double amount) =>
         await Assert.ThrowsAsync<ValidationException>(() => App().Sender.Send(Order() with { ExpectedTotalFee = (decimal)amount }));
+
+    [Fact]
+    public async Task Cargo_type_must_be_a_code_from_the_list()
+    {
+        var app = App();
+        var order = Order();
+
+        var error = await Assert.ThrowsAsync<ValidationException>(() =>
+            app.Sender.Send(order with { Cargo = order.Cargo with { CargoType = "Tủ lạnh" } }));
+
+        Assert.Contains("Cargo.CargoType", error.Errors.Keys);
+        Assert.Empty(app.Orders.Items);
+        Assert.Equal(0, app.Coupons.Items[0].UsedCount);
+    }
+
+    [Fact]
+    public async Task Cargo_type_switched_off_by_the_admin_is_refused()
+    {
+        var app = App();
+        app.MasterData.Items.Single(i => i.Code == "FURNITURE").SetActive(false);
+
+        await Assert.ThrowsAsync<ValidationException>(() => app.Sender.Send(Order()));
+
+        Assert.Empty(app.Orders.Items);
+    }
 
     [Fact]
     public async Task Missing_prohibited_goods_commitment_is_rejected_4_3() =>

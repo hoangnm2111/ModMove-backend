@@ -12,9 +12,9 @@ internal sealed class RefundRow
 
     public const string Columns = """
         r.id AS Id, r.order_id AS OrderId, o.order_code AS OrderCode, r.incident_id AS IncidentId,
-        r.source_type AS SourceType, r.refund_status AS RefundStatus, r.reason AS Reason, r.evidence_urls AS EvidenceUrls,
+        r.source_type AS SourceType, r.refund_status AS RefundStatus, r.reason AS Reason, r.reason_code AS ReasonCode, r.evidence_urls AS EvidenceUrls,
         r.requested_amount AS RequestedAmount, r.proposed_amount AS ProposedAmount,
-        r.info_request_note AS InfoRequestNote, r.customer_reply AS CustomerReply,
+        r.info_request_note AS InfoRequestNote, r.customer_reply AS CustomerReply, r.decision_note AS DecisionReason,
         r.decided_at AS DecidedAt, r.processed_at AS ProcessedAt, r.created_at AS CreatedAt
         """;
 
@@ -25,11 +25,16 @@ internal sealed class RefundRow
     public string SourceType { get; init; } = "";
     public string RefundStatus { get; init; } = "";
     public string Reason { get; init; } = "";
+    public string? ReasonCode { get; init; }
     public string? EvidenceUrls { get; init; }
     public decimal RequestedAmount { get; init; }
     public decimal? ProposedAmount { get; init; }
     public string? InfoRequestNote { get; init; }
     public string? CustomerReply { get; init; }
+
+    /// <summary>CUS-23: the Administrator's note, set only when they decide. The Dispatcher's proposal_reason stays internal.</summary>
+    public string? DecisionReason { get; init; }
+
     public DateTime? DecidedAt { get; init; }
     public DateTime? ProcessedAt { get; init; }
     public DateTime CreatedAt { get; init; }

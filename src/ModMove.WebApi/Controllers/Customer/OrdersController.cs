@@ -6,6 +6,7 @@ using ModMove.Application.Features.Orders.Commands.ReviewPickupEvidence;
 using ModMove.Application.Features.Orders.Commands.CreateOrder;
 using ModMove.Application.Features.Orders.Queries.GetMyOrderDetail;
 using ModMove.Application.Features.Orders.Queries.GetMyOrders;
+using ModMove.Application.Features.Tracking.Queries.GetOrderTracking;
 
 namespace ModMove.WebApi.Controllers.Customer;
 
@@ -21,6 +22,11 @@ public sealed class OrdersController : ApiControllerBase
     public Task<OrderDetailResponse> GetById(long id, CancellationToken cancellationToken) =>
         Sender.Send(new GetMyOrderDetailQuery(id), cancellationToken);
 
+    /// <summary>Stops, last driver position and ETA when the tracking screen opens (CUS-13); then follow /hubs/tracking. Not yours → 404.</summary>
+    [HttpGet("{id:long}/tracking")]
+    public Task<OrderTrackingResponse> GetTracking(long id, CancellationToken cancellationToken) =>
+        Sender.Send(new GetOrderTrackingQuery(id), cancellationToken);
+
     /// <summary>Book a cash or PayOS order (UC-GST-17). Price is computed again server-side; a different expectedTotalFee → 422 FARE_CHANGED.</summary>
     [HttpPost]
     public async Task<IActionResult> Create(CreateOrderCommand command, CancellationToken cancellationToken)
@@ -33,7 +39,7 @@ public sealed class OrdersController : ApiControllerBase
     [HttpPost("{id:long}/cancel")]
     public async Task<IActionResult> Cancel(long id, CancelOrderRequest request, CancellationToken cancellationToken)
     {
-        await Sender.Send(new CancelOrderCommand(id, request.Reason), cancellationToken);
+        await Sender.Send(new CancelOrderCommand(id, request.ReasonCode, request.Reason), cancellationToken);
         return NoContent();
     }
 
