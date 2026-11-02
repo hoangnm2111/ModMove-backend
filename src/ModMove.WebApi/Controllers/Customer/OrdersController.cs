@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ModMove.Application.Common.Models;
 using ModMove.Application.Features.Orders.Commands.CancelOrder;
 using ModMove.Application.Features.Orders.Commands.ConfirmReceipt;
@@ -7,6 +8,7 @@ using ModMove.Application.Features.Orders.Commands.CreateOrder;
 using ModMove.Application.Features.Orders.Queries.GetMyOrderDetail;
 using ModMove.Application.Features.Orders.Queries.GetMyOrders;
 using ModMove.Application.Features.Tracking.Queries.GetOrderTracking;
+using ModMove.WebApi.Controllers.Public;
 
 namespace ModMove.WebApi.Controllers.Customer;
 
@@ -22,8 +24,9 @@ public sealed class OrdersController : ApiControllerBase
     public Task<OrderDetailResponse> GetById(long id, CancellationToken cancellationToken) =>
         Sender.Send(new GetMyOrderDetailQuery(id), cancellationToken);
 
-    /// <summary>Stops, last driver position and ETA when the tracking screen opens (CUS-13); then follow /hubs/tracking. Not yours → 404.</summary>
+    /// <summary>Stops, last driver position and ETA when the tracking screen opens (CUS-13); then follow /hubs/tracking. Not yours → 404. Each call costs a Google Maps request, so it is limited per user.</summary>
     [HttpGet("{id:long}/tracking")]
+    [EnableRateLimiting(AuthRateLimit.UserPolicy)]
     public Task<OrderTrackingResponse> GetTracking(long id, CancellationToken cancellationToken) =>
         Sender.Send(new GetOrderTrackingQuery(id), cancellationToken);
 

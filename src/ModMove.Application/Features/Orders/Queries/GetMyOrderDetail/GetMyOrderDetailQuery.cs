@@ -26,7 +26,7 @@ public sealed record ProofResponse(
     string? DeliveryPhotoUrl, DateTimeOffset? DeliveredAt);
 
 /// <summary>
-/// The latest PayOS payment attempt (UC-CUS-27); null for a cash order or before a payment link exists. CheckoutUrl only while
+/// The latest PayOS payment attempt (UC-CUS-27); null for a cash or cancelled order, or before a payment link exists. CheckoutUrl only while
 /// the link can still be paid; IsExpired = Pending but past ExpiresAt, so the client offers a new code (DECISIONS 3.1).
 /// </summary>
 public sealed record PaymentResponse(
