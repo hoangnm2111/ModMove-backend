@@ -56,9 +56,12 @@ public class PersistenceModelTests
             Update(typeof(OrderStatusHistory), nameof(OrderStatusHistory.ToStatus), from, to),
         ];
         var migration = new RenameOrderStatusPendingToPlaceOrder();
+        var back = new RenameOrderStatusPlaceOrderBackToPending();
 
         Assert.Equal(Expected("Pending", "PlaceOrder"), migration.UpOperations.Cast<SqlOperation>().Select(o => o.Sql));
         Assert.Equal(Expected("PlaceOrder", "Pending"), migration.DownOperations.Cast<SqlOperation>().Select(o => o.Sql));
+        Assert.Equal(Expected("PlaceOrder", "Pending"), back.UpOperations.Cast<SqlOperation>().Select(o => o.Sql));
+        Assert.Equal(Expected("Pending", "PlaceOrder"), back.DownOperations.Cast<SqlOperation>().Select(o => o.Sql));
     }
 
     [Fact]
