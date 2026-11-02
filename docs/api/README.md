@@ -155,7 +155,7 @@ Hợp đồng phía khách cần; command nằm ở `Features/Payments` (Hoàng)
 | `COUPON_EXPIRED` | 422 | Mã giảm giá chưa tới hạn hoặc đã hết hạn |
 | `COUPON_LIMIT_REACHED` | 422 | Mã giảm giá đã hết lượt |
 | `COUPON_MIN_ORDER_NOT_MET` | 422 | Đơn chưa đạt giá trị tối thiểu của mã (so với cước trước giảm, gồm phí bốc xếp) |
-| `COMMISSION_RATE_LOCKED` | 422 | Admin đổi tỷ lệ hoa hồng khi còn đơn từ `Accepted` tới trước `Completed` (DECISIONS C8) |
+| `COMMISSION_RATE_LOCKED` | 422 | Admin đổi tỷ lệ hoa hồng khi còn đơn từ `Accepted` tới trước `Delivered` (DECISIONS C8) |
 | `APPLICATION_NOT_EDITABLE` | 422 | Tài xế nộp hồ sơ khi phiên bản mới nhất đang `Pending` hoặc đã `Approved` (MSG07) |
 | `CANNOT_CHANGE_OWN_STATUS` | 422 | Admin tự khóa hoặc vô hiệu hóa tài khoản của chính mình (UC-ADM-06, MSG65) |
 | `ORDER_NOT_ACTIVE` | 422 | Dispatcher chọn `ContinueTrip` khi đơn không còn đang chạy (`Accepted`…`InTransit`) |
