@@ -19,7 +19,7 @@ public interface IShippingOrderRepository : IRepository<ShippingOrder>
 
     /// <summary>
     /// True while any order is running: from Accepted up to, but not including, Completed (DECISIONS C8).
-    /// Pending has no driver yet and Cancelled is over, so neither counts.
+    /// PlaceOrder has no driver yet and Cancelled is over, so neither counts.
     /// </summary>
     Task<bool> HasOrdersInProgressAsync(CancellationToken cancellationToken = default);
 

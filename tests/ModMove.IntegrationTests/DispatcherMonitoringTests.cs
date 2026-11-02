@@ -67,13 +67,13 @@ public class DispatcherMonitoringTests
         table.Columns.Add("PaidAt", typeof(DateTime));
         table.Columns.Add("TotalCount", typeof(long));
 
-        // 1. Pending Cash order created 9 minutes ago => MatchingTimeoutSoon = true
-        table.Rows.Add(1L, "MM001", "Pending", "Cash", "Unpaid", 150_000m, "A", "B", "Khách 1", "0901111111",
+        // 1. PlaceOrder Cash order created 9 minutes ago => MatchingTimeoutSoon = true
+        table.Rows.Add(1L, "MM001", "PlaceOrder", "Cash", "Unpaid", 150_000m, "A", "B", "Khách 1", "0901111111",
             DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, "Xe 500kg", DBNull.Value, DBNull.Value,
             Now.AddMinutes(-9).UtcDateTime, DBNull.Value, 3L);
 
-        // 2. Pending PayOS order created 15 minutes ago, UNPAID => MatchingTimeoutSoon = false (DECISIONS 3.2: timer starts at PaidAt)
-        table.Rows.Add(2L, "MM002", "Pending", "PayOS", "Unpaid", 200_000m, "A", "B", "Khách 2", "0902222222",
+        // 2. PlaceOrder PayOS order created 15 minutes ago, UNPAID => MatchingTimeoutSoon = false (DECISIONS 3.2: timer starts at PaidAt)
+        table.Rows.Add(2L, "MM002", "PlaceOrder", "PayOS", "Unpaid", 200_000m, "A", "B", "Khách 2", "0902222222",
             DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, "Xe 500kg", DBNull.Value, DBNull.Value,
             Now.AddMinutes(-15).UtcDateTime, DBNull.Value, 3L);
 
@@ -106,7 +106,7 @@ public class DispatcherMonitoringTests
         var t = new DataTable();
         t.Columns.Add("OrderStatus", typeof(string));
         t.Columns.Add("Count", typeof(long));
-        t.Rows.Add("Pending", 4L);
+        t.Rows.Add("PlaceOrder", 4L);
         t.Rows.Add("InTransit", 7L);
         t.Rows.Add("Completed", 12L);
         sql.Results.Enqueue(t);
@@ -114,7 +114,7 @@ public class DispatcherMonitoringTests
         var summary = await SenderWith(sql).Send(new GetDispatcherOrdersSummaryQuery());
 
         Assert.Equal(23, summary.Total);
-        Assert.Equal(4, summary.Pending);
+        Assert.Equal(4, summary.PlaceOrder);
         Assert.Equal(0, summary.Accepted);
         Assert.Equal(0, summary.Arrived);
         Assert.Equal(0, summary.PickedUp);
@@ -210,7 +210,7 @@ public class DispatcherMonitoringTests
         historyTable.Columns.Add("ChangedByUserName", typeof(string));
         historyTable.Columns.Add("Note", typeof(string));
         historyTable.Columns.Add("CreatedAt", typeof(DateTime));
-        historyTable.Rows.Add(1L, DBNull.Value, "Pending", "Customer", 2L, "Nguyễn Văn Khách", DBNull.Value, Now.AddMinutes(-40).UtcDateTime);
+        historyTable.Rows.Add(1L, DBNull.Value, "PlaceOrder", "Customer", 2L, "Nguyễn Văn Khách", DBNull.Value, Now.AddMinutes(-40).UtcDateTime);
         sql.Results.Enqueue(historyTable);
 
         var paymentTable = new DataTable();

@@ -75,7 +75,7 @@ public class MyOrdersQueryTests
     private static DataTable OrderRows(int count)
     {
         var table = Table(
-            ("Id", typeof(long), 1L), ("OrderCode", typeof(string), "MM20261020001"), ("OrderStatus", typeof(string), "Pending"),
+            ("Id", typeof(long), 1L), ("OrderCode", typeof(string), "MM20261020001"), ("OrderStatus", typeof(string), "PlaceOrder"),
             ("PickupAddress", typeof(string), "Hoàn Kiếm"), ("DropoffAddress", typeof(string), "Cầu Giấy"),
             ("VehicleTypeName", typeof(string), "Xe van 500kg"), ("TotalFee", typeof(decimal), 250_000m),
             ("PaymentMethod", typeof(string), "Cash"), ("PaymentStatus", typeof(string), "Unpaid"), ("CreatedAt", typeof(DateTime), Created),
@@ -112,7 +112,7 @@ public class MyOrdersQueryTests
         ("ExpiresAt", typeof(DateTime), expiresAt.UtcDateTime), ("PaidAt", typeof(DateTime), paidAt));
 
     private static DataTable HistoryRows() => Table(
-        ("FromStatus", typeof(string), null), ("ToStatus", typeof(string), "Pending"), ("ChangedByRole", typeof(string), "Customer"),
+        ("FromStatus", typeof(string), null), ("ToStatus", typeof(string), "PlaceOrder"), ("ChangedByRole", typeof(string), "Customer"),
         ("Note", typeof(string), null), ("ChangedAt", typeof(DateTime), Created));
 
     [Fact]
@@ -271,7 +271,7 @@ public class MyOrdersQueryTests
         Assert.Contains("o.customer_id = @CustomerId", sql);
         Assert.Equal(1L, parameters["OrderId"]);
         Assert.Equal(["https://res.cloudinary.com/demo/a.jpg"], order.Cargo.PhotoUrls);
-        Assert.Equal("Pending", order.History.Single().ToStatus);
+        Assert.Equal("PlaceOrder", order.History.Single().ToStatus);
         Assert.Null(order.Driver);
     }
 
