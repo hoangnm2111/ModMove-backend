@@ -7,7 +7,7 @@ public sealed record GetDispatcherOrdersSummaryQuery : IQuery<DispatcherOrdersSu
 
 public sealed record DispatcherOrdersSummaryResponse(
     int Total,
-    int Pending,
+    int PlaceOrder,
     int Accepted,
     int Arrived,
     int PickedUp,

@@ -31,7 +31,7 @@ public class CreateOrderTests
             HasLoadingService: true, CouponCode: "WELCOME20K", method, payer, commitment);
 
     [Fact]
-    public async Task Cash_order_is_created_pending_unpaid_B10()
+    public async Task Cash_order_is_created_placeorder_unpaid_B10()
     {
         var app = App();
 
@@ -39,7 +39,7 @@ public class CreateOrderTests
 
         var order = app.Orders.Items.Single();
         Assert.Equal(1, app.UnitOfWork.Saves);
-        Assert.Equal(OrderStatus.Pending, order.OrderStatus);
+        Assert.Equal(OrderStatus.PlaceOrder, order.OrderStatus);
         Assert.Equal(PaymentStatus.Unpaid, order.PaymentStatus);
         Assert.Equal("MM20261020001", result.OrderCode);
         Assert.Equal(250_000m, result.TotalFee);
@@ -59,7 +59,7 @@ public class CreateOrderTests
     }
 
     [Fact]
-    public async Task PayOS_order_is_created_pending_unpaid_B10()
+    public async Task PayOS_order_is_created_placeorder_unpaid_B10()
     {
         var app = App();
 
@@ -67,7 +67,7 @@ public class CreateOrderTests
 
         var order = app.Orders.Items.Single();
         Assert.Equal((PaymentMethod.PayOS, (PayerRole?)null), (order.PaymentMethod, order.PayerRole));
-        Assert.Equal((OrderStatus.Pending, PaymentStatus.Unpaid), (order.OrderStatus, order.PaymentStatus));
+        Assert.Equal((OrderStatus.PlaceOrder, PaymentStatus.Unpaid), (order.OrderStatus, order.PaymentStatus));
         Assert.Equal(1, app.UnitOfWork.Saves);
     }
 

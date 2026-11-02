@@ -143,7 +143,7 @@ public class GetComplaintByIdTests
         sql.Results.Enqueue(complaintTable);
 
         var historyTable = CreateHistoriesTable();
-        historyTable.Rows.Add(101L, DBNull.Value, "Pending", "Customer", 3L, "Khách hàng Demo", null, now.AddHours(-4));
+        historyTable.Rows.Add(101L, DBNull.Value, "PlaceOrder", "Customer", 3L, "Khách hàng Demo", null, now.AddHours(-4));
         sql.Results.Enqueue(historyTable);
 
         var incidentTable = CreateIncidentsTable();
@@ -186,6 +186,6 @@ public class GetComplaintByIdTests
 
         // Status histories
         Assert.Single(res.StatusHistories);
-        Assert.Equal("Pending", res.StatusHistories[0].ToStatus);
+        Assert.Equal("PlaceOrder", res.StatusHistories[0].ToStatus);
     }
 }

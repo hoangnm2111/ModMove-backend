@@ -53,12 +53,12 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [x] Danh sách, tìm, chi tiết, lịch sử đơn của khách (CUS-08..10, 20)
 
 **Phase 2**
-- [x] Hủy đơn qua `ShippingOrder.CancelByCustomer` (chỉ Pending/Accepted) + tạo hoàn tiền Cancellation cho Admin (3.3)
+- [x] Hủy đơn qua `ShippingOrder.CancelByCustomer` (chỉ PlaceOrder/Accepted) + tạo hoàn tiền Cancellation cho Admin (3.3)
 - [x] Duyệt/từ chối ảnh lấy hàng (GB-26, tối đa 5 lần gửi: 6.3), xác nhận nhận hàng (CUS-19)
 - [x] Tracking: `TrackingHub` SignalR theo B12: `access_token` trên query string; `JoinOrder` kiểm tra đơn là của khách (`ORDER_NOT_YOURS`); `SendLocation` phát tới `order-{id}` và group `dispatchers`; Dispatcher tự vào `dispatchers` theo role
 - [x] Phía khách của sự cố, hoàn tiền, khiếu nại (CUS-15..18, 21..24; 7.3, 7.4 `ReplyToInfoRequest`) — cùng tuần với Huy
 - [x] Đánh giá (CUS-25, 26; trong 1 ngày sau hoàn tất, 7.5)
-- [ ] Nối thanh toán PayOS vào đặt đơn qua `CreateOrderPayment` của Hoàng (B10, 3.1): tạo đơn đã nhận PayOS (`Pending` + `Unpaid`) và chi tiết đơn có `payment`; còn chờ `CreateOrderPayment` + webhook của Hoàng (hợp đồng ở mục "Chờ Hoàng" trong `api/README.md`)
+- [ ] Nối thanh toán PayOS vào đặt đơn qua `CreateOrderPayment` của Hoàng (B10, 3.1): tạo đơn đã nhận PayOS (`PlaceOrder` + `Unpaid`) và chi tiết đơn có `payment`; còn chờ `CreateOrderPayment` + webhook của Hoàng (hợp đồng ở mục "Chờ Hoàng" trong `api/README.md`)
 - [x] `INotificationService` (B17): gửi FCM tới app và SignalR `NotificationReceived` qua `Clients.User`; không lưu lịch sử. Gửi thông báo cho khách theo bảng sự kiện 8.3
 - [x] Logout nhận kèm FCM token của app, chỉ xóa token nếu khớp token đang lưu (9.2)
 

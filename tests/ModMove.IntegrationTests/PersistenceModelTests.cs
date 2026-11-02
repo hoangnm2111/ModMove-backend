@@ -1,8 +1,10 @@
 using System.Reflection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Migrations.Operations;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 using ModMove.Infrastructure.Persistence;
+using ModMove.Infrastructure.Persistence.Migrations;
 using ModMove.Infrastructure.Persistence.Repositories;
 
 namespace ModMove.IntegrationTests;
@@ -35,6 +37,28 @@ public class PersistenceModelTests
             .GetField("InProgress", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
 
         Assert.Equal([OrderStatus.Accepted, OrderStatus.Arrived, OrderStatus.PickedUp, OrderStatus.InTransit], inProgress);
+    }
+
+    [Fact]
+    public void Rename_migration_updates_every_column_holding_an_order_status_both_ways()
+    {
+        using var db = NewContext();
+        string Update(Type entity, string property, string from, string to)
+        {
+            var type = db.Model.FindEntityType(entity)!;
+            var column = type.FindProperty(property)!.GetColumnName();
+            return $"UPDATE `{type.GetTableName()}` SET `{column}` = '{to}' WHERE `{column}` = '{from}';";
+        }
+        string[] Expected(string from, string to) =>
+        [
+            Update(typeof(ShippingOrder), nameof(ShippingOrder.OrderStatus), from, to),
+            Update(typeof(OrderStatusHistory), nameof(OrderStatusHistory.FromStatus), from, to),
+            Update(typeof(OrderStatusHistory), nameof(OrderStatusHistory.ToStatus), from, to),
+        ];
+        var migration = new RenameOrderStatusPendingToPlaceOrder();
+
+        Assert.Equal(Expected("Pending", "PlaceOrder"), migration.UpOperations.Cast<SqlOperation>().Select(o => o.Sql));
+        Assert.Equal(Expected("PlaceOrder", "Pending"), migration.DownOperations.Cast<SqlOperation>().Select(o => o.Sql));
     }
 
     [Fact]
