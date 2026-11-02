@@ -143,8 +143,8 @@ public class GetIncidentByIdTests
         sql.Results.Enqueue(incidentTable);
 
         var historyTable = CreateHistoriesTable();
-        historyTable.Rows.Add(101L, DBNull.Value, "PlaceOrder", "Customer", 3L, "Khách hàng Demo", "Tạo đơn", now.AddHours(-2));
-        historyTable.Rows.Add(102L, "PlaceOrder", "Accepted", "Driver", 4L, "Tài xế Demo", "Nhận đơn", now.AddHours(-1));
+        historyTable.Rows.Add(101L, DBNull.Value, "Pending", "Customer", 3L, "Khách hàng Demo", "Tạo đơn", now.AddHours(-2));
+        historyTable.Rows.Add(102L, "Pending", "Accepted", "Driver", 4L, "Tài xế Demo", "Nhận đơn", now.AddHours(-1));
         sql.Results.Enqueue(historyTable);
 
         var refundTable = CreateRefundTable();
@@ -204,7 +204,7 @@ public class GetIncidentByIdTests
 
         // Histories & Refund
         Assert.Equal(2, res.StatusHistories.Count);
-        Assert.Equal("PlaceOrder", res.StatusHistories[0].ToStatus);
+        Assert.Equal("Pending", res.StatusHistories[0].ToStatus);
         Assert.Equal("Accepted", res.StatusHistories[1].ToStatus);
         Assert.NotNull(res.Refund);
         Assert.Equal(501, res.Refund!.Id);
@@ -226,7 +226,7 @@ public class GetIncidentByIdTests
         var incidentTable = CreateIncidentTable();
         var now = new DateTime(2026, 10, 20, 8, 30, 0, DateTimeKind.Unspecified);
         incidentTable.Rows.Add(
-            2L, 20L, "MMDEMO002", "PlaceOrder", "Other", "Khách báo sự cố", DBNull.Value,
+            2L, 20L, "MMDEMO002", "Pending", "Other", "Khách báo sự cố", DBNull.Value,
             DBNull.Value, DBNull.Value, "Open", DBNull.Value, DBNull.Value,
             3L, "Khách hàng Demo", "Customer", DBNull.Value, DBNull.Value, DBNull.Value, now,
             "A", "B", "PayOS", "Unpaid", 100000m, DBNull.Value,
