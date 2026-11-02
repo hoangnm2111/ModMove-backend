@@ -1,6 +1,6 @@
 # Quyết định thiết kế Backend
 
-Đây là các quyết định nhóm đã chốt (bản cuối 2026-10-24, cập nhật kênh client và thông báo 2026-10-30). Khi SRS/SDS khác file này, **làm theo file này**. Muốn đổi một quyết định: sửa file này trong một PR riêng, cả nhóm duyệt.
+Đây là các quyết định nhóm đã chốt (bản cuối 2026-10-24, cập nhật kênh client và thông báo 2026-10-30, phía khách 2026-11-02). Khi SRS/SDS khác file này, **làm theo file này**. Muốn đổi một quyết định: sửa file này trong một PR riêng, cả nhóm duyệt.
 
 - **Thiết kế DB:** Report-4 mục 3 chỉ là bản thiết kế ban đầu. Nguồn sự thật của schema là **migration trong code** cùng file này.
 - **Mã quyết định:** `B*`, `C*` là từ các buổi họp trước; `M*` và `1.x`–`9.x` là số mục trong tài liệu "Các vấn đề cần nhóm thống nhất".
@@ -13,7 +13,7 @@
 |---|---|
 | B1 | **Giá đơn** = `max(minimum_fare, base_fare + price_per_km × km)` + phí bốc xếp (`LOADING_FEE`, nếu chọn) − coupon = `total_fee`. Giá nằm ở `vehicle_types` và `platform_settings`, không có entity `FareRule` |
 | B2 | Không có giờ cao điểm, không có phụ phí cồng kềnh |
-| 4.4 | Giá chốt lúc đặt đơn theo khoảng cách Google Maps, không tính lại theo quãng đường thực tế |
+| 4.4 | Giá chốt lúc đặt đơn theo khoảng cách Google Maps, không tính lại theo quãng đường thực tế. Tạo đơn gửi kèm `expectedTotalFee`; giá server khác số này thì trả 422 `FARE_CHANGED`, không tạo đơn và không tính lượt coupon (2026-11-02) |
 | 4.6 | Không giới hạn phạm vi phục vụ hay số km |
 | M1, M2, B4 | **Tài xế chịu coupon.** Khi đơn hoàn tất: `commission_amount = commission_rate × total_fee` (đã trừ coupon, làm tròn đến đồng); tài xế nhận `total_fee − commission_amount`. Cùng công thức cho đơn PayOS và tiền mặt. Đổi tỷ lệ không ảnh hưởng đơn cũ |
 | GB-15 | Đơn tiền mặt: hoa hồng trừ vào ví cọc của tài xế |
@@ -67,7 +67,9 @@
 | 7.1 | Không thêm loại sự cố: "trễ", "sai tuyến", "khách vắng mặt" ghi là `Other` |
 | 7.3 | Khiếu nại chỉ nhận khi đơn đang `Delivered` và trong 24 giờ từ `delivered_at`; sau 24 giờ đơn tự `Completed` (GB-23) và không nhận khiếu nại nữa |
 | 7.4 | Dispatcher xin thêm thông tin: khách trả lời bằng một đoạn chữ (`refunds.customer_reply`) và thêm ảnh vào `evidence_urls` (tối đa 5 ảnh) |
-| 7.5 | Đánh giá chỉ trong **1 ngày** sau khi đơn `Completed` (GB-20: một lần, không sửa). Điểm trung bình tính khi truy vấn |
+| 7.5 | Đánh giá chỉ trong **1 ngày** sau khi đơn `Completed` (GB-20: một lần, không sửa). Điểm trung bình tính khi truy vấn. Đánh giá 1–2 sao như mọi đánh giá khác: số sao và nhận xét, không có tag hay trường bắt buộc thêm (2026-11-02) |
+| CUS-23 | Khách thấy lý do của Admin (`refunds.decision_note`, trả về là `decisionReason`) khi Admin đã quyết định. `proposal_reason` của Dispatcher chỉ là ghi chú nội bộ, không trả về cho khách. `Refund.Approve`/`RejectRefund` nhận tham số `note` (2026-11-02) |
+| Danh mục | `cargoType`, lý do hủy và lý do khiếu nại gửi bằng **mã** master data (`CARGO_TYPE`, `CANCELLATION_REASON`, `COMPLAINT_REASON`); web và app lấy danh sách từ `api/public/lookups/...`. Mã lạ hoặc đã tắt: 400 `VALIDATION`. Lý do hủy và lý do khiếu nại chọn `OTHER` thì phải viết lý do (2026-11-02) |
 | 2.9, B14 | Khách gửi yêu cầu hỗ trợ (bảng `support_requests`); **không có màn hình Dispatcher**, Dispatcher xử lý ngoài hệ thống |
 
 ## 6. Tài khoản, đăng nhập
@@ -91,7 +93,7 @@
 | B13 | Nội dung chính sách và giới thiệu dịch vụ: cột `master_data_items.description`, Admin nhập |
 | B15 | Hóa đơn điện tử, hoàn tiền tự động: ngoài phạm vi |
 | B16 | Xuất báo cáo Excel (cần xin duyệt một package Excel khi bắt đầu) |
-| B17, 8.3 | Mỗi sự kiện dưới đây gửi **hai đường**: FCM tới app, và SignalR `NotificationReceived` tới mọi kết nối của user (`Clients.User(userId)`, đọc claim `NameIdentifier`, không tự tạo group `user-{id}`). Web chỉ nhận khi đang mở trang. Gói hai đường vào một chỗ (`INotificationService` gọi `IPushNotificationService` và `IRealtimeNotifier`) để mọi người chỉ gọi một hàm. **Không lưu lịch sử, không có bảng `notifications`**: mở lại web thì khách xem trạng thái hiện tại ở danh sách và chi tiết đơn. Sự kiện tối thiểu cho **khách**: đơn được nhận, tài xế đến điểm lấy, ảnh lấy hàng chờ duyệt, đã giao, đã hoàn thành, kết quả sự cố, kết quả hoàn tiền. Cho **tài xế**: đơn mới gần, quyết định sự cố, kết quả duyệt hồ sơ, kết quả rút tiền. Ai đổi trạng thái thì gửi thông báo đó |
+| B17, 8.3 | Mỗi sự kiện dưới đây gửi **hai đường**: FCM tới app, và SignalR `NotificationReceived` tới mọi kết nối của user (`Clients.User(userId)`, đọc claim `NameIdentifier`, không tự tạo group `user-{id}`). Web chỉ nhận khi đang mở trang. Gói hai đường vào một chỗ (`INotificationService` gọi `IPushNotificationService` và `IRealtimeNotifier`) để mọi người chỉ gọi một hàm. **Không lưu lịch sử, không có bảng `notifications`**: mở lại web thì khách xem trạng thái hiện tại ở danh sách và chi tiết đơn. Sự kiện tối thiểu cho **khách**: đơn được nhận, tài xế đến điểm lấy, ảnh lấy hàng chờ duyệt, đã giao, đã hoàn thành, kết quả sự cố, kết quả hoàn tiền. Cho **tài xế**: đơn mới gần, quyết định sự cố, khách báo sự cố (`INCIDENT_REPORTED`), đánh giá mới (`RATING_RECEIVED`), kết quả duyệt hồ sơ, kết quả rút tiền. Ai đổi trạng thái thì gửi thông báo đó |
 
 ## 8. Hạ tầng và quy ước
 
