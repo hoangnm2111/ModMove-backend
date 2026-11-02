@@ -7,7 +7,7 @@ using ModMove.Domain.Exceptions;
 
 namespace ModMove.IntegrationTests;
 
-/// <summary>POST api/customer/orders: cash order (GST-17, B10, B11, 4.3) through the real pipeline with fakes.</summary>
+/// <summary>POST api/customer/orders: cash and PayOS orders (GST-17, B10, B11, 4.3) through the real pipeline with fakes.</summary>
 public class CreateOrderTests
 {
     private const string Photo = "https://res.cloudinary.com/demo/image/upload/modmove/customers/1/a.jpg";
@@ -58,15 +58,56 @@ public class CreateOrderTests
     }
 
     [Fact]
-    public async Task PayOS_is_not_supported_in_phase_1()
+    public async Task PayOS_order_is_created_pending_unpaid_B10()
     {
         var app = App();
 
-        var error = await Assert.ThrowsAsync<DomainException>(() => app.Sender.Send(Order(method: PaymentMethod.PayOS, payer: null)));
+        await app.Sender.Send(Order(method: PaymentMethod.PayOS, payer: null));
 
-        Assert.Equal("PAYMENT_METHOD_NOT_SUPPORTED", error.Code);
+        var order = app.Orders.Items.Single();
+        Assert.Equal((PaymentMethod.PayOS, (PayerRole?)null), (order.PaymentMethod, order.PayerRole));
+        Assert.Equal((OrderStatus.Pending, PaymentStatus.Unpaid), (order.OrderStatus, order.PaymentStatus));
+        Assert.Equal(1, app.UnitOfWork.Saves);
+    }
+
+    [Fact]
+    public async Task PayOS_order_with_a_payer_is_rejected() =>
+        await Assert.ThrowsAsync<ValidationException>(() => App().Sender.Send(Order(method: PaymentMethod.PayOS, payer: PayerRole.Sender)));
+
+    [Fact]
+    public async Task Unknown_payment_method_is_rejected() =>
+        await Assert.ThrowsAsync<ValidationException>(() => App().Sender.Send(Order(method: (PaymentMethod)9)));
+
+    [Fact]
+    public async Task Matching_expected_total_creates_the_order_GST17()
+    {
+        var app = App();
+
+        var result = await app.Sender.Send(Order() with { ExpectedTotalFee = 250_000m });
+
+        Assert.Equal(250_000m, result.TotalFee);
+        Assert.Single(app.Orders.Items);
+    }
+
+    [Fact]
+    public async Task Changed_total_is_FARE_CHANGED_and_coupon_not_used_GST17()
+    {
+        var app = App();
+
+        var error = await Assert.ThrowsAsync<DomainException>(() => app.Sender.Send(Order() with { ExpectedTotalFee = 240_000m }));
+
+        Assert.Equal("FARE_CHANGED", error.Code);
+        Assert.Contains("250000", error.Message);
+        Assert.Empty(app.Orders.Items);
+        Assert.Equal(0, app.Coupons.Items[0].UsedCount);
         Assert.Equal(0, app.UnitOfWork.Saves);
     }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(1000.5)]
+    public async Task Expected_total_is_a_whole_non_negative_amount(double amount) =>
+        await Assert.ThrowsAsync<ValidationException>(() => App().Sender.Send(Order() with { ExpectedTotalFee = (decimal)amount }));
 
     [Fact]
     public async Task Missing_prohibited_goods_commitment_is_rejected_4_3() =>
