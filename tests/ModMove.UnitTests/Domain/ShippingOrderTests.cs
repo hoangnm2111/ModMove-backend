@@ -535,6 +535,7 @@ public class ShippingOrderTests
     public void Incident_refund_points_at_the_incident_and_waits_for_the_dispatcher_B9()
     {
         var order = AcceptedOrder();
+        order.MarkPaid(Now);
         var version = order.RowVersion;
 
         var refund = order.RequestIncidentRefund(1, incidentId: 3, "Xe hỏng, trễ 3 giờ", ["a.jpg"], 50_000);
@@ -542,6 +543,35 @@ public class ShippingOrderTests
         Assert.Equal((RefundSourceType.Incident, (long?)3, 50_000m), (refund.SourceType, refund.IncidentId, refund.RequestedAmount));
         Assert.Null(refund.ProposedAmount);
         Assert.Equal(version + 1, order.RowVersion);
+    }
+
+    [Fact]
+    public void Incident_refund_needs_a_paid_PayOS_order_B9()
+    {
+        var cash = NewOrder(PaymentMethod.Cash, PayerRole.Sender);
+        var unpaid = NewOrder();
+
+        var onCash = Assert.Throws<DomainException>(() => cash.RequestIncidentRefund(1, 3, "x", null, 1_000));
+        var onUnpaid = Assert.Throws<DomainException>(() => unpaid.RequestIncidentRefund(1, 3, "x", null, 1_000));
+
+        Assert.Equal(("REFUND_NOT_ALLOWED", "REFUND_NOT_ALLOWED"), (onCash.Code, onUnpaid.Code));
+    }
+
+    [Theory]
+    [InlineData(0, 180_000)]
+    [InlineData(100_000, 80_000)]
+    public void Refunds_may_add_up_to_the_order_total_B9(int claimed, int requested) =>
+        NewOrder().EnsureRefundFits(requested, claimed); // total 180,000
+
+    [Theory]
+    [InlineData(100_000, 80_001)]
+    [InlineData(180_000, 1)]
+    public void Refunds_cannot_add_up_to_more_than_the_order_total_B9(int claimed, int requested)
+    {
+        var error = Assert.Throws<DomainException>(() => NewOrder().EnsureRefundFits(requested, claimed));
+
+        Assert.Equal("REFUND_TOTAL_EXCEEDED", error.Code);
+        Assert.Contains((180_000 - claimed).ToString(), error.Message);
     }
 
     [Fact]

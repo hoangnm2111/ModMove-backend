@@ -83,7 +83,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [ ] Matching (DRV-08..10, B5): đơn PayOS chỉ hiện khi đã trả; GB-08/09; đơn tiền mặt cần ví cọc ≥ `MIN_COD_DEPOSIT` và ≥ hoa hồng của đơn (GB-16: `DriverWallet.CanReceiveCod(minDeposit, order.CommissionFor(rate))`, dùng cả khi đổi tài xế); ẩn tài xế mất GPS quá 5 phút (6.4)
 - [ ] Trips (DRV-11..16, 18, 19): không có hủy từ tài xế (6.1); không có người nhận thì vẫn giao và gửi POD (2.7)
 - [ ] Ví (DRV-17, 20..23): thu COD, rút tiền không tối thiểu (5.1), thu nhập = `DriverEarning`
-- [ ] Admin duyệt hoàn tiền (cả hoàn tiền do hủy không qua Dispatcher, 3.3) và chi trả tay; truyền lý do cho khách vào tham số `note` của `Refund.Approve`/`RejectRefund` (CUS-23); duyệt rút tiền (ADM-24)
+- [ ] Admin duyệt hoàn tiền (cả hoàn tiền do hủy không qua Dispatcher, 3.3) và chi trả tay; truyền lý do cho khách vào tham số `note` của `Refund.Approve`/`RejectRefund` (CUS-23); trước khi duyệt gọi `order.EnsureRefundFits(0, await refunds.GetClaimedTotalForOrderAsync(order.Id))` để tổng hoàn của đơn không vượt `total_fee` (B9); duyệt rút tiền (ADM-24)
 
 **Phase 3**
 - [ ] JOB-PAY-01 (mã hết hạn sau 10 phút; hủy đơn PayOS vẫn `Unpaid` sau 30 phút từ `created_at`, 3.1), JOB-MATCH-01 (từ lúc tạo hoặc lúc trả, 3.2: `IsMatchingExpired`), JOB-ORDER-01 (`CanBeAutoCompleted`, rồi `order.Complete(rate, System, null, now)` + `OrderSettlement.SettleAsync` trong `Features/Orders` như ConfirmReceipt của Hiếu, để ví được tất toán giống nhau)
@@ -105,6 +105,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [x] Thông báo cho **khách** khi xử lý xong sự cố (8.3): `NotifyCustomerAsync(order, CustomerEvent.IncidentResolved, ct, detail)`, `detail` nói rõ quyết định; đổi tài xế hoặc hủy đơn thì gọi thêm `PublishOrderStatusAsync` (B12). Đổi tài xế: gọi cho **cả tài xế cũ và tài xế mới**, vì tài xế không vào group đơn
 - [x] Hàng còn trên xe sau khi hủy: trả về hay giữ lại (2.6)
 - [x] Không làm màn hình yêu cầu hỗ trợ (2.9)
+- [ ] `CancelOrderByIncident` theo luật tổng hoàn (B9): khi hoàn 100%, xử lý mọi khoản hoàn đang mở của đơn (không chỉ của sự cố đang xử lý), từ chối nếu đơn đã có khoản được duyệt hoặc đã chi; tự đóng các sự cố đang mở khác của đơn
 
 ## 7. Dịch vụ ngoài
 
