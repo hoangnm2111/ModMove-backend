@@ -39,6 +39,34 @@ public class RateTripTests
     }
 
     [Fact]
+    public async Task The_driver_is_told_about_a_new_rating_B17()
+    {
+        var s = new TripSetup();
+        var order = Completed(s);
+        s.App.Realtime.Sent.Clear();
+
+        var result = await s.App.Sender.Send(new RateTripCommand(order.Id, 2, "Đến trễ"));
+
+        var notification = s.SentToDriver();
+        Assert.Equal("RATING_RECEIVED", notification.Type);
+        Assert.Contains("2 sao", notification.Body);
+        Assert.Equal((order.Id.ToString(), result.RatingId.ToString()), (notification.Data!["orderId"], notification.Data["ratingId"]));
+    }
+
+    [Fact]
+    public async Task A_refused_rating_tells_the_driver_nothing()
+    {
+        var s = new TripSetup();
+        var order = Completed(s);
+        await s.App.Sender.Send(new RateTripCommand(order.Id, 4, null));
+        s.App.Realtime.Sent.Clear();
+
+        await Assert.ThrowsAsync<ConflictException>(() => s.App.Sender.Send(new RateTripCommand(order.Id, 1, null)));
+
+        Assert.Empty(s.App.Realtime.Sent);
+    }
+
+    [Fact]
     public async Task Empty_comment_is_stored_as_none()
     {
         var s = new TripSetup();

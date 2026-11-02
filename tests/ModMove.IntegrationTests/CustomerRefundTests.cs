@@ -16,7 +16,7 @@ public class CustomerRefundTests
     private const string Photo = "https://res.cloudinary.com/demo/image/upload/modmove/customers/1/a.jpg";
 
     private static SubmitComplaintCommand Complaint(ShippingOrder order, decimal amount = 100_000, IReadOnlyList<string>? photos = null) =>
-        new(order.Id, " Hàng vỡ ", photos ?? [Photo], amount);
+        new(order.Id, "DAMAGED_CARGO", " Hàng vỡ ", photos ?? [Photo], amount);
 
     private static InTransitIncident AddIncident(TripSetup s, ShippingOrder order)
     {
@@ -38,6 +38,7 @@ public class CustomerRefundTests
         var refund = Assert.Single(s.App.Refunds.Items);
         Assert.Equal(refund.Id, result.RefundId);
         Assert.Equal((RefundSourceType.Complaint, RefundStatus.Requested, "Hàng vỡ"), (refund.SourceType, refund.RefundStatus, refund.Reason));
+        Assert.Equal("DAMAGED_CARGO", refund.ReasonCode);
         Assert.Equal(100_000m, refund.RequestedAmount);
         Assert.Equal([Photo], refund.EvidenceUrls!);
         Assert.Equal(1, s.App.UnitOfWork.Saves);
@@ -119,13 +120,75 @@ public class CustomerRefundTests
 
     [Theory]
     [InlineData("", 100_000)]
-    [InlineData("Hàng vỡ", 0)]
-    public async Task Reason_and_a_positive_amount_are_required(string reason, int amount)
+    [InlineData("DAMAGED_CARGO", 0)]
+    public async Task Reason_code_and_a_positive_amount_are_required(string code, int amount)
     {
         var s = new TripSetup();
         var order = s.Delivered();
 
-        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new SubmitComplaintCommand(order.Id, reason, null, amount)));
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new SubmitComplaintCommand(order.Id, code, null, null, amount)));
+    }
+
+    [Fact]
+    public async Task Code_alone_stores_the_name_from_the_list()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+
+        await s.App.Sender.Send(new SubmitComplaintCommand(order.Id, "DAMAGED_CARGO", null, null, 100_000));
+
+        var refund = Assert.Single(s.App.Refunds.Items);
+        Assert.Equal(("DAMAGED_CARGO", "Hàng bị hư hỏng"), (refund.ReasonCode, refund.Reason));
+    }
+
+    [Fact]
+    public async Task Code_not_in_the_list_is_refused()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+
+        var error = await Assert.ThrowsAsync<ValidationException>(() =>
+            s.App.Sender.Send(new SubmitComplaintCommand(order.Id, "CHANGED_PLAN", null, null, 100_000))); // a cancellation reason
+
+        Assert.Contains("ReasonCode", error.Errors.Keys);
+        Assert.Empty(s.App.Refunds.Items);
+    }
+
+    [Fact]
+    public async Task Code_switched_off_by_the_admin_is_refused()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+        s.App.MasterData.Items.Single(i => i.Code == "DAMAGED_CARGO").SetActive(false);
+
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new SubmitComplaintCommand(order.Id, "DAMAGED_CARGO", null, null, 100_000)));
+
+        Assert.Empty(s.App.Refunds.Items);
+    }
+
+    [Theory]
+    [InlineData("OTHER")]
+    [InlineData("ÓTHER")] // the database column ignores case and accents
+    public async Task Other_needs_a_written_reason(string code)
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new SubmitComplaintCommand(order.Id, code, " ", null, 100_000)));
+
+        Assert.Empty(s.App.Refunds.Items);
+    }
+
+    [Fact]
+    public async Task Other_with_a_written_reason_is_accepted()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+
+        await s.App.Sender.Send(new SubmitComplaintCommand(order.Id, "OTHER", " Sai địa chỉ ", null, 100_000));
+
+        var refund = Assert.Single(s.App.Refunds.Items);
+        Assert.Equal(("OTHER", "Sai địa chỉ"), (refund.ReasonCode, refund.Reason));
     }
 
     [Fact]
@@ -141,7 +204,7 @@ public class CustomerRefundTests
 
     [Fact]
     public async Task Signed_out_caller_is_unauthorized() =>
-        await Assert.ThrowsAsync<UnauthorizedException>(() => new TestApp().Sender.Send(new SubmitComplaintCommand(1, "x", null, 1)));
+        await Assert.ThrowsAsync<UnauthorizedException>(() => new TestApp().Sender.Send(new SubmitComplaintCommand(1, "DAMAGED_CARGO", null, null, 1)));
 
     // ---- Incident refund (UC-CUS-17, 18) ----
 
@@ -168,6 +231,131 @@ public class CustomerRefundTests
         await s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 50_000));
 
         await Assert.ThrowsAsync<ConflictException>(() => s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 50_000)));
+    }
+
+    [Fact]
+    public async Task Incident_refund_on_a_cash_order_is_refused_B9()
+    {
+        var s = new TripSetup();
+        var incident = AddIncident(s, s.PickedUp(method: PaymentMethod.Cash));
+
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 50_000)));
+
+        Assert.Equal("REFUND_NOT_ALLOWED", error.Code);
+        Assert.Empty(s.App.Refunds.Items);
+    }
+
+    // ---- The refunds of one order add up to at most its total (B9); this order's total is 180,000 ----
+
+    [Fact]
+    public async Task Two_incidents_cannot_claim_more_than_the_order_total_B9()
+    {
+        var s = new TripSetup();
+        var order = s.PickedUp();
+        var first = AddIncident(s, order);
+        var second = AddIncident(s, order);
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(first.Id, "Trễ", null, 100_000));
+
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(new RequestIncidentRefundCommand(second.Id, "Vỡ", null, 80_001)));
+
+        Assert.Equal("REFUND_TOTAL_EXCEEDED", error.Code);
+        Assert.Contains("80000", error.Message); // what is left to ask for
+        Assert.Single(s.App.Refunds.Items);
+        Assert.Equal(1, s.App.UnitOfWork.Saves);
+    }
+
+    [Fact]
+    public async Task What_is_left_of_the_total_can_still_be_claimed_B9()
+    {
+        var s = new TripSetup();
+        var order = s.PickedUp();
+        var first = AddIncident(s, order);
+        var second = AddIncident(s, order);
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(first.Id, "Trễ", null, 100_000));
+
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(second.Id, "Vỡ", null, 80_000));
+
+        Assert.Equal(2, s.App.Refunds.Items.Count);
+    }
+
+    [Fact]
+    public async Task Complaint_counts_what_incidents_already_claimed_B9()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+        var incident = AddIncident(s, order);
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 150_000));
+
+        var error = await Assert.ThrowsAsync<DomainException>(() => s.App.Sender.Send(Complaint(order, 30_001)));
+
+        Assert.Equal("REFUND_TOTAL_EXCEEDED", error.Code);
+        Assert.Single(s.App.Refunds.Items);
+    }
+
+    [Fact]
+    public async Task Nothing_more_can_be_claimed_once_the_order_was_refunded_in_full_B9()
+    {
+        var s = new TripSetup();
+        var order = s.PickedUp();
+        var incident = AddIncident(s, order);
+        var paid = Refund.Request(order.Id, incident.Id, RefundSourceType.Cancellation, "Hủy", null, order.TotalFee);
+        paid.Approve(1, TripSetup.Now);
+        paid.MarkProcessed("BANK1", TripSetup.Now);
+        s.App.Refunds.Add(paid);
+
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 1)));
+
+        Assert.Equal("REFUND_TOTAL_EXCEEDED", error.Code);
+    }
+
+    [Fact]
+    public async Task A_lowered_proposal_counts_instead_of_what_was_asked_B9()
+    {
+        var s = new TripSetup();
+        var order = s.PickedUp();
+        var first = AddIncident(s, order);
+        var second = AddIncident(s, order);
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(first.Id, "Trễ", null, 180_000));
+        s.App.Refunds.Items[0].Propose(50_000, "Một phần", 1);
+
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(second.Id, "Vỡ", null, 130_000));
+
+        Assert.Equal(2, s.App.Refunds.Items.Count);
+    }
+
+    [Theory]
+    [InlineData("Withdrawn")]
+    [InlineData("Rejected")]
+    [InlineData("Failed")]
+    public async Task Refunds_that_paid_nothing_do_not_count_B9(string outcome)
+    {
+        var s = new TripSetup();
+        var order = s.PickedUp();
+        var first = AddIncident(s, order);
+        var second = AddIncident(s, order);
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(first.Id, "Trễ", null, 180_000));
+        var refund = s.App.Refunds.Items[0];
+        switch (outcome)
+        {
+            case "Withdrawn":
+                refund.Withdraw();
+                break;
+            case "Rejected":
+                refund.RejectRefund(1, TripSetup.Now);
+                break;
+            default:
+                refund.Propose(180_000, "Đủ", 1);
+                refund.Approve(1, TripSetup.Now);
+                refund.MarkFailed();
+                break;
+        }
+
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(second.Id, "Vỡ", null, 180_000));
+
+        Assert.Equal(2, s.App.Refunds.Items.Count);
     }
 
     [Fact]

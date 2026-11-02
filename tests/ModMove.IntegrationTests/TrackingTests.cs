@@ -8,6 +8,7 @@ using ModMove.Application;
 using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
+using ModMove.Application.Features.Tracking.Commands.PurgeOldLocationLogs;
 using ModMove.Application.Features.Tracking.Commands.UpdateDriverLocation;
 using ModMove.Application.Features.Tracking.Queries.CanFollowOrder;
 using ModMove.Application.Features.Tracking.Queries.IsActiveAccount;
@@ -17,6 +18,25 @@ using ModMove.Domain.Exceptions;
 using ModMove.WebApi.Hubs;
 
 namespace ModMove.IntegrationTests;
+
+/// <summary>JOB-GPS-01: GPS points are kept for 30 days.</summary>
+public class PurgeOldLocationLogsTests
+{
+    [Fact]
+    public async Task Points_older_than_30_days_are_deleted_and_newer_ones_kept()
+    {
+        var app = new TestApp();
+        var now = TestApp.Start;
+        app.LocationLogs.Add(DriverLocationLog.Record(1, 1, 21m, 105m, now.AddDays(-30).AddSeconds(-1)));
+        var onTheLine = DriverLocationLog.Record(1, 1, 21m, 105m, now.AddDays(-30));
+        app.LocationLogs.Add(onTheLine);
+
+        var deleted = await app.Sender.Send(new PurgeOldLocationLogsCommand());
+
+        Assert.Equal(1, deleted);
+        Assert.Equal(onTheLine, Assert.Single(app.LocationLogs.Items));
+    }
+}
 
 /// <summary>SendLocation behind /hubs/tracking (DECISIONS B12, 6.4).</summary>
 public class UpdateDriverLocationTests

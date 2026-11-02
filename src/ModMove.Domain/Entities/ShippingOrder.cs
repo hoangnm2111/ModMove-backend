@@ -53,6 +53,9 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     public OrderStatus OrderStatus { get; private set; } = OrderStatus.Pending;
     public string? CancellationReason { get; private set; }
 
+    /// <summary>The CANCELLATION_REASON code the customer picked; null when a Dispatcher or the System cancelled.</summary>
+    public string? CancellationReasonCode { get; private set; }
+
     public DateTimeOffset WarrantyAcceptedAt { get; private set; }
     public DateTimeOffset? AcceptedAt { get; private set; }
 
@@ -212,7 +215,8 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     /// RowVersion makes a second complaint saved at the same time fail with 409.
     /// </summary>
     public Refund FileComplaint(
-        long customerId, string reason, IEnumerable<string>? evidenceUrls, decimal requestedAmount, DateTimeOffset now)
+        long customerId, string reason, IEnumerable<string>? evidenceUrls, decimal requestedAmount, DateTimeOffset now,
+        string? reasonCode = null)
     {
         EnsureCustomer(customerId);
         if (!CanReceiveComplaint(now))
@@ -221,18 +225,21 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         EnsureRefundAmount(requestedAmount);
 
         RowVersion++;
-        return Refund.Request(Id, null, RefundSourceType.Complaint, reason, evidenceUrls, requestedAmount);
+        return Refund.Request(Id, null, RefundSourceType.Complaint, reason, evidenceUrls, requestedAmount, reasonCode);
     }
 
     /// <summary>
     /// UC-CUS-17, DECISIONS B9: the customer asks for a refund because of an incident on this order, whatever the
-    /// incident's state. "One open refund per incident" is checked by the caller; RowVersion guards a concurrent one.
+    /// incident's state; only money paid through PayOS can come back. "One open refund per incident" and the order-wide
+    /// total (<see cref="EnsureRefundFits"/>) are checked by the caller; RowVersion guards a concurrent one.
     /// </summary>
     public Refund RequestIncidentRefund(
         long customerId, long incidentId, string reason, IEnumerable<string>? evidenceUrls, decimal requestedAmount)
     {
         EnsureCustomer(customerId);
         EnsureRefundAmount(requestedAmount);
+        if (PaymentMethod != PaymentMethod.PayOS || PaymentStatus != PaymentStatus.Paid)
+            throw new DomainException("An incident refund is only allowed for a paid PayOS order.", "REFUND_NOT_ALLOWED");
 
         RowVersion++;
         return Refund.Request(Id, incidentId, RefundSourceType.Incident, reason, evidenceUrls, requestedAmount);
@@ -260,6 +267,18 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         if (requestedAmount <= 0 || requestedAmount > TotalFee)
             throw new DomainException(
                 $"The amount requested must be more than 0 and at most the order total ({TotalFee:0} VND).", "REFUND_AMOUNT_INVALID");
+    }
+
+    /// <summary>
+    /// DECISIONS B9: all refunds of an order add up to at most its total. <paramref name="alreadyClaimed"/> comes from the
+    /// refunds table (IRefundRepository.GetClaimedTotalForOrderAsync).
+    /// </summary>
+    public void EnsureRefundFits(decimal requestedAmount, decimal alreadyClaimed)
+    {
+        if (alreadyClaimed + requestedAmount > TotalFee)
+            throw new DomainException(
+                $"The refunds of this order cannot exceed its total: at most {Math.Max(0, TotalFee - alreadyClaimed):0} VND can still be requested.",
+                "REFUND_TOTAL_EXCEEDED");
     }
 
     /// <summary>
@@ -329,7 +348,7 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     /// full refund of what was paid online. From Arrived on, the goods are with the driver: the customer reports an
     /// incident and a Dispatcher decides (no refund). Returns the amount to refund (0 for unpaid or cash orders).
     /// </summary>
-    public decimal CancelByCustomer(long customerId, string reason, DateTimeOffset now)
+    public decimal CancelByCustomer(long customerId, string reason, DateTimeOffset now, string? reasonCode = null)
     {
         if (customerId != CustomerId)
             throw new DomainException("Only the customer who placed the order can cancel it.", "ORDER_NOT_YOURS");
@@ -339,6 +358,7 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
                 "ORDER_NOT_CANCELLABLE");
 
         Cancel(reason, ChangedByRole.Customer, customerId, now);
+        CancellationReasonCode = reasonCode;
         return PaymentStatus == PaymentStatus.Paid ? TotalFee : 0;
     }
 
@@ -367,6 +387,10 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         _statusHistories.Add(OrderStatusHistory.Create(from, OrderStatus.Accepted, ChangedByRole.Dispatcher, dispatcherId, note));
     }
 
+    /// <summary>
+    /// GB-23: delivered for 24 hours. An open complaint also holds the order (DECISIONS 7.3), but that needs the refunds
+    /// table, so the caller checks IRefundRepository.HasOpenComplaintAsync as well.
+    /// </summary>
     public bool CanBeAutoCompleted(DateTimeOffset now) =>
         OrderStatus == OrderStatus.Delivered && DeliveredAt is not null &&
         now - DeliveredAt >= BusinessRules.AutoCompleteAfterDelivery;

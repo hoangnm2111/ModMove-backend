@@ -236,6 +236,59 @@ public class UserAndCouponTests
         Assert.Equal(180_000m, refund.ProposedAmount);
     }
 
+    private static Refund OpenComplaint() => Refund.Request(1, null, RefundSourceType.Complaint, "Hàng vỡ", null, 100_000);
+
+    private static Refund ProposedComplaint()
+    {
+        var refund = OpenComplaint();
+        refund.Propose(50_000, "Một phần", 3);
+        return refund;
+    }
+
+    private static Refund ApprovedComplaint()
+    {
+        var refund = ProposedComplaint();
+        refund.Approve(4, Now);
+        return refund;
+    }
+
+    public static TheoryData<string, Func<Refund>, Action<Refund>> RefundChanges => new()
+    {
+        { "RequestMoreInfo", OpenComplaint, r => r.RequestMoreInfo("Chụp thêm ảnh") },
+        { "ReplyToInfoRequest", () => { var r = OpenComplaint(); r.RequestMoreInfo("Chụp thêm ảnh"); return r; }, r => r.ReplyToInfoRequest("Đây", null) },
+        { "Propose", OpenComplaint, r => r.Propose(50_000, "Một phần", 3) },
+        { "Approve", ProposedComplaint, r => r.Approve(4, Now) },
+        { "RejectRefund", OpenComplaint, r => r.RejectRefund(4, Now) },
+        { "MarkProcessed", ApprovedComplaint, r => r.MarkProcessed("BANK1", Now) },
+        { "MarkFailed", ApprovedComplaint, r => r.MarkFailed() },
+        { "Withdraw", OpenComplaint, r => r.Withdraw() },
+    };
+
+    [Theory]
+    [MemberData(nameof(RefundChanges))]
+    public void Every_refund_change_bumps_the_row_version(string _, Func<Refund> create, Action<Refund> change)
+    {
+        var refund = create();
+        var before = refund.RowVersion;
+
+        change(refund);
+
+        Assert.Equal(before + 1, refund.RowVersion);
+    }
+
+    [Fact]
+    public void Administrator_note_is_kept_on_approval_and_rejection_CUS23()
+    {
+        var approved = Refund.Request(1, null, RefundSourceType.Cancellation, "Khách hủy", null, 180_000);
+        var rejected = Refund.Request(2, null, RefundSourceType.Complaint, "Hàng vỡ", null, 100_000);
+
+        approved.Approve(adminId: 4, Now, "Đã đối chiếu giao dịch");
+        rejected.RejectRefund(adminId: 4, Now, "Ảnh không cho thấy hư hỏng");
+
+        Assert.Equal("Đã đối chiếu giao dịch", approved.DecisionNote);
+        Assert.Equal("Ảnh không cho thấy hư hỏng", rejected.DecisionNote);
+    }
+
     [Fact]
     public void Dispatcher_cannot_change_a_cancellation_refund_B9()
     {

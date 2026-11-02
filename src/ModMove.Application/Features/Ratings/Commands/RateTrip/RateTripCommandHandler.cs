@@ -1,8 +1,10 @@
+using System.Globalization;
 using ModMove.Application.Common;
 using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
+using ModMove.Application.Features.Orders;
 using ModMove.Domain.Entities;
 
 namespace ModMove.Application.Features.Ratings.Commands.RateTrip;
@@ -12,6 +14,8 @@ internal sealed class RateTripCommandHandler(
     IUserRepository users,
     IShippingOrderRepository orders,
     IRatingRepository ratings,
+    IDriverProfileRepository driverProfiles,
+    INotificationService notifications,
     IUnitOfWork unitOfWork,
     TimeProvider clock) : ICommandHandler<RateTripCommand, RateTripResponse>
 {
@@ -30,6 +34,11 @@ internal sealed class RateTripCommandHandler(
 
         ratings.Add(rating);
         await unitOfWork.SaveChangesAsync(cancellationToken); // a concurrent second rating hits the unique index: 409
+
+        var driverUserId = await driverProfiles.DriverUserIdAsync(order, cancellationToken);
+        await notifications.NotifyDriverAsync(driverUserId, order, "RATING_RECEIVED",
+            "Bạn có đánh giá mới", $"Khách đánh giá {rating.RatingStars} sao cho đơn {order.OrderCode}.", cancellationToken,
+            ("ratingId", rating.Id.ToString(CultureInfo.InvariantCulture)));
         return new RateTripResponse(rating.Id);
     }
 }

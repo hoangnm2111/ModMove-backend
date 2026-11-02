@@ -11,6 +11,8 @@ internal sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
     {
         builder.ToTable("refunds");
         builder.Property(r => r.Reason).HasMaxLength(1000);
+        builder.Property(r => r.ReasonCode).HasMaxLength(50); // master_data_items.code
+        builder.Property(r => r.DecisionNote).HasMaxLength(1000);
         builder.Property(r => r.EvidenceUrls).HasJsonList();
         builder.Property(r => r.RequestedAmount).HasPrecision(15, 2);
         builder.Property(r => r.ProposedAmount).HasPrecision(15, 2);
@@ -18,6 +20,7 @@ internal sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
         builder.Property(r => r.InfoRequestNote).HasMaxLength(1000);
         builder.Property(r => r.CustomerReply).HasMaxLength(1000); // DECISIONS 7.4
         builder.Property(r => r.BankReferenceCode).HasMaxLength(50);
+        builder.Property(r => r.RowVersion).IsConcurrencyToken();
 
         // "One open refund per (order, source)" and "one complaint per order" are checked by the
         // command handlers: MySQL has no partial unique index.

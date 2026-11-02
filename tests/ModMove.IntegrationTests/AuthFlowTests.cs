@@ -42,6 +42,44 @@ public class AuthFlowTests
         Assert.Matches("^[0-9]{6}$", app.Email.LastCode());
     }
 
+    [Fact]
+    public async Task Mail_failure_keeps_the_new_account_and_the_code_can_be_sent_again()
+    {
+        var app = new TestApp();
+        app.Email.Fail = true;
+
+        var result = await app.Sender.Send(RegisterCommand.From(Valid, UserRole.Customer));
+
+        Assert.Equal("an@example.com", result.Email);
+        Assert.Single(app.Users.Items);
+        Assert.Empty(app.Email.Sent);
+
+        app.Email.Fail = false;
+        await app.Sender.Send(new ResendOtpCommand(Valid.Email, OtpPurpose.Register));
+        Assert.Matches("^[0-9]{6}$", app.Email.LastCode());
+    }
+
+    [Fact]
+    public async Task Mail_failure_on_a_known_email_answers_like_an_unknown_one()
+    {
+        var app = await RegisteredAsync();
+        app.Email.Fail = true;
+
+        await app.Sender.Send(new ForgotPasswordCommand(Valid.Email));
+        await app.Sender.Send(new ResendOtpCommand(Valid.Email, OtpPurpose.Register));
+    }
+
+    [Fact]
+    public async Task Client_leaving_during_the_mail_is_not_logged_as_a_mail_failure()
+    {
+        var app = new TestApp();
+        app.Email.Fail = true;
+        using var left = new CancellationTokenSource();
+        app.UnitOfWork.AfterSave = left.Cancel;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => app.Sender.Send(RegisterCommand.From(Valid, UserRole.Customer), left.Token));
+    }
+
     [Theory]
     [InlineData(UserRole.Dispatcher)]
     [InlineData(UserRole.Administrator)]

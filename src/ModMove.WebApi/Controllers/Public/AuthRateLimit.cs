@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -7,11 +8,17 @@ namespace ModMove.WebApi.Controllers.Public;
 /// <summary>
 /// Per-IP fixed window for the anonymous auth endpoints. Without it, a 6-digit OTP (5-minute life) or a
 /// password could be guessed by sending requests fast; the GB-02 lock alone does not cover OTP checks.
+/// <see cref="UserPolicy"/> is the per-user version for signed-in endpoints that cost money or bother other people.
 /// </summary>
 public static class AuthRateLimit
 {
     public const string Policy = "auth";
+    public const string UserPolicy = "per-user";
     public const int PermitsPerMinute = 10;
+
+    /// <summary>One bucket per user per endpoint: customers behind one IP do not share it, and one endpoint does not use up another.</summary>
+    public static string UserPartitionKey(HttpContext http) =>
+        $"{http.User.FindFirstValue(ClaimTypes.NameIdentifier)}:{http.GetEndpoint()?.DisplayName}";
 
     // shortcut: keys on the connection IP; behind a reverse proxy, enable forwarded headers first or all clients share one bucket.
     public static IServiceCollection AddAuthRateLimit(this IServiceCollection services) =>
@@ -19,6 +26,10 @@ public static class AuthRateLimit
         {
             options.AddPolicy(Policy, http => RateLimitPartition.GetFixedWindowLimiter(
                 http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = PermitsPerMinute, Window = TimeSpan.FromMinutes(1) }));
+
+            options.AddPolicy(UserPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
+                UserPartitionKey(http),
                 _ => new FixedWindowRateLimiterOptions { PermitLimit = PermitsPerMinute, Window = TimeSpan.FromMinutes(1) }));
 
             // Same error shape as every other error (ProblemDetails + stable code).

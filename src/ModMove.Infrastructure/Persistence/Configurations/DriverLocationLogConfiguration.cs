@@ -13,6 +13,7 @@ internal sealed class DriverLocationLogConfiguration : IEntityTypeConfiguration<
         builder.Property(l => l.Longitude).HasPrecision(9, 6);
 
         builder.HasIndex(l => new { l.OrderId, l.RecordedAt });
+        builder.HasIndex(l => l.RecordedAt); // JOB-GPS-01 deletes by age
 
         builder.HasOne<DriverProfile>().WithMany().HasForeignKey(l => l.DriverProfileId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<ShippingOrder>().WithMany().HasForeignKey(l => l.OrderId).OnDelete(DeleteBehavior.Restrict);

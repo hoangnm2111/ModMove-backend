@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
@@ -12,6 +13,7 @@ internal sealed class ResendOtpCommandHandler(
     IUnitOfWork unitOfWork,
     IPasswordHasher passwordHasher,
     IEmailSender emailSender,
+    ILogger<ResendOtpCommandHandler> logger,
     TimeProvider clock) : ICommandHandler<ResendOtpCommand>
 {
     public async Task Handle(ResendOtpCommand request, CancellationToken cancellationToken)
@@ -34,6 +36,6 @@ internal sealed class ResendOtpCommandHandler(
             return; // GB-25 limit reached: send nothing, answer like an unknown email (no 422 that would reveal the account)
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        await AuthRules.SendOtpAsync(emailSender, email, code, request.Purpose, cancellationToken);
+        await AuthRules.SendOtpAsync(emailSender, email, code, request.Purpose, logger, cancellationToken);
     }
 }

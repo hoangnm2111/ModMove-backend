@@ -3,6 +3,7 @@ using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
+using ModMove.Application.Features.MasterData.Queries.GetPublicContent;
 using ModMove.Domain.Entities;
 
 namespace ModMove.Application.Features.Refunds.Commands.SubmitComplaint;
@@ -12,6 +13,7 @@ internal sealed class SubmitComplaintCommandHandler(
     IUserRepository users,
     IShippingOrderRepository orders,
     IRefundRepository refunds,
+    IMasterDataRepository masterData,
     INotificationService notifications,
     IUnitOfWork unitOfWork,
     TimeProvider clock) : ICommandHandler<SubmitComplaintCommand, RefundCreatedResponse>
@@ -22,11 +24,15 @@ internal sealed class SubmitComplaintCommandHandler(
         var order = await orders.GetByIdAsync(request.OrderId, cancellationToken)
             ?? throw new NotFoundException(nameof(ShippingOrder), request.OrderId);
 
-        // ORDER_NOT_YOURS, COMPLAINT_WINDOW_CLOSED, REFUND_AMOUNT_INVALID come from the order.
+        var choice = await masterData.RequireActiveAsync(
+            PublicContentCategories.ComplaintReason, request.ReasonCode, nameof(request.ReasonCode), cancellationToken);
+
+        // ORDER_NOT_YOURS, COMPLAINT_WINDOW_CLOSED, REFUND_AMOUNT_INVALID, REFUND_TOTAL_EXCEEDED come from the order.
         var refund = order.FileComplaint(
-            customer.Id, request.Reason.Trim(), request.EvidenceUrls, request.RequestedAmount, clock.GetUtcNow());
+            customer.Id, choice.ReasonText(request.Reason), request.EvidenceUrls, request.RequestedAmount, clock.GetUtcNow(), choice.Code);
         if (await refunds.HasOpenComplaintAsync(order.Id, cancellationToken))
             throw new ConflictException("This order already has an open complaint.");
+        order.EnsureRefundFits(request.RequestedAmount, await refunds.GetClaimedTotalForOrderAsync(order.Id, cancellationToken));
 
         refunds.Add(refund);
         await unitOfWork.SaveChangesAsync(cancellationToken); // a concurrent second complaint fails on RowVersion: 409

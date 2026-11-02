@@ -4,6 +4,7 @@ using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
+using ModMove.Application.Features.Orders;
 using ModMove.Domain.Entities;
 
 namespace ModMove.Application.Features.Incidents.Commands.ReportIncidentByCustomer;
@@ -13,6 +14,7 @@ internal sealed class ReportIncidentByCustomerCommandHandler(
     IUserRepository users,
     IShippingOrderRepository orders,
     IRepository<InTransitIncident> incidents,
+    IDriverProfileRepository driverProfiles,
     INotificationService notifications,
     IUnitOfWork unitOfWork) : ICommandHandler<ReportIncidentByCustomerCommand, IncidentCreatedResponse>
 {
@@ -35,6 +37,12 @@ internal sealed class ReportIncidentByCustomerCommandHandler(
                 ["incidentId"] = incident.Id.ToString(CultureInfo.InvariantCulture),
                 ["orderId"] = order.Id.ToString(CultureInfo.InvariantCulture),
             }), cancellationToken);
+
+        var driverUserId = await driverProfiles.DriverUserIdAsync(order, cancellationToken);
+        // The report may be about the driver, so the customer's words go to Dispatchers only.
+        await notifications.NotifyDriverAsync(driverUserId, order, "INCIDENT_REPORTED",
+            $"Khách báo sự cố đơn {order.OrderCode}", "Điều phối viên sẽ xử lý và liên hệ khi cần.", cancellationToken,
+            ("incidentId", incident.Id.ToString(CultureInfo.InvariantCulture)));
         return new IncidentCreatedResponse(incident.Id);
     }
 }

@@ -31,8 +31,8 @@ public sealed class DriverWallet : BaseAuditableEntity, IAggregateRoot
 
     /// <summary>
     /// GB-16: the deposit covers both <paramref name="minDeposit"/> (the MIN_COD_DEPOSIT setting) and the commission of
-    /// this order (<see cref="ShippingOrder.CommissionFor"/>), so <see cref="DeductCommissionFromDeposit"/> cannot fail
-    /// at completion. The same check applies to a driver taking over the order (DECISIONS 7.2).
+    /// this order (<see cref="ShippingOrder.CommissionFor"/>). The wallet only decides whether a driver may take a cash
+    /// order, never whether a finished one completes. The same check applies to a driver taking over the order (DECISIONS 7.2).
     /// </summary>
     public bool CanReceiveCod(decimal minDeposit, decimal orderCommission) =>
         WalletStatus == WalletStatus.Active && DepositBalance >= minDeposit && DepositBalance >= orderCommission;
@@ -47,10 +47,9 @@ public sealed class DriverWallet : BaseAuditableEntity, IAggregateRoot
         return Record(WalletTransactionType.TopUpDeposit, null, amount, DepositBalance, WalletTransactionStatus.Completed);
     }
 
-    /// <summary>Online-paid trip: the driver earns the fare minus the platform commission (GB-14).</summary>
+    /// <summary>Online-paid trip: the driver earns the fare minus the platform commission (GB-14). The trip is done, so a frozen wallet still settles.</summary>
     public WalletTransaction CreditTripEarning(long orderId, decimal fare, decimal commission)
     {
-        EnsureActive();
         EnsurePositive(fare);
         if (commission < 0 || commission > fare)
             throw new DomainException("Commission must be between 0 and the fare.");
@@ -59,25 +58,36 @@ public sealed class DriverWallet : BaseAuditableEntity, IAggregateRoot
         return Record(WalletTransactionType.TripEarning, orderId, fare - commission, EarningsBalance, WalletTransactionStatus.Completed);
     }
 
-    /// <summary>Cash trip: commission is taken from the deposit (GB-15).</summary>
+    /// <summary>
+    /// Cash trip: commission is taken from the deposit (GB-15). The customer must never be blocked by the driver's wallet, so
+    /// the deposit may go negative; the driver then cannot take cash orders until topping up (GB-16).
+    /// </summary>
     public WalletTransaction DeductCommissionFromDeposit(long orderId, decimal commission)
     {
-        EnsureActive();
         EnsurePositive(commission);
-        if (DepositBalance < commission)
-            throw new DomainException("The deposit is not enough to cover the commission.");
 
         DepositBalance -= commission;
         return Record(WalletTransactionType.CommissionDeduction, orderId, commission, DepositBalance, WalletTransactionStatus.Completed);
     }
 
-    /// <summary>UC-DRV-22: the amount is held at once; an Administrator pays it out manually (GB-27).</summary>
+    /// <summary>
+    /// UC-DRV-22: the amount is held at once; an Administrator pays it out manually (GB-27). Commission owed on a negative
+    /// deposit is paid from earnings first (5.1). A rejected withdrawal gives back the amount only; the debt stays paid.
+    /// </summary>
     public WalletTransaction RequestWithdrawal(decimal amount)
     {
         EnsureActive();
         EnsurePositive(amount);
-        if (EarningsBalance < amount)
-            throw new DomainException("The earnings balance is not enough for this withdrawal.");
+        var debt = Math.Max(0, -DepositBalance);
+        if (EarningsBalance - debt < amount)
+            throw new DomainException("The earnings balance, after the commission owed on the deposit, is not enough for this withdrawal.");
+
+        if (debt > 0)
+        {
+            EarningsBalance -= debt;
+            DepositBalance = 0;
+            Record(WalletTransactionType.CommissionDebtPaid, null, debt, DepositBalance, WalletTransactionStatus.Completed);
+        }
 
         EarningsBalance -= amount;
         return Record(WalletTransactionType.WithdrawEarnings, null, amount, EarningsBalance, WalletTransactionStatus.Pending);
