@@ -241,4 +241,29 @@ public class DriverWalletTests
         Assert.Equal((0m, 50_000m), (wallet.EarningsBalance, wallet.DepositBalance));
         Assert.DoesNotContain(wallet.Transactions, t => t.TransactionType == WalletTransactionType.CommissionDebtPaid);
     }
+
+    [Fact]
+    public void Payment_transaction_mark_paid_is_idempotent()
+    {
+        var tx = PaymentTransaction.ForOrderViaPayOs(10, 180_000, 123456, "https://pay.payos.vn/web/1", Now);
+
+        Assert.True(tx.MarkPaid(Now.AddMinutes(1)));
+        Assert.Equal(PaymentTransactionStatus.Paid, tx.TransactionStatus);
+        Assert.Equal(Now.AddMinutes(1), tx.PaidAt);
+
+        Assert.False(tx.MarkPaid(Now.AddMinutes(5)));
+        Assert.Equal(Now.AddMinutes(1), tx.PaidAt);
+    }
+
+    [Fact]
+    public void Payment_transaction_expires_after_10_minutes_only_while_pending_GB13()
+    {
+        var tx = PaymentTransaction.ForDeposit(1, 100_000, 123456, "https://pay.payos.vn/web/1", Now);
+
+        Assert.False(tx.ExpireIfDue(Now.AddMinutes(9).AddSeconds(59)));
+        Assert.True(tx.ExpireIfDue(Now.AddMinutes(10)));
+        Assert.Equal(PaymentTransactionStatus.Expired, tx.TransactionStatus);
+        Assert.False(tx.ExpireIfDue(Now.AddMinutes(11))); // already Expired
+        Assert.False(tx.MarkPaid(Now.AddMinutes(11))); // Expired cannot become Paid
+    }
 }
