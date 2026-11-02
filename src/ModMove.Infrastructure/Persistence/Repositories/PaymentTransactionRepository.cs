@@ -1,0 +1,21 @@
+using Microsoft.EntityFrameworkCore;
+using ModMove.Application.Common.Interfaces.Persistence;
+using ModMove.Domain.Entities;
+using ModMove.Domain.Enums;
+
+namespace ModMove.Infrastructure.Persistence.Repositories;
+
+public sealed class PaymentTransactionRepository(ApplicationDbContext dbContext)
+    : Repository<PaymentTransaction>(dbContext), IPaymentTransactionRepository
+{
+    public async Task<IReadOnlyList<PaymentTransaction>> GetPendingPayOsForOrderAsync(long orderId, CancellationToken cancellationToken = default) =>
+        await Set
+            .Where(p => p.OrderId == orderId
+                && p.PaymentMethod == PaymentMethod.PayOS
+                && p.TransactionStatus == PaymentTransactionStatus.Pending)
+            .ToListAsync(cancellationToken);
+
+    public Task<PaymentTransaction?> GetByPayOsOrderCodeAsync(long payosOrderCode, CancellationToken cancellationToken = default) =>
+        Set.FirstOrDefaultAsync(p => p.PayosOrderCode == payosOrderCode, cancellationToken);
+}
+

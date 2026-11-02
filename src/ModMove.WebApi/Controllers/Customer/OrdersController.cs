@@ -7,6 +7,7 @@ using ModMove.Application.Features.Orders.Commands.ReviewPickupEvidence;
 using ModMove.Application.Features.Orders.Commands.CreateOrder;
 using ModMove.Application.Features.Orders.Queries.GetMyOrderDetail;
 using ModMove.Application.Features.Orders.Queries.GetMyOrders;
+using ModMove.Application.Features.Payments.Commands.CreateOrderPayment;
 using ModMove.Application.Features.Tracking.Queries.GetOrderTracking;
 using ModMove.WebApi.Controllers.Public;
 
@@ -44,6 +45,19 @@ public sealed class OrdersController : ApiControllerBase
     {
         await Sender.Send(new CancelOrderCommand(id, request.ReasonCode, request.Reason), cancellationToken);
         return NoContent();
+    }
+
+    /// <summary>
+    /// Start the PayOS payment of an order, or get a new code after the old one expired (UC-CUS-27, DECISIONS 3.1): a link and QR valid
+    /// 10 minutes. The server picks the return URL from <c>platform</c> (Web | App). Only the PayOS webhook marks the order paid.
+    /// Each call asks PayOS for a link, so it is limited per user.
+    /// </summary>
+    [HttpPost("{id:long}/payment")]
+    [EnableRateLimiting(AuthRateLimit.UserPolicy)]
+    public async Task<IActionResult> CreatePayment(long id, CreateOrderPaymentRequest request, CancellationToken cancellationToken)
+    {
+        var result = await Sender.Send(new CreateOrderPaymentCommand(id, request.Platform), cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
     }
 
     /// <summary>Approve the driver's pickup photos (the trip starts) or reject them with a reason (UC-CUS-12, GB-26).</summary>

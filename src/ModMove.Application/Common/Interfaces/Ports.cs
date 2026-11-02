@@ -9,6 +9,13 @@ public sealed record RouteInfo(decimal DistanceKm, int DurationMinutes);
 
 public sealed record PaymentLink(string CheckoutUrl, string? QrCode);
 
+/// <summary>Where the customer pays from: decides which return URL PayOS sends them back to (DECISIONS 3.1).</summary>
+public enum PaymentPlatform
+{
+    Web,
+    App,
+}
+
 /// <summary>Cloudinary. Returns the public URL stored in the database (GB-06: JPG/PNG, at most 5 MB).</summary>
 public interface IFileStorage
 {
@@ -32,11 +39,23 @@ public interface IPushNotificationService
         IReadOnlyDictionary<string, string>? data, CancellationToken cancellationToken);
 }
 
-/// <summary>PayOS: payment link/QR and webhook signature check (HMAC-SHA256).</summary>
+/// <summary>PayOS: payment link/QR, cancelling a link, and the webhook signature check (HMAC-SHA256).</summary>
 public interface IPaymentGateway
 {
+    /// <summary>
+    /// A link and QR for <paramref name="amount"/> that PayOS stops accepting at <paramref name="expiresAt"/> (GB-13).
+    /// The adapter picks the return and cancel URLs from configuration by <paramref name="platform"/> (DECISIONS 3.1):
+    /// the client never sends a URL.
+    /// </summary>
     Task<PaymentLink> CreatePaymentLinkAsync(
-        long payosOrderCode, decimal amount, string description, CancellationToken cancellationToken);
+        long payosOrderCode, decimal amount, string description, PaymentPlatform platform,
+        DateTimeOffset expiresAt, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Best effort: asks PayOS to stop accepting an older code once a new one replaced it. A failure is only logged,
+    /// because a transfer that still arrives on the old code is reconciled by the webhook.
+    /// </summary>
+    Task CancelPaymentLinkAsync(long payosOrderCode, CancellationToken cancellationToken);
 
     bool VerifyWebhookSignature(string rawBody, string signature);
 }

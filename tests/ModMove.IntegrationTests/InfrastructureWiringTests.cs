@@ -94,6 +94,7 @@ public class InfrastructureWiringTests
 
     [Theory]
     [InlineData(typeof(ModMove.WebApi.Controllers.Customer.OrdersController), nameof(ModMove.WebApi.Controllers.Customer.OrdersController.GetTracking))]
+    [InlineData(typeof(ModMove.WebApi.Controllers.Customer.OrdersController), nameof(ModMove.WebApi.Controllers.Customer.OrdersController.CreatePayment))]
     [InlineData(typeof(ModMove.WebApi.Controllers.Customer.IncidentsController), nameof(ModMove.WebApi.Controllers.Customer.IncidentsController.Report))]
     public void Costly_customer_endpoints_are_rate_limited_per_user(Type controller, string action) =>
         Assert.Equal(AuthRateLimit.UserPolicy, controller.GetMethod(action)!.GetCustomAttribute<EnableRateLimitingAttribute>()?.PolicyName);
