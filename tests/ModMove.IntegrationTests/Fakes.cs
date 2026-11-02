@@ -127,6 +127,49 @@ internal sealed class InMemoryRepository<T> : IRepository<T> where T : ModMove.D
     public void Remove(T aggregate) => Items.Remove(aggregate);
 }
 
+/// <summary>The list entries the customer commands choose from, as ReferenceDataSeeder loads them.</summary>
+internal sealed class InMemoryMasterData : IMasterDataRepository
+{
+    public List<MasterDataItem> Items { get; } =
+    [
+        MasterDataItem.Create("CARGO_TYPE", "FURNITURE", "Đồ nội thất"),
+        MasterDataItem.Create("COMPLAINT_REASON", "DAMAGED_CARGO", "Hàng bị hư hỏng"),
+        MasterDataItem.Create("COMPLAINT_REASON", "OTHER", "Khác"),
+        MasterDataItem.Create("CANCELLATION_REASON", "CHANGED_PLAN", "Thay đổi kế hoạch"),
+        MasterDataItem.Create("CANCELLATION_REASON", "OTHER", "Khác"),
+    ];
+
+    public Task<MasterDataItem?> GetActiveAsync(string category, string code, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(i => i.Category == category && SameAsMySql(i.Code, code) && i.IsActive));
+
+    // utf8mb4_unicode_ci ignores case and accents.
+    private static bool SameAsMySql(string left, string right) =>
+        System.Globalization.CultureInfo.InvariantCulture.CompareInfo.Compare(
+            left, right, System.Globalization.CompareOptions.IgnoreCase | System.Globalization.CompareOptions.IgnoreNonSpace) == 0;
+
+    public Task<MasterDataItem?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(i => i.Id == id));
+
+    public void Add(MasterDataItem aggregate) => Items.Add(aggregate);
+    public void Update(MasterDataItem aggregate) { }
+    public void Remove(MasterDataItem aggregate) => Items.Remove(aggregate);
+}
+
+internal sealed class InMemoryLocationLogs : IDriverLocationLogRepository
+{
+    public List<DriverLocationLog> Items { get; } = [];
+
+    public Task<int> DeleteRecordedBeforeAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.RemoveAll(l => l.RecordedAt < cutoff));
+
+    public Task<DriverLocationLog?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(l => l.Id == id));
+
+    public void Add(DriverLocationLog aggregate) => Items.Add(aggregate);
+    public void Update(DriverLocationLog aggregate) { }
+    public void Remove(DriverLocationLog aggregate) => Items.Remove(aggregate);
+}
+
 internal sealed class InMemoryRefunds : IRefundRepository
 {
     public List<Refund> Items { get; } = [];
@@ -414,7 +457,8 @@ internal sealed class TestApp
     public InMemoryDriverWallets DriverWallets { get; } = new();
     public InMemoryRatings Ratings { get; } = new();
     public InMemoryRepository<InTransitIncident> Incidents { get; } = new();
-    public InMemoryRepository<DriverLocationLog> LocationLogs { get; } = new();
+    public InMemoryLocationLogs LocationLogs { get; } = new();
+    public InMemoryMasterData MasterData { get; } = new();
     public CapturingRealtimeNotifier Realtime { get; } = new();
     public CapturingPushNotifications Push { get; } = new();
     public CountingUnitOfWork UnitOfWork { get; } = new();
@@ -454,6 +498,8 @@ internal sealed class TestApp
             .AddSingleton<IRatingRepository>(Ratings)
             .AddSingleton<IRepository<InTransitIncident>>(Incidents)
             .AddSingleton<IRepository<DriverLocationLog>>(LocationLogs)
+            .AddSingleton<IDriverLocationLogRepository>(LocationLogs)
+            .AddSingleton<IMasterDataRepository>(MasterData)
             .AddSingleton<IRealtimeNotifier>(Realtime)
             .AddSingleton<IPushNotificationService>(Push)
             .AddSingleton<IUnitOfWork>(UnitOfWork)

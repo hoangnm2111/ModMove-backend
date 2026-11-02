@@ -237,6 +237,19 @@ public class UserAndCouponTests
     }
 
     [Fact]
+    public void Administrator_note_is_kept_on_approval_and_rejection_CUS23()
+    {
+        var approved = Refund.Request(1, null, RefundSourceType.Cancellation, "Khách hủy", null, 180_000);
+        var rejected = Refund.Request(2, null, RefundSourceType.Complaint, "Hàng vỡ", null, 100_000);
+
+        approved.Approve(adminId: 4, Now, "Đã đối chiếu giao dịch");
+        rejected.RejectRefund(adminId: 4, Now, "Ảnh không cho thấy hư hỏng");
+
+        Assert.Equal("Đã đối chiếu giao dịch", approved.DecisionNote);
+        Assert.Equal("Ảnh không cho thấy hư hỏng", rejected.DecisionNote);
+    }
+
+    [Fact]
     public void Dispatcher_cannot_change_a_cancellation_refund_B9()
     {
         var refund = Refund.Request(1, null, RefundSourceType.Cancellation, "Khách hủy khi Accepted", null, 180_000);

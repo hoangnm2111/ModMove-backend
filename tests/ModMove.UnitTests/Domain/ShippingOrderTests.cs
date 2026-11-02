@@ -481,6 +481,24 @@ public class ShippingOrderTests
     }
 
     [Fact]
+    public void Complaint_keeps_the_reason_code_from_the_list()
+    {
+        var refund = DeliveredOrder().FileComplaint(1, "Hàng bị hư hỏng", null, 100_000, Now, "DAMAGED_CARGO");
+
+        Assert.Equal(("DAMAGED_CARGO", "Hàng bị hư hỏng"), (refund.ReasonCode, refund.Reason));
+    }
+
+    [Fact]
+    public void Customer_cancellation_keeps_the_reason_code_from_the_list()
+    {
+        var order = NewOrder();
+
+        order.CancelByCustomer(1, "Thay đổi kế hoạch", Now, "CHANGED_PLAN");
+
+        Assert.Equal(("CHANGED_PLAN", "Thay đổi kế hoạch"), (order.CancellationReasonCode, order.CancellationReason));
+    }
+
+    [Fact]
     public void Complaint_after_24_hours_or_before_delivery_is_refused_7_3()
     {
         var late = Assert.Throws<DomainException>(() => DeliveredOrder().FileComplaint(1, "x", null, 1_000, Now.AddHours(24)));

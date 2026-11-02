@@ -17,12 +17,23 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
     public long? IncidentId { get; private set; }
     public RefundSourceType SourceType { get; private set; }
     public string Reason { get; private set; } = null!;
+
+    /// <summary>The list code behind <see cref="Reason"/> (COMPLAINT_REASON or CANCELLATION_REASON); null for an incident refund.</summary>
+    public string? ReasonCode { get; private set; }
+
     public List<string>? EvidenceUrls { get; private set; }
     public decimal RequestedAmount { get; private set; }
     public decimal? ProposedAmount { get; private set; }
+
+    /// <summary>The Dispatcher's internal note for the Administrator; never shown to the customer.</summary>
     public string? ProposalReason { get; private set; }
+
     public long? ProposedBy { get; private set; }
     public long? ApprovedBy { get; private set; }
+
+    /// <summary>UC-CUS-23: the Administrator's reason, which the customer sees.</summary>
+    public string? DecisionNote { get; private set; }
+
     public string? InfoRequestNote { get; private set; }
 
     /// <summary>The customer's answer to <see cref="InfoRequestNote"/> (UC-DIS-14, DECISIONS 7.4).</summary>
@@ -39,13 +50,14 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
     /// </summary>
     public static Refund Request(
         long orderId, long? incidentId, RefundSourceType source, string reason,
-        IEnumerable<string>? evidenceUrls, decimal requestedAmount) =>
+        IEnumerable<string>? evidenceUrls, decimal requestedAmount, string? reasonCode = null) =>
         new()
         {
             OrderId = orderId,
             IncidentId = incidentId,
             SourceType = source,
             Reason = reason,
+            ReasonCode = reasonCode,
             EvidenceUrls = evidenceUrls?.ToList(),
             RequestedAmount = requestedAmount,
             ProposedAmount = source == RefundSourceType.Cancellation ? requestedAmount : null,
@@ -90,7 +102,7 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
         ProposedBy = dispatcherId;
     }
 
-    public void Approve(long adminId, DateTimeOffset now)
+    public void Approve(long adminId, DateTimeOffset now, string? note = null)
     {
         EnsureStatus(RefundStatus.Requested);
         if (ProposedAmount is null)
@@ -99,14 +111,16 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
         RefundStatus = RefundStatus.Approved;
         ApprovedBy = adminId;
         DecidedAt = now;
+        DecisionNote = note;
     }
 
-    public void RejectRefund(long adminId, DateTimeOffset now)
+    public void RejectRefund(long adminId, DateTimeOffset now, string? note = null)
     {
         EnsureStatus(RefundStatus.Requested);
         RefundStatus = RefundStatus.Rejected;
         ApprovedBy = adminId;
         DecidedAt = now;
+        DecisionNote = note;
     }
 
     public void MarkProcessed(string bankReferenceCode, DateTimeOffset now)
