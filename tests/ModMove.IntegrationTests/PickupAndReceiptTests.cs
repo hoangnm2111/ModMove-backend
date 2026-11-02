@@ -175,6 +175,97 @@ public class ReviewPickupEvidenceTests
 public class ConfirmReceiptTests
 {
     [Fact]
+    public async Task Open_complaint_holds_the_order_until_it_closes_7_3()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+        var complaint = order.FileComplaint(s.Customer.Id, "Hàng vỡ", null, 100_000, TripSetup.Now);
+        s.App.Refunds.Add(complaint);
+
+        var error = await Assert.ThrowsAsync<DomainException>(() => s.App.Sender.Send(new ConfirmReceiptCommand(order.Id)));
+
+        Assert.Equal("COMPLAINT_OPEN", error.Code);
+        Assert.Equal(OrderStatus.Delivered, order.OrderStatus);
+        Assert.Equal(0m, s.Wallet.EarningsBalance);
+        Assert.Equal(0, s.App.UnitOfWork.Saves);
+    }
+
+    [Fact]
+    public async Task Approved_complaint_still_holds_the_order_7_3()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+        var complaint = order.FileComplaint(s.Customer.Id, "Hàng vỡ", null, 100_000, TripSetup.Now);
+        s.App.Refunds.Add(complaint);
+        complaint.Propose(50_000, "Một phần", 1);
+        complaint.Approve(1, TripSetup.Now);
+
+        var error = await Assert.ThrowsAsync<DomainException>(() => s.App.Sender.Send(new ConfirmReceiptCommand(order.Id)));
+
+        Assert.Equal("COMPLAINT_OPEN", error.Code);
+    }
+
+    [Fact]
+    public async Task Someone_elses_order_says_nothing_about_its_complaint_C10()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered(customerId: s.Other.Id);
+        s.App.Refunds.Add(order.FileComplaint(s.Other.Id, "Hàng vỡ", null, 100_000, TripSetup.Now));
+
+        var error = await Assert.ThrowsAsync<DomainException>(() => s.App.Sender.Send(new ConfirmReceiptCommand(order.Id)));
+
+        Assert.Equal("ORDER_NOT_YOURS", error.Code);
+    }
+
+    [Theory]
+    [InlineData("Withdrawn")]
+    [InlineData("Rejected")]
+    [InlineData("Processed")]
+    [InlineData("Failed")]
+    public async Task Order_completes_once_the_complaint_is_closed_7_3(string outcome)
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+        var complaint = order.FileComplaint(s.Customer.Id, "Hàng vỡ", null, 100_000, TripSetup.Now);
+        s.App.Refunds.Add(complaint);
+        switch (outcome)
+        {
+            case "Withdrawn":
+                complaint.Withdraw();
+                break;
+            case "Rejected":
+                complaint.RejectRefund(1, TripSetup.Now);
+                break;
+            default:
+                complaint.Propose(50_000, "Một phần", 1);
+                complaint.Approve(1, TripSetup.Now);
+                if (outcome == "Processed")
+                    complaint.MarkProcessed("BANK1", TripSetup.Now);
+                else
+                    complaint.MarkFailed();
+                break;
+        }
+
+        await s.App.Sender.Send(new ConfirmReceiptCommand(order.Id));
+
+        Assert.Equal(OrderStatus.Completed, order.OrderStatus);
+    }
+
+    [Fact]
+    public async Task Driver_wallet_never_blocks_the_customer_GB15()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered(method: PaymentMethod.Cash);
+        typeof(DriverWallet).GetProperty("DepositBalance")!.SetValue(s.Wallet, 1_000m);
+        typeof(DriverWallet).GetProperty("WalletStatus")!.SetValue(s.Wallet, WalletStatus.Frozen);
+
+        await s.App.Sender.Send(new ConfirmReceiptCommand(order.Id));
+
+        Assert.Equal(OrderStatus.Completed, order.OrderStatus);
+        Assert.Equal(-17_000m, s.Wallet.DepositBalance); // 1,000 − 18,000 commission
+    }
+
+    [Fact]
     public async Task PayOS_order_completes_and_the_driver_earns_the_fare_minus_commission_M1()
     {
         var s = new TripSetup();

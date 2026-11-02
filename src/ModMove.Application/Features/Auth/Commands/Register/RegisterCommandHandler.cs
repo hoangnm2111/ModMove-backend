@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
@@ -13,6 +14,7 @@ internal sealed class RegisterCommandHandler(
     IUnitOfWork unitOfWork,
     IPasswordHasher passwordHasher,
     IEmailSender emailSender,
+    ILogger<RegisterCommandHandler> logger,
     TimeProvider clock) : ICommandHandler<RegisterCommand, RegisterResponse>
 {
     public async Task<RegisterResponse> Handle(RegisterCommand request, CancellationToken cancellationToken)
@@ -31,7 +33,7 @@ internal sealed class RegisterCommandHandler(
         otps.Add(OtpVerification.Issue(email, OtpPurpose.Register, passwordHasher.Hash(code), clock.GetUtcNow()));
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        await AuthRules.SendOtpAsync(emailSender, email, code, OtpPurpose.Register, cancellationToken);
+        await AuthRules.SendOtpAsync(emailSender, email, code, OtpPurpose.Register, logger, cancellationToken);
 
         return new RegisterResponse(user.Id, email);
     }

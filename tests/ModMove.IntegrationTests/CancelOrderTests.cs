@@ -99,6 +99,21 @@ public class CancelOrderTests
     }
 
     [Fact]
+    public async Task The_driver_is_told_even_when_the_customer_disconnects_right_after_the_save()
+    {
+        var s = Build();
+        var order = AddOrder(s, s.Customer.Id);
+        order.Accept(s.Profile.Id, s.Driver.Id, Now);
+        using var disconnect = new CancellationTokenSource();
+        s.App.UnitOfWork.AfterSave = disconnect.Cancel;
+
+        await s.App.Sender.Send(Cancel(order), disconnect.Token);
+
+        var sent = Assert.Single(s.App.Realtime.Sent, x => x.EventName == RealtimeEvents.NotificationReceived);
+        Assert.Equal("ORDER_CANCELLED", Assert.IsType<Notification>(sent.Payload).Type);
+    }
+
+    [Fact]
     public async Task Paid_order_already_accepted_is_refunded_and_the_driver_told()
     {
         var s = Build();
