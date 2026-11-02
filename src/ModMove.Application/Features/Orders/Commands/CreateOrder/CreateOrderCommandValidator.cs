@@ -1,4 +1,5 @@
 using FluentValidation;
+using ModMove.Application.Common;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Features.Auth;
 using ModMove.Domain.Constants;
@@ -28,7 +29,7 @@ internal sealed class CreateOrderCommandValidator : AbstractValidator<CreateOrde
         RuleFor(x => x.Cargo).NotNull();
         When(x => x.Cargo is not null, () =>
         {
-            RuleFor(x => x.Cargo.CargoType).NotEmpty().MaximumLength(50);
+            RuleFor(x => x.Cargo.CargoType).NotEmpty().MaximumLength(MasterDataChoice.MaxCodeLength);
             RuleFor(x => x.Cargo.Quantity).GreaterThan(0);
             RuleFor(x => x.Cargo.WeightKg).GreaterThan(0).LessThanOrEqualTo(100_000);
             RuleFor(x => x.Cargo.LengthCm).InclusiveBetween(1, 2_000);

@@ -18,7 +18,6 @@ public sealed class User : BaseAuditableEntity, IAggregateRoot
     public bool EmailVerified { get; private set; }
     public int FailedLoginCount { get; private set; }
     public DateTimeOffset? LockedUntil { get; private set; }
-    public string? AvatarUrl { get; private set; }
     public string? FcmToken { get; private set; }
 
     public static User Create(string fullName, string phoneNumber, string email, string passwordHash, UserRole role, bool emailVerified = false) =>
@@ -57,11 +56,10 @@ public sealed class User : BaseAuditableEntity, IAggregateRoot
 
     public void ChangePassword(string passwordHash) => PasswordHash = passwordHash;
 
-    public void UpdateProfile(string fullName, string phoneNumber, string? avatarUrl)
+    public void UpdateProfile(string fullName, string phoneNumber)
     {
         FullName = fullName;
         PhoneNumber = phoneNumber;
-        AvatarUrl = avatarUrl;
     }
 
     public void SetFcmToken(string? token) => FcmToken = token;

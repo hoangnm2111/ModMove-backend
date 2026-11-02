@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ModMove.Application.Common.Models;
 using ModMove.Application.Features.Incidents.Commands.ReportIncidentByCustomer;
 using ModMove.Application.Features.Incidents.Queries.GetMyIncidents;
+using ModMove.WebApi.Controllers.Public;
 
 namespace ModMove.WebApi.Controllers.Customer;
 
@@ -13,8 +15,9 @@ public sealed class IncidentsController : ApiControllerBase
     public Task<PagedResult<MyIncidentResponse>> GetMine([FromQuery] GetMyIncidentsQuery query, CancellationToken cancellationToken) =>
         Sender.Send(query, cancellationToken);
 
-    /// <summary>Report a problem while the driver has your order (Arrived, PickedUp, InTransit).</summary>
+    /// <summary>Report a problem while the driver has your order (Arrived, PickedUp, InTransit). Each one notifies people, so it is limited per user.</summary>
     [HttpPost]
+    [EnableRateLimiting(AuthRateLimit.UserPolicy)]
     public async Task<IActionResult> Report(ReportIncidentByCustomerCommand command, CancellationToken cancellationToken)
     {
         var result = await Sender.Send(command, cancellationToken);

@@ -13,7 +13,6 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.PhoneNumber).HasMaxLength(15);
         builder.Property(u => u.Email).HasMaxLength(100);
         builder.Property(u => u.PasswordHash).HasMaxLength(60);
-        builder.Property(u => u.AvatarUrl).HasMaxLength(500);
         builder.Property(u => u.FcmToken).HasMaxLength(255);
 
         // GB-02: parallel wrong-password requests must not overwrite each other's count (lost update).

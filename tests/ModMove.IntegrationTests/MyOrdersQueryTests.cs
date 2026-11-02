@@ -362,6 +362,17 @@ public class MyOrdersQueryTests
     }
 
     [Fact]
+    public async Task Cancelled_order_has_no_payment_so_it_cannot_be_paid_any_more()
+    {
+        var db = new Db { Payment = PaymentRows("Pending", Now.AddMinutes(5)) };
+        db.Orders.Rows[0]["OrderStatus"] = "Cancelled";
+
+        var order = await db.Sender().Send(new GetMyOrderDetailQuery(1));
+
+        Assert.Null(order.Payment);
+    }
+
+    [Fact]
     public async Task Paid_transaction_shows_when_it_was_paid()
     {
         var paidAt = new DateTime(2026, 10, 20, 8, 30, 0, DateTimeKind.Unspecified);

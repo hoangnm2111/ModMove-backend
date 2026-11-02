@@ -19,7 +19,7 @@ internal sealed class UpdateMyProfileCommandHandler(
         if (phone != user.PhoneNumber && await users.IsPhoneTakenByAnotherAsync(phone, user.Id, cancellationToken))
             throw new ConflictException("This phone number is already registered."); // GB-01
 
-        user.UpdateProfile(request.FullName.Trim(), phone, request.AvatarUrl);
+        user.UpdateProfile(request.FullName.Trim(), phone);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }
 }

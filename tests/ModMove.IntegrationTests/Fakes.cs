@@ -127,6 +127,49 @@ internal sealed class InMemoryRepository<T> : IRepository<T> where T : ModMove.D
     public void Remove(T aggregate) => Items.Remove(aggregate);
 }
 
+/// <summary>The list entries the customer commands choose from, as ReferenceDataSeeder loads them.</summary>
+internal sealed class InMemoryMasterData : IMasterDataRepository
+{
+    public List<MasterDataItem> Items { get; } =
+    [
+        MasterDataItem.Create("CARGO_TYPE", "FURNITURE", "Đồ nội thất"),
+        MasterDataItem.Create("COMPLAINT_REASON", "DAMAGED_CARGO", "Hàng bị hư hỏng"),
+        MasterDataItem.Create("COMPLAINT_REASON", "OTHER", "Khác"),
+        MasterDataItem.Create("CANCELLATION_REASON", "CHANGED_PLAN", "Thay đổi kế hoạch"),
+        MasterDataItem.Create("CANCELLATION_REASON", "OTHER", "Khác"),
+    ];
+
+    public Task<MasterDataItem?> GetActiveAsync(string category, string code, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(i => i.Category == category && SameAsMySql(i.Code, code) && i.IsActive));
+
+    // utf8mb4_unicode_ci ignores case and accents.
+    private static bool SameAsMySql(string left, string right) =>
+        System.Globalization.CultureInfo.InvariantCulture.CompareInfo.Compare(
+            left, right, System.Globalization.CompareOptions.IgnoreCase | System.Globalization.CompareOptions.IgnoreNonSpace) == 0;
+
+    public Task<MasterDataItem?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(i => i.Id == id));
+
+    public void Add(MasterDataItem aggregate) => Items.Add(aggregate);
+    public void Update(MasterDataItem aggregate) { }
+    public void Remove(MasterDataItem aggregate) => Items.Remove(aggregate);
+}
+
+internal sealed class InMemoryLocationLogs : IDriverLocationLogRepository
+{
+    public List<DriverLocationLog> Items { get; } = [];
+
+    public Task<int> DeleteRecordedBeforeAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.RemoveAll(l => l.RecordedAt < cutoff));
+
+    public Task<DriverLocationLog?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(l => l.Id == id));
+
+    public void Add(DriverLocationLog aggregate) => Items.Add(aggregate);
+    public void Update(DriverLocationLog aggregate) { }
+    public void Remove(DriverLocationLog aggregate) => Items.Remove(aggregate);
+}
+
 internal sealed class InMemoryRefunds : IRefundRepository
 {
     public List<Refund> Items { get; } = [];
@@ -140,6 +183,17 @@ internal sealed class InMemoryRefunds : IRefundRepository
 
     public Task<Refund?> GetOpenForIncidentAsync(long incidentId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.LastOrDefault(r => r.IncidentId == incidentId && r.RefundStatus is RefundStatus.Requested or RefundStatus.Approved));
+
+    public Task<decimal> GetClaimedTotalForOrderAsync(long orderId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items
+            .Where(r => r.OrderId == orderId && r.RefundStatus is RefundStatus.Requested or RefundStatus.Approved or RefundStatus.Processed)
+            .Sum(r => r.ProposedAmount ?? r.RequestedAmount));
+
+    /// <summary>Customers whose orders have an open refund; refunds here do not know their order's customer.</summary>
+    public HashSet<long> CustomersWithOpenRefunds { get; } = [];
+
+    public Task<bool> HasOpenForCustomerAsync(long customerId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(CustomersWithOpenRefunds.Contains(customerId));
 
     public Task<Refund?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(r => r.Id == id));
@@ -198,8 +252,11 @@ internal sealed class InMemoryDriverProfiles : IDriverProfileRepository
 {
     public List<DriverProfile> Items { get; } = [];
 
-    public Task<DriverProfile?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Items.FirstOrDefault(d => d.Id == id));
+    public Task<DriverProfile?> GetByIdAsync(long id, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested(); // like the database call this stands in for
+        return Task.FromResult(Items.FirstOrDefault(d => d.Id == id));
+    }
 
     public Task<DriverProfile?> GetByIdWithApplicationsAndVehicleAsync(long id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(d => d.Id == id));
@@ -267,6 +324,9 @@ internal sealed class CountingUnitOfWork : IUnitOfWork
 {
     public int Saves { get; private set; }
 
+    /// <summary>Runs right after a save, e.g. to act like the client disconnecting at that moment.</summary>
+    public Action? AfterSave { get; set; }
+
     /// <summary>Pretends a unique index lost a race, like ApplicationDbContext turning a duplicate key into 409.</summary>
     public bool ThrowConflictOnSave { get; set; }
 
@@ -275,6 +335,7 @@ internal sealed class CountingUnitOfWork : IUnitOfWork
         if (ThrowConflictOnSave)
             throw new ModMove.Application.Common.Exceptions.ConflictException("A record with the same unique value already exists.");
         Saves++;
+        AfterSave?.Invoke();
         return Task.FromResult(1);
     }
 }
@@ -302,8 +363,13 @@ internal sealed class CapturingEmailSender : IEmailSender
 {
     public List<(string To, string Subject, string Body)> Sent { get; } = [];
 
+    /// <summary>Set to true to act like the SMTP server being down.</summary>
+    public bool Fail { get; set; }
+
     public Task SendAsync(string to, string subject, string htmlBody, CancellationToken cancellationToken)
     {
+        if (Fail)
+            throw new InvalidOperationException("SMTP is down");
         Sent.Add((to, subject, htmlBody));
         return Task.CompletedTask;
     }
@@ -414,7 +480,8 @@ internal sealed class TestApp
     public InMemoryDriverWallets DriverWallets { get; } = new();
     public InMemoryRatings Ratings { get; } = new();
     public InMemoryRepository<InTransitIncident> Incidents { get; } = new();
-    public InMemoryRepository<DriverLocationLog> LocationLogs { get; } = new();
+    public InMemoryLocationLogs LocationLogs { get; } = new();
+    public InMemoryMasterData MasterData { get; } = new();
     public CapturingRealtimeNotifier Realtime { get; } = new();
     public CapturingPushNotifications Push { get; } = new();
     public CountingUnitOfWork UnitOfWork { get; } = new();
@@ -454,6 +521,8 @@ internal sealed class TestApp
             .AddSingleton<IRatingRepository>(Ratings)
             .AddSingleton<IRepository<InTransitIncident>>(Incidents)
             .AddSingleton<IRepository<DriverLocationLog>>(LocationLogs)
+            .AddSingleton<IDriverLocationLogRepository>(LocationLogs)
+            .AddSingleton<IMasterDataRepository>(MasterData)
             .AddSingleton<IRealtimeNotifier>(Realtime)
             .AddSingleton<IPushNotificationService>(Push)
             .AddSingleton<IUnitOfWork>(UnitOfWork)

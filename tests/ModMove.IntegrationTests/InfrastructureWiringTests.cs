@@ -1,6 +1,7 @@
 using System.Net;
 using System.Reflection;
 using System.Text;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -47,6 +48,15 @@ public class InfrastructureWiringTests
     }
 
     [Fact]
+    public void Gps_cleanup_job_is_registered_JOB_GPS_01()
+    {
+        var services = new ServiceCollection().AddLogging().AddApplication().AddInfrastructure(Config());
+
+        Assert.Contains(services, d => d.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)
+            && d.ImplementationType == typeof(ModMove.Infrastructure.BackgroundJobs.GpsLogCleanupJob));
+    }
+
+    [Fact]
     public void App_starts_without_maps_or_cloudinary_keys()
     {
         var services = new ServiceCollection().AddLogging().AddApplication().AddInfrastructure(Config());
@@ -81,4 +91,29 @@ public class InfrastructureWiringTests
         Assert.Equal(
             AuthRateLimit.Policy,
             typeof(FareEstimateController).GetCustomAttribute<EnableRateLimitingAttribute>()?.PolicyName);
+
+    [Theory]
+    [InlineData(typeof(ModMove.WebApi.Controllers.Customer.OrdersController), nameof(ModMove.WebApi.Controllers.Customer.OrdersController.GetTracking))]
+    [InlineData(typeof(ModMove.WebApi.Controllers.Customer.IncidentsController), nameof(ModMove.WebApi.Controllers.Customer.IncidentsController.Report))]
+    public void Costly_customer_endpoints_are_rate_limited_per_user(Type controller, string action) =>
+        Assert.Equal(AuthRateLimit.UserPolicy, controller.GetMethod(action)!.GetCustomAttribute<EnableRateLimitingAttribute>()?.PolicyName);
+
+    private static string UserKey(string userId, string endpoint)
+    {
+        var http = new Microsoft.AspNetCore.Http.DefaultHttpContext
+        {
+            User = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(
+                [new System.Security.Claims.Claim(System.Security.Claims.ClaimTypes.NameIdentifier, userId)], "test")),
+        };
+        http.SetEndpoint(new Microsoft.AspNetCore.Http.Endpoint(null, null, endpoint));
+        return AuthRateLimit.UserPartitionKey(http);
+    }
+
+    [Fact]
+    public void Each_user_has_a_bucket_for_each_endpoint()
+    {
+        Assert.Equal(UserKey("7", "tracking"), UserKey("7", "tracking"));
+        Assert.NotEqual(UserKey("7", "tracking"), UserKey("8", "tracking"));
+        Assert.NotEqual(UserKey("7", "tracking"), UserKey("7", "incidents"));
+    }
 }

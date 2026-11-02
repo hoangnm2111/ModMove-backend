@@ -116,7 +116,6 @@ public class AdminUserManagementTests
         dt.Columns.Add("Role", typeof(string));
         dt.Columns.Add("AccountStatus", typeof(string));
         dt.Columns.Add("EmailVerified", typeof(bool));
-        dt.Columns.Add("AvatarUrl", typeof(string));
         dt.Columns.Add("CreatedAt", typeof(DateTimeOffset));
         dt.Columns.Add("UpdatedAt", typeof(DateTimeOffset));
         dt.Columns.Add("DriverApprovalStatus", typeof(string));
@@ -127,7 +126,7 @@ public class AdminUserManagementTests
 
         dt.Rows.Add(
             3L, "Trần Tài Xế", "0922222222", "driver@modmove.vn", "Driver", "Active", true,
-            DBNull.Value, TestApp.Start, DBNull.Value, "Approved", "Online", "51C-888.99", 15, 12);
+            TestApp.Start, DBNull.Value, "Approved", "Online", "51C-888.99", 15, 12);
 
         app.Sql.Result = dt;
 

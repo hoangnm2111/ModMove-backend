@@ -12,7 +12,7 @@ namespace ModMove.Application.Features.Orders;
 /// </summary>
 internal sealed class OrderSettlement(IPlatformSettings settings, IDriverWalletRepository wallets)
 {
-    /// <summary>COMMISSION_RATE now; it cannot change while an order is running (DECISIONS C8).</summary>
+    /// <summary>COMMISSION_RATE now; it cannot change before an order is Delivered, so a Delivered order may settle at a newer rate (DECISIONS C8).</summary>
     public Task<decimal> CommissionRateAsync(CancellationToken cancellationToken) =>
         settings.GetDecimalAsync(SettingKeys.CommissionRate, cancellationToken);
 

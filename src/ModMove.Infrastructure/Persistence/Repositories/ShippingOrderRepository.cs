@@ -8,9 +8,10 @@ namespace ModMove.Infrastructure.Persistence.Repositories;
 public sealed class ShippingOrderRepository(ApplicationDbContext dbContext)
     : Repository<ShippingOrder>(dbContext), IShippingOrderRepository
 {
-    // DECISIONS C8: Accepted up to before Completed. A list, not a range: enums are stored as text, so >= would compare strings.
+    // DECISIONS C8: Accepted up to before Delivered; an open complaint can hold a Delivered order for a long time.
+    // A list, not a range: enums are stored as text, so >= would compare strings.
     private static readonly OrderStatus[] InProgress =
-        [OrderStatus.Accepted, OrderStatus.Arrived, OrderStatus.PickedUp, OrderStatus.InTransit, OrderStatus.Delivered];
+        [OrderStatus.Accepted, OrderStatus.Arrived, OrderStatus.PickedUp, OrderStatus.InTransit];
 
     public Task<ShippingOrder?> GetWithProofAsync(long id, CancellationToken cancellationToken = default) =>
         Set.Include(o => o.Proof).FirstOrDefaultAsync(o => o.Id == id, cancellationToken);

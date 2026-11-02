@@ -57,12 +57,26 @@ public class DriverWalletTests
     }
 
     [Fact]
-    public void Commission_larger_than_deposit_is_rejected()
+    public void Commission_larger_than_deposit_leaves_a_negative_deposit_GB15()
     {
         var wallet = DriverWallet.Create(1);
         wallet.TopUpDeposit(50_000);
 
-        Assert.Throws<DomainException>(() => wallet.DeductCommissionFromDeposit(10, 60_000));
+        var tx = wallet.DeductCommissionFromDeposit(10, 60_000);
+
+        Assert.Equal(-10_000m, wallet.DepositBalance);
+        Assert.Equal(-10_000m, tx.BalanceAfter);
+    }
+
+    [Fact]
+    public void Negative_deposit_stops_the_driver_taking_cash_orders_GB16()
+    {
+        var wallet = DriverWallet.Create(1);
+        wallet.TopUpDeposit(50_000);
+
+        wallet.DeductCommissionFromDeposit(10, 60_000);
+
+        Assert.False(wallet.CanReceiveCod(minDeposit: 0, orderCommission: 0));
     }
 
     [Fact]
@@ -125,6 +139,18 @@ public class DriverWalletTests
     }
 
     [Fact]
+    public void Frozen_wallet_still_settles_a_finished_order_GB15()
+    {
+        var wallet = DriverWallet.Create(1);
+        typeof(DriverWallet).GetProperty("WalletStatus")!.SetValue(wallet, WalletStatus.Frozen);
+
+        wallet.CreditTripEarning(10, 100_000, 10_000);
+        wallet.DeductCommissionFromDeposit(11, 5_000);
+
+        Assert.Equal((90_000m, -5_000m), (wallet.EarningsBalance, wallet.DepositBalance));
+    }
+
+    [Fact]
     public void Top_up_below_50000_is_rejected_5_2()
     {
         var wallet = DriverWallet.Create(1);
@@ -145,5 +171,74 @@ public class DriverWalletTests
         wallet.RequestWithdrawal(1_000);
 
         Assert.Equal(89_000m, wallet.EarningsBalance);
+    }
+
+    /// <summary>Earnings 90,000 and a deposit of -10,000.</summary>
+    private static DriverWallet WalletOwingCommission()
+    {
+        var wallet = DriverWallet.Create(1);
+        wallet.CreditTripEarning(10, 100_000, 10_000);
+        wallet.TopUpDeposit(50_000);
+        wallet.DeductCommissionFromDeposit(11, 60_000);
+        return wallet;
+    }
+
+    [Fact]
+    public void Withdrawal_pays_the_deposit_debt_from_earnings_first_5_1()
+    {
+        var wallet = WalletOwingCommission();
+
+        var withdrawal = wallet.RequestWithdrawal(50_000);
+
+        Assert.Equal((30_000m, 0m), (wallet.EarningsBalance, wallet.DepositBalance));
+        Assert.Equal((50_000m, 30_000m), (withdrawal.Amount, withdrawal.BalanceAfter));
+        var paid = Assert.Single(wallet.Transactions, t => t.TransactionType == WalletTransactionType.CommissionDebtPaid);
+        Assert.Equal((10_000m, 0m, WalletTransactionStatus.Completed), (paid.Amount, paid.BalanceAfter, paid.TransactionStatus));
+    }
+
+    [Fact]
+    public void Withdrawal_can_take_all_earnings_left_after_the_debt_5_1()
+    {
+        var wallet = WalletOwingCommission();
+
+        wallet.RequestWithdrawal(80_000);
+
+        Assert.Equal((0m, 0m), (wallet.EarningsBalance, wallet.DepositBalance));
+    }
+
+    [Fact]
+    public void Withdrawal_above_what_is_left_after_the_debt_changes_nothing_5_1()
+    {
+        var wallet = WalletOwingCommission();
+        var before = wallet.Transactions.Count;
+
+        Assert.Throws<DomainException>(() => wallet.RequestWithdrawal(80_001));
+
+        Assert.Equal((90_000m, -10_000m), (wallet.EarningsBalance, wallet.DepositBalance));
+        Assert.Equal(before, wallet.Transactions.Count);
+    }
+
+    [Fact]
+    public void Rejected_withdrawal_gives_back_the_amount_but_the_debt_stays_paid_5_1()
+    {
+        var wallet = WalletOwingCommission();
+        var withdrawal = wallet.RequestWithdrawal(50_000);
+
+        wallet.RejectWithdrawal(withdrawal, adminId: 2, Now);
+
+        Assert.Equal((80_000m, 0m), (wallet.EarningsBalance, wallet.DepositBalance));
+    }
+
+    [Fact]
+    public void Withdrawal_leaves_a_positive_deposit_alone_5_1()
+    {
+        var wallet = DriverWallet.Create(1);
+        wallet.CreditTripEarning(10, 100_000, 10_000);
+        wallet.TopUpDeposit(50_000);
+
+        wallet.RequestWithdrawal(90_000);
+
+        Assert.Equal((0m, 50_000m), (wallet.EarningsBalance, wallet.DepositBalance));
+        Assert.DoesNotContain(wallet.Transactions, t => t.TransactionType == WalletTransactionType.CommissionDebtPaid);
     }
 }

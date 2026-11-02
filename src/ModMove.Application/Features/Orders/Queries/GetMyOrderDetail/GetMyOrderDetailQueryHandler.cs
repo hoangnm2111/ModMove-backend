@@ -94,7 +94,8 @@ internal sealed class GetMyOrderDetailQueryHandler(
                 p.ProofStatus, p.PickupSubmissionCount, p.RejectionReason, p.DeliveryPhotoUrl,
                 p.DeliveryCompletionTime is { } delivered ? CustomerAccess.Utc(delivered) : null),
             history.Select(h => new StatusHistoryResponse(h.FromStatus, h.ToStatus, h.ChangedByRole, h.Note, CustomerAccess.Utc(h.ChangedAt))).ToList(),
-            o.CouponCode, pay is null ? null : ToPayment(pay));
+            // A cancelled order cannot be paid any more, even while its last link is still alive.
+            o.CouponCode, pay is null || o.OrderStatus == "Cancelled" ? null : ToPayment(pay));
     }
 
     private PaymentResponse ToPayment(PaymentRow row)

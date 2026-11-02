@@ -48,7 +48,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [x] Gửi email Gmail SMTP (Development không có SMTP thì ghi OTP ra log)
 - [x] Google Maps (`IMapService`: Geocoding + Distance Matrix hoặc Routes API, DECISIONS 3.4) và `FareCalculator` (B1)
 - [x] `POST api/public/fareestimate`: loại xe, tải trọng và lọt thùng theo món lớn nhất (GB-10, 4.2: dùng `VehicleType.CanCarry`), phí bốc xếp, coupon (GB-21) với mã lỗi riêng `COUPON_NOT_FOUND`, `COUPON_INACTIVE`, `COUPON_EXPIRED`, `COUPON_LIMIT_REACHED`, `COUPON_MIN_ORDER_NOT_MET`
-- [x] Cloudinary (`IFileStorage`) + `POST api/customer/uploads` (JPG/PNG ≤ 5 MB, GB-06); ảnh đại diện và ảnh hàng chỉ nhận URL thuộc domain Cloudinary của nhóm
+- [x] Cloudinary (`IFileStorage`) + `POST api/customer/uploads` (JPG/PNG ≤ 5 MB, GB-06); ảnh hàng chỉ nhận URL thuộc domain Cloudinary của nhóm
 - [x] Tạo đơn (GST-17): cam kết không hàng cấm (4.3), 1–5 ảnh, mã đơn `MMyyyyMMddNNN` giờ VN, coupon `used_count++` (B11), **chỉ tiền mặt** ở Phase 1; **không có sửa đơn** (4.1)
 - [x] Danh sách, tìm, chi tiết, lịch sử đơn của khách (CUS-08..10, 20)
 
@@ -63,14 +63,17 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [x] Logout nhận kèm FCM token của app, chỉ xóa token nếu khớp token đang lưu (9.2)
 
 **Phase 3**
-- [ ] JOB-GPS-01 (xóa GPS log quá 30 ngày)
+- [ ] REST theo dõi đơn: vị trí cuối và ETA (CUS-13)
+- [ ] Danh mục `api/public/lookups/...`, mã loại hàng và mã lý do khi tạo đơn, hủy, khiếu nại; danh sách coupon cho khách (GST-10, 14, CUS-21, 29)
+- [ ] Khách thấy lý do quyết định hoàn tiền (CUS-23); tài xế nhận `INCIDENT_REPORTED`, `RATING_RECEIVED`
+- [ ] JOB-GPS-01 (xóa GPS log quá 30 ngày): `GpsLogCleanupJob` chạy mỗi 24 giờ; job của Hoàng kế thừa `PeriodicCommandJob`
 - [ ] Bảng mã lỗi cho frontend trong `api/README.md` đủ cho mọi endpoint (9.4)
 
 ## 5. Hoàng: Admin / Driver / Payments
 
 **Phase 1**
 - [ ] MasterData (ADM-14..16), nhập nội dung chính sách và giới thiệu (`description`)
-- [ ] Pricing (ADM-10..13): `vehicle_types`, `LOADING_FEE`, `COMMISSION_RATE` (đọc qua `IPlatformSettings`); chặn sửa `COMMISSION_RATE` khi còn đơn đang chạy (C8)
+- [ ] Pricing (ADM-10..13): `vehicle_types`, `LOADING_FEE`, `COMMISSION_RATE` (đọc qua `IPlatformSettings`); chặn sửa `COMMISSION_RATE` khi còn đơn từ `Accepted` tới trước `Delivered` (C8)
 - [ ] Tài khoản (ADM-04..07): danh sách, chi tiết, khóa/mở (`Locked`, chỉ Admin mở; khóa thì gọi `RevokeAllForUserAsync`), tạo Dispatcher với mật khẩu cố định (B7)
 - [ ] Hồ sơ tài xế: phía Driver (DRV-03..07) và phía Admin duyệt (ADM-08, 09); `driver_wallets` tạo khi duyệt lần đầu
 - [ ] Adapter PayOS và FCM
@@ -79,14 +82,14 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [ ] Thanh toán PayOS (CUS-27, nạp cọc DRV-21 ≥ 50.000đ), tạo lại mã khi hết 10 phút (3.1), `CreateOrderPayment` nhận `platform` (`Web` | `App`) và chọn `returnUrl` từ cấu hình `PayOS:ReturnUrls:*`, client không gửi URL (3.1), webhook (sai chữ ký → từ chối, gọi trùng → idempotent), `ShippingOrder.MarkPaid(now)`
 - [ ] Matching (DRV-08..10, B5): đơn PayOS chỉ hiện khi đã trả; GB-08/09; đơn tiền mặt cần ví cọc ≥ `MIN_COD_DEPOSIT` và ≥ hoa hồng của đơn (GB-16: `DriverWallet.CanReceiveCod(minDeposit, order.CommissionFor(rate))`, dùng cả khi đổi tài xế); ẩn tài xế mất GPS quá 5 phút (6.4)
 - [ ] Trips (DRV-11..16, 18, 19): không có hủy từ tài xế (6.1); không có người nhận thì vẫn giao và gửi POD (2.7)
-- [ ] Ví (DRV-17, 20..23): thu COD, rút tiền không tối thiểu (5.1), thu nhập = `DriverEarning`
-- [ ] Admin duyệt hoàn tiền (cả hoàn tiền do hủy không qua Dispatcher, 3.3) và chi trả tay; duyệt rút tiền (ADM-24)
+- [ ] Ví (DRV-17, 20..23): thu COD, rút tiền không tối thiểu (5.1), thu nhập = `DriverEarning`; số rút tối đa hiển thị = `earningsBalance + min(depositBalance, 0)`, `DriverWallet.RequestWithdrawal` tự trừ nợ ví cọc trước (5.1)
+- [ ] Admin duyệt hoàn tiền (cả hoàn tiền do hủy không qua Dispatcher, 3.3) và chi trả tay; truyền lý do cho khách vào tham số `note` của `Refund.Approve`/`RejectRefund` (CUS-23); trước khi duyệt gọi `order.EnsureRefundFits(0, await refunds.GetClaimedTotalForOrderAsync(order.Id))` để tổng hoàn của đơn không vượt `total_fee` (B9); duyệt rút tiền (ADM-24)
 
 **Phase 3**
-- [ ] JOB-PAY-01 (mã hết hạn sau 10 phút; hủy đơn PayOS vẫn `Unpaid` sau 30 phút từ `created_at`, 3.1), JOB-MATCH-01 (từ lúc tạo hoặc lúc trả, 3.2: `IsMatchingExpired`), JOB-ORDER-01 (`CanBeAutoCompleted`, rồi `order.Complete(rate, System, null, now)` + `OrderSettlement.SettleAsync` trong `Features/Orders` như ConfirmReceipt của Hiếu, để ví được tất toán giống nhau)
+- [ ] JOB-PAY-01 (mã hết hạn sau 10 phút; hủy đơn PayOS vẫn `Unpaid` sau 30 phút từ `created_at`, 3.1), JOB-MATCH-01 (từ lúc tạo hoặc lúc trả, 3.2: `IsMatchingExpired`), JOB-ORDER-01 (`CanBeAutoCompleted`, bỏ qua đơn có khiếu nại mở (`HasOpenComplaintAsync`, 7.3), rồi `order.Complete(rate, System, null, now)` + `OrderSettlement.SettleAsync` trong `Features/Orders` như ConfirmReceipt của Hiếu, để ví được tất toán giống nhau)
 - [ ] Báo cáo, doanh thu (8.1: tổng `commission_amount` của đơn `Completed`, giờ VN), xuất Excel (B16, xin duyệt package)
 - [ ] Thông báo cho tài xế theo bảng sự kiện 8.3, gọi qua `INotificationService` (B17)
-- [ ] Thông báo cho **khách** khi chính bước của Hoàng đổi trạng thái (8.3): nhận đơn `CustomerEvent.OrderAccepted`, đến điểm lấy `DriverArrived`, gửi ảnh lấy hàng `PickupPhotosToReview`, giao hàng `OrderDelivered`, JOB-ORDER-01 `OrderCompleted`, Admin duyệt/chi hoàn tiền `RefundDecided`: gọi `NotifyCustomerAsync`, và `PublishOrderStatusAsync` sau mỗi lần đổi trạng thái đơn (B12)
+- [ ] Thông báo cho **khách** khi chính bước của Hoàng đổi trạng thái (8.3): nhận đơn `CustomerEvent.OrderAccepted`, đến điểm lấy `DriverArrived`, gửi ảnh lấy hàng `PickupPhotosToReview`, giao hàng `OrderDelivered`, JOB-ORDER-01 `OrderCompleted`, Admin duyệt/chi hoàn tiền `RefundDecided`, job tự hủy đơn `OrderCancelled`: gọi `NotifyCustomerAsync`, và `PublishOrderStatusAsync` sau mỗi lần đổi trạng thái đơn (B12)
 
 ## 6. Huy: Dispatcher
 
@@ -102,6 +105,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [x] Thông báo cho **khách** khi xử lý xong sự cố (8.3): `NotifyCustomerAsync(order, CustomerEvent.IncidentResolved, ct, detail)`, `detail` nói rõ quyết định; đổi tài xế hoặc hủy đơn thì gọi thêm `PublishOrderStatusAsync` (B12). Đổi tài xế: gọi cho **cả tài xế cũ và tài xế mới**, vì tài xế không vào group đơn
 - [x] Hàng còn trên xe sau khi hủy: trả về hay giữ lại (2.6)
 - [x] Không làm màn hình yêu cầu hỗ trợ (2.9)
+- [ ] `CancelOrderByIncident` theo luật tổng hoàn (B9): khi hoàn 100%, xử lý mọi khoản hoàn đang mở của đơn (không chỉ của sự cố đang xử lý), từ chối nếu đơn đã có khoản được duyệt hoặc đã chi; tự đóng các sự cố đang mở khác của đơn
 
 ## 7. Dịch vụ ngoài
 

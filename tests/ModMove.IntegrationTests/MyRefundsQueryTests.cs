@@ -21,6 +21,7 @@ public class MyRefundsQueryTests
         public string AccountStatus { get; set; } = "Active";
         public string Status { get; set; } = "Requested";
         public bool Found { get; set; } = true;
+        public string? DecisionReason { get; set; }
         public List<(string Sql, IReadOnlyDictionary<string, object?> Parameters)> Executed { get; } = [];
 
         public Db()
@@ -34,7 +35,9 @@ public class MyRefundsQueryTests
                 var row = Table(
                     ("Id", typeof(long), 4L), ("OrderId", typeof(long), 1L), ("OrderCode", typeof(string), "MM20261020001"),
                     ("IncidentId", typeof(long), null), ("SourceType", typeof(string), "Complaint"), ("RefundStatus", typeof(string), Status),
-                    ("Reason", typeof(string), "Hàng vỡ"), ("EvidenceUrls", typeof(string), """["https://res.cloudinary.com/demo/a.jpg"]"""),
+                    ("Reason", typeof(string), "Hàng vỡ"), ("ReasonCode", typeof(string), "DAMAGED_CARGO"),
+                    ("DecisionReason", typeof(string), DecisionReason),
+                    ("EvidenceUrls", typeof(string), """["https://res.cloudinary.com/demo/a.jpg"]"""),
                     ("RequestedAmount", typeof(decimal), 100_000m), ("ProposedAmount", typeof(decimal), 80_000m),
                     ("InfoRequestNote", typeof(string), "Chụp thêm ảnh"), ("CustomerReply", typeof(string), null),
                     ("DecidedAt", typeof(DateTime), null), ("ProcessedAt", typeof(DateTime), null),
@@ -116,6 +119,28 @@ public class MyRefundsQueryTests
 
         Assert.Equal((decimal?)expected, refund.ApprovedAmount);
         Assert.False(refund.WaitingForYourReply);
+    }
+
+    [Fact]
+    public async Task Customer_sees_the_admins_reason_and_the_reason_code_CUS23()
+    {
+        var db = new Db { Status = "Rejected", DecisionReason = "Ảnh không cho thấy hư hỏng" };
+
+        var detail = await db.Sender().Send(new GetMyRefundDetailQuery(4));
+        var page = await db.Sender().Send(new GetMyRefundsQuery());
+
+        Assert.Equal(("DAMAGED_CARGO", "Ảnh không cho thấy hư hỏng"), (detail.ReasonCode, detail.DecisionReason));
+        Assert.Equal("Ảnh không cho thấy hư hỏng", Assert.Single(page.Items).DecisionReason);
+    }
+
+    [Fact]
+    public async Task The_dispatchers_proposal_reason_is_never_read_for_the_customer()
+    {
+        var db = new Db();
+
+        await db.Sender().Send(new GetMyRefundDetailQuery(4));
+
+        Assert.DoesNotContain("proposal_reason", db.RefundsQuery().Sql);
     }
 
     [Fact]

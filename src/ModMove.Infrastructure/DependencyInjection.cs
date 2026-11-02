@@ -5,6 +5,7 @@ using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Infrastructure.ExternalServices.Cloudinary;
 using ModMove.Infrastructure.ExternalServices.Email;
+using ModMove.Infrastructure.BackgroundJobs;
 using ModMove.Infrastructure.ExternalServices.GoogleMaps;
 using ModMove.Infrastructure.Identity;
 using ModMove.Infrastructure.Persistence;
@@ -57,6 +58,10 @@ public static class DependencyInjection
         services.AddScoped<IDriverWalletRepository, DriverWalletRepository>();
         services.AddScoped<IRefundRepository, RefundRepository>();
         services.AddScoped<IRatingRepository, RatingRepository>();
+        services.AddScoped<IMasterDataRepository, MasterDataRepository>();
+        services.AddScoped<IDriverLocationLogRepository, DriverLocationLogRepository>();
+
+        services.AddHostedService<GpsLogCleanupJob>();
 
         // Read side (Queries): raw connection for Dapper.
         services.AddSingleton<ISqlConnectionFactory>(new SqlConnectionFactory(connectionString));
