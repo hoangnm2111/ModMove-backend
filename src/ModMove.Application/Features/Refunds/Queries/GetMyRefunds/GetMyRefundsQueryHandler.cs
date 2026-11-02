@@ -31,7 +31,7 @@ internal sealed class GetMyRefundsQueryHandler(ISqlConnectionFactory connectionF
         var rows = await connection.QueryAsync<RefundRow>(new CommandDefinition(ItemsSql, parameters, cancellationToken: cancellationToken));
 
         var items = rows.Select(r => new MyRefundSummaryResponse(
-            r.Id, r.OrderId, r.OrderCode, r.SourceType, r.RefundStatus, r.RequestedAmount, r.ApprovedAmount,
+            r.Id, r.OrderId, r.OrderCode, r.SourceType, r.RefundStatus, r.RequestedAmount, r.ApprovedAmount, r.DecisionReason,
             r.WaitingForReply, CustomerAccess.Utc(r.CreatedAt))).ToList();
         return new PagedResult<MyRefundSummaryResponse>(items, request.Page, request.PageSize, total);
     }

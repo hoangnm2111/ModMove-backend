@@ -3,6 +3,7 @@ using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
+using ModMove.Application.Features.MasterData.Queries.GetPublicContent;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 
@@ -14,6 +15,7 @@ internal sealed class CancelOrderCommandHandler(
     IShippingOrderRepository orders,
     IRefundRepository refunds,
     IDriverProfileRepository driverProfiles,
+    IMasterDataRepository masterData,
     INotificationService notifications,
     IUnitOfWork unitOfWork,
     TimeProvider clock) : ICommandHandler<CancelOrderCommand>
@@ -24,11 +26,13 @@ internal sealed class CancelOrderCommandHandler(
         var order = await orders.GetByIdAsync(request.OrderId, cancellationToken)
             ?? throw new NotFoundException(nameof(ShippingOrder), request.OrderId);
 
-        var reason = request.Reason.Trim();
+        var choice = await masterData.RequireActiveAsync(
+            PublicContentCategories.CancellationReason, request.ReasonCode, nameof(request.ReasonCode), cancellationToken);
+        var reason = choice.ReasonText(request.Reason);
         // ORDER_NOT_YOURS / ORDER_NOT_CANCELLABLE come from the entity. A coupon use is not given back (B11).
-        var refundAmount = order.CancelByCustomer(customer.Id, reason, clock.GetUtcNow());
+        var refundAmount = order.CancelByCustomer(customer.Id, reason, clock.GetUtcNow(), choice.Code);
         if (refundAmount > 0)
-            refunds.Add(Refund.Request(order.Id, null, RefundSourceType.Cancellation, reason, null, refundAmount));
+            refunds.Add(Refund.Request(order.Id, null, RefundSourceType.Cancellation, reason, null, refundAmount, choice.Code));
 
         // Accept, MarkPaid and Cancel all bump RowVersion: of two racing saves, the later one is a 409.
         await unitOfWork.SaveChangesAsync(cancellationToken);

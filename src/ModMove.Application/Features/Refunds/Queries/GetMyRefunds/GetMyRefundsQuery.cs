@@ -12,4 +12,4 @@ public sealed record GetMyRefundsQuery(int Page = 1, int PageSize = 20) : IQuery
 /// </summary>
 public sealed record MyRefundSummaryResponse(
     long Id, long OrderId, string OrderCode, string SourceType, string RefundStatus,
-    decimal RequestedAmount, decimal? ApprovedAmount, bool WaitingForYourReply, DateTimeOffset CreatedAt);
+    decimal RequestedAmount, decimal? ApprovedAmount, string? DecisionReason, bool WaitingForYourReply, DateTimeOffset CreatedAt);

@@ -16,7 +16,7 @@ public class CustomerRefundTests
     private const string Photo = "https://res.cloudinary.com/demo/image/upload/modmove/customers/1/a.jpg";
 
     private static SubmitComplaintCommand Complaint(ShippingOrder order, decimal amount = 100_000, IReadOnlyList<string>? photos = null) =>
-        new(order.Id, " Hàng vỡ ", photos ?? [Photo], amount);
+        new(order.Id, "DAMAGED_CARGO", " Hàng vỡ ", photos ?? [Photo], amount);
 
     private static InTransitIncident AddIncident(TripSetup s, ShippingOrder order)
     {
@@ -38,6 +38,7 @@ public class CustomerRefundTests
         var refund = Assert.Single(s.App.Refunds.Items);
         Assert.Equal(refund.Id, result.RefundId);
         Assert.Equal((RefundSourceType.Complaint, RefundStatus.Requested, "Hàng vỡ"), (refund.SourceType, refund.RefundStatus, refund.Reason));
+        Assert.Equal("DAMAGED_CARGO", refund.ReasonCode);
         Assert.Equal(100_000m, refund.RequestedAmount);
         Assert.Equal([Photo], refund.EvidenceUrls!);
         Assert.Equal(1, s.App.UnitOfWork.Saves);
@@ -119,13 +120,75 @@ public class CustomerRefundTests
 
     [Theory]
     [InlineData("", 100_000)]
-    [InlineData("Hàng vỡ", 0)]
-    public async Task Reason_and_a_positive_amount_are_required(string reason, int amount)
+    [InlineData("DAMAGED_CARGO", 0)]
+    public async Task Reason_code_and_a_positive_amount_are_required(string code, int amount)
     {
         var s = new TripSetup();
         var order = s.Delivered();
 
-        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new SubmitComplaintCommand(order.Id, reason, null, amount)));
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new SubmitComplaintCommand(order.Id, code, null, null, amount)));
+    }
+
+    [Fact]
+    public async Task Code_alone_stores_the_name_from_the_list()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+
+        await s.App.Sender.Send(new SubmitComplaintCommand(order.Id, "DAMAGED_CARGO", null, null, 100_000));
+
+        var refund = Assert.Single(s.App.Refunds.Items);
+        Assert.Equal(("DAMAGED_CARGO", "Hàng bị hư hỏng"), (refund.ReasonCode, refund.Reason));
+    }
+
+    [Fact]
+    public async Task Code_not_in_the_list_is_refused()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+
+        var error = await Assert.ThrowsAsync<ValidationException>(() =>
+            s.App.Sender.Send(new SubmitComplaintCommand(order.Id, "CHANGED_PLAN", null, null, 100_000))); // a cancellation reason
+
+        Assert.Contains("ReasonCode", error.Errors.Keys);
+        Assert.Empty(s.App.Refunds.Items);
+    }
+
+    [Fact]
+    public async Task Code_switched_off_by_the_admin_is_refused()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+        s.App.MasterData.Items.Single(i => i.Code == "DAMAGED_CARGO").SetActive(false);
+
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new SubmitComplaintCommand(order.Id, "DAMAGED_CARGO", null, null, 100_000)));
+
+        Assert.Empty(s.App.Refunds.Items);
+    }
+
+    [Theory]
+    [InlineData("OTHER")]
+    [InlineData("ÓTHER")] // the database column ignores case and accents
+    public async Task Other_needs_a_written_reason(string code)
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new SubmitComplaintCommand(order.Id, code, " ", null, 100_000)));
+
+        Assert.Empty(s.App.Refunds.Items);
+    }
+
+    [Fact]
+    public async Task Other_with_a_written_reason_is_accepted()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+
+        await s.App.Sender.Send(new SubmitComplaintCommand(order.Id, "OTHER", " Sai địa chỉ ", null, 100_000));
+
+        var refund = Assert.Single(s.App.Refunds.Items);
+        Assert.Equal(("OTHER", "Sai địa chỉ"), (refund.ReasonCode, refund.Reason));
     }
 
     [Fact]
@@ -141,7 +204,7 @@ public class CustomerRefundTests
 
     [Fact]
     public async Task Signed_out_caller_is_unauthorized() =>
-        await Assert.ThrowsAsync<UnauthorizedException>(() => new TestApp().Sender.Send(new SubmitComplaintCommand(1, "x", null, 1)));
+        await Assert.ThrowsAsync<UnauthorizedException>(() => new TestApp().Sender.Send(new SubmitComplaintCommand(1, "DAMAGED_CARGO", null, null, 1)));
 
     // ---- Incident refund (UC-CUS-17, 18) ----
 

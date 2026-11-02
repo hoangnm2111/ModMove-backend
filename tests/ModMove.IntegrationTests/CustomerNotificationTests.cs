@@ -106,7 +106,7 @@ public class CustomerNotificationTests
         accepted.Accept(s.Profile.Id, s.Driver.Id, TripSetup.Now);
         s.App.Orders.Add(accepted);
 
-        await s.App.Sender.Send(new CancelOrderCommand(accepted.Id, "Đổi ý"));
+        await s.App.Sender.Send(new CancelOrderCommand(accepted.Id, "CHANGED_PLAN"));
 
         Assert.Equal([("order", accepted.Id.ToString()), ("user", s.Driver.Id.ToString())], StatusEvents(s));
     }

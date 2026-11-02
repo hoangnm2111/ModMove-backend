@@ -2,6 +2,7 @@ using ModMove.Application.Common;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
+using ModMove.Application.Features.MasterData.Queries.GetPublicContent;
 using ModMove.Domain.Entities;
 
 namespace ModMove.Application.Features.Orders.Commands.CreateOrder;
@@ -11,6 +12,7 @@ internal sealed class CreateOrderCommandHandler(
     IUserRepository users,
     IShippingOrderRepository orders,
     OrderPricing pricing,
+    IMasterDataRepository masterData,
     IUnitOfWork unitOfWork,
     TimeProvider clock) : ICommandHandler<CreateOrderCommand, CreateOrderResponse>
 {
@@ -19,6 +21,9 @@ internal sealed class CreateOrderCommandHandler(
         var customer = await currentUser.LoadUserAsync(users, cancellationToken);
 
         var cargo = request.Cargo;
+        var cargoType = await masterData.RequireActiveAsync(
+            PublicContentCategories.CargoType, cargo.CargoType, "Cargo.CargoType", cancellationToken);
+
         var trip = await pricing.PriceAsync(new PricingInput(
             request.VehicleTypeId, request.PickupAddress, request.DropoffAddress,
             cargo.WeightKg, cargo.LengthCm, cargo.WidthCm, cargo.HeightCm,
@@ -39,7 +44,7 @@ internal sealed class CreateOrderCommandHandler(
             trip.Fare.DistanceFee, trip.Fare.ServiceFee, trip.Fare.DiscountAmount,
             request.PaymentMethod, request.PayerRole,
             CargoDetail.Create(
-                cargo.CargoType.Trim(), cargo.Quantity, cargo.WeightKg, cargo.LengthCm, cargo.WidthCm, cargo.HeightCm,
+                cargoType.Code, cargo.Quantity, cargo.WeightKg, cargo.LengthCm, cargo.WidthCm, cargo.HeightCm,
                 cargo.PhotoUrls, cargo.SpecialNotes?.Trim()),
             warrantyAcceptedAt: now);
 
