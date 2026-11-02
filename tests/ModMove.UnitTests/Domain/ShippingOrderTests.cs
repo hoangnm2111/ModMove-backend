@@ -268,7 +268,7 @@ public class ShippingOrderTests
     [Theory]
     [InlineData(false, 0)]        // nothing paid yet
     [InlineData(true, 180_000)]   // paid online: full refund of total_fee
-    public void Customer_cancels_free_while_pending_B3(bool paid, double refund)
+    public void Customer_cancels_free_while_placeorder_B3(bool paid, double refund)
     {
         var order = NewOrder();
         if (paid)
@@ -588,10 +588,10 @@ public class ShippingOrderTests
     [Fact]
     public void Customer_reports_incidents_only_from_Arrived_to_InTransit_2_2()
     {
-        var pending = Assert.Throws<DomainException>(() => NewOrder().ReportIncidentByCustomer(1, IncidentType.Other, "x", null, null, null));
+        var placeOrder = Assert.Throws<DomainException>(() => NewOrder().ReportIncidentByCustomer(1, IncidentType.Other, "x", null, null, null));
         var delivered = Assert.Throws<DomainException>(() => DeliveredOrder().ReportIncidentByCustomer(1, IncidentType.Other, "x", null, null, null));
 
-        Assert.Equal(("INCIDENT_NOT_ALLOWED", "INCIDENT_NOT_ALLOWED"), (pending.Code, delivered.Code));
+        Assert.Equal(("INCIDENT_NOT_ALLOWED", "INCIDENT_NOT_ALLOWED"), (placeOrder.Code, delivered.Code));
     }
 
     [Fact]
@@ -606,7 +606,7 @@ public class ShippingOrderTests
     {
         switch (status)
         {
-            case OrderStatus.Pending: return NewOrder();
+            case OrderStatus.PlaceOrder: return NewOrder();
             case OrderStatus.Accepted: return AcceptedOrder();
             case OrderStatus.Arrived:
                 var arrived = AcceptedOrder();
@@ -627,7 +627,7 @@ public class ShippingOrderTests
     }
 
     [Theory]
-    [InlineData(OrderStatus.Pending, false)]
+    [InlineData(OrderStatus.PlaceOrder, false)]
     [InlineData(OrderStatus.Accepted, false)]
     [InlineData(OrderStatus.Arrived, true)]
     [InlineData(OrderStatus.PickedUp, true)]

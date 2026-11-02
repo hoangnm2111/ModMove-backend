@@ -10,7 +10,7 @@ internal sealed class ListDispatcherOrdersQueryHandler(
     ISqlConnectionFactory connectionFactory,
     TimeProvider clock) : IQueryHandler<ListDispatcherOrdersQuery, PagedResult<DispatcherOrderListItemResponse>>
 {
-    // Highlight Pending orders once 8 of the 10 matching minutes have elapsed (UC-DIS-01 Step 5, GB-24, DECISIONS 3.2).
+    // Highlight PlaceOrder orders once 8 of the 10 matching minutes have elapsed (UC-DIS-01 Step 5, GB-24, DECISIONS 3.2).
     private static readonly TimeSpan MatchingWarningThreshold = TimeSpan.FromMinutes(8);
 
     private const string From = """
@@ -98,7 +98,7 @@ internal sealed class ListDispatcherOrdersQueryHandler(
                 ? paidAt
                 : createdAt;
 
-            var matchingTimeoutSoon = string.Equals(r.OrderStatus, "Pending", StringComparison.OrdinalIgnoreCase)
+            var matchingTimeoutSoon = string.Equals(r.OrderStatus, "PlaceOrder", StringComparison.OrdinalIgnoreCase)
                 && matchingStart is not null
                 && now - matchingStart.Value >= MatchingWarningThreshold;
 

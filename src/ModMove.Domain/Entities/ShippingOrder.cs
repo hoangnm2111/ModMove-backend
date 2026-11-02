@@ -10,7 +10,7 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
 {
     private static readonly Dictionary<OrderStatus, OrderStatus[]> AllowedTransitions = new()
     {
-        [OrderStatus.Pending] = [OrderStatus.Accepted, OrderStatus.Cancelled],
+        [OrderStatus.PlaceOrder] = [OrderStatus.Accepted, OrderStatus.Cancelled],
         [OrderStatus.Accepted] = [OrderStatus.Arrived, OrderStatus.Cancelled],
         [OrderStatus.Arrived] = [OrderStatus.PickedUp, OrderStatus.Cancelled],
         [OrderStatus.PickedUp] = [OrderStatus.InTransit, OrderStatus.Cancelled],
@@ -50,7 +50,7 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     public PaymentMethod PaymentMethod { get; private set; }
     public PayerRole? PayerRole { get; private set; }
     public PaymentStatus PaymentStatus { get; private set; } = PaymentStatus.Unpaid;
-    public OrderStatus OrderStatus { get; private set; } = OrderStatus.Pending;
+    public OrderStatus OrderStatus { get; private set; } = OrderStatus.PlaceOrder;
     public string? CancellationReason { get; private set; }
 
     /// <summary>The CANCELLATION_REASON code the customer picked; null when a Dispatcher or the System cancelled.</summary>
@@ -116,7 +116,7 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
             Cargo = cargo,
             WarrantyAcceptedAt = warrantyAcceptedAt,
         };
-        order._statusHistories.Add(OrderStatusHistory.Create(null, OrderStatus.Pending, ChangedByRole.Customer, customerId, null));
+        order._statusHistories.Add(OrderStatusHistory.Create(null, OrderStatus.PlaceOrder, ChangedByRole.Customer, customerId, null));
         return order;
     }
 
@@ -344,7 +344,7 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     }
 
     /// <summary>
-    /// DECISIONS B3, 2.1, 2.2: a customer may cancel only while the order is Pending or Accepted, free and with a
+    /// DECISIONS B3, 2.1, 2.2: a customer may cancel only while the order is PlaceOrder or Accepted, free and with a
     /// full refund of what was paid online. From Arrived on, the goods are with the driver: the customer reports an
     /// incident and a Dispatcher decides (no refund). Returns the amount to refund (0 for unpaid or cash orders).
     /// </summary>
@@ -352,9 +352,9 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     {
         if (customerId != CustomerId)
             throw new DomainException("Only the customer who placed the order can cancel it.", "ORDER_NOT_YOURS");
-        if (OrderStatus is not (OrderStatus.Pending or OrderStatus.Accepted))
+        if (OrderStatus is not (OrderStatus.PlaceOrder or OrderStatus.Accepted))
             throw new DomainException(
-                "Only a Pending or Accepted order can be cancelled. Once the driver has arrived, report an incident instead.",
+                "Only an order still waiting for a driver or already accepted can be cancelled. Once the driver has arrived, report an incident instead.",
                 "ORDER_NOT_CANCELLABLE");
 
         Cancel(reason, ChangedByRole.Customer, customerId, now);
@@ -401,7 +401,7 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     /// </summary>
     public bool IsMatchingExpired(DateTimeOffset now)
     {
-        if (OrderStatus != OrderStatus.Pending)
+        if (OrderStatus != OrderStatus.PlaceOrder)
             return false;
 
         var start = PaymentMethod == PaymentMethod.PayOS ? PaidAt : CreatedAt;

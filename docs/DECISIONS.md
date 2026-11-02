@@ -27,7 +27,7 @@
 | 4.2, GB-10 | `weight_kg` = tổng khối lượng của cả đơn, phải ≤ `vehicle_types.max_load_weight_kg`. Dài × rộng × cao khách nhập là của **món lớn nhất**. Hàng lọt thùng (cho phép xoay hàng) khi xếp 3 cạnh của món đó và 3 cạnh thùng xe (`cargo_bed_*_cm`) từ nhỏ đến lớn rồi so từng cặp: cạnh nhỏ nhất ≤ cạnh nhỏ nhất của thùng, cạnh giữa ≤ cạnh giữa, cạnh lớn nhất ≤ cạnh lớn nhất |
 | 4.3 | Khách tick cam kết không chở hàng cấm khi đặt đơn. Tài xế thấy hàng cấm lúc lấy thì báo sự cố; Dispatcher hủy đơn, **không hoàn tiền** |
 | 4.5 | Không có đặt lịch trước |
-| 2.1, 2.2, B3 | Khách **tự hủy chỉ khi `Pending` hoặc `Accepted`**, miễn phí, không giới hạn thời gian; đơn PayOS đã trả được hoàn 100%. Từ `Arrived` trở đi khách không tự hủy: báo sự cố để Dispatcher xử lý (GB-17), không hoàn tiền. **Khách báo sự cố** (UC-CUS-15) khi đơn của mình đang `Arrived`, `PickedUp` hoặc `InTransit`; sau khi giao thì dùng khiếu nại (7.3) (2026-10-31) |
+| 2.1, 2.2, B3 | Khách **tự hủy chỉ khi `PlaceOrder` hoặc `Accepted`**, miễn phí, không giới hạn thời gian; đơn PayOS đã trả được hoàn 100%. Từ `Arrived` trở đi khách không tự hủy: báo sự cố để Dispatcher xử lý (GB-17), không hoàn tiền. **Khách báo sự cố** (UC-CUS-15) khi đơn của mình đang `Arrived`, `PickedUp` hoặc `InTransit`; sau khi giao thì dùng khiếu nại (7.3) (2026-10-31) |
 | 2.3, M3 | Không có ví khách. Đơn tiền mặt bị hủy sau khi tài xế đã đến: không thu được, không xử lý trong hệ thống. Đơn PayOS: không hoàn tiền đã trả |
 | 2.4 (điểm lấy) | **Khách vắng mặt ở điểm lấy hàng:** tài xế chờ 15 phút kể từ `Arrived`; không liên hệ được khách thì báo sự cố `Other` kèm ảnh tại điểm lấy. Dispatcher hủy đơn (UC-DIS-07). Đơn tiền mặt: không thu được. Đơn PayOS: **không hoàn tiền** (theo 2.1, 2.3) |
 | 2.4, 2.7 (điểm giao) | Tới điểm giao mà **không có người nhận**: tài xế để hàng tại điểm giao, gửi ảnh POD, đơn chuyển `Delivered`. Không có đếm ngược 5 phút, không có trạng thái "khách vắng mặt" (bỏ mục B7/B18 cũ) |
@@ -41,7 +41,7 @@
 
 | # | Quyết định |
 |---|---|
-| B10 | Đơn tạo ra ở `Pending`, `PaymentStatus = Unpaid`. Đơn **PayOS** chỉ hiện cho tài xế khi đã `Paid`; đơn **tiền mặt** hiện ngay |
+| B10 | Đơn tạo ra ở `PlaceOrder` (đổi tên từ `Pending` ngày 2026-11-02 cho khớp web; chỉ trạng thái đơn đổi, `Pending` của hồ sơ tài xế, ảnh lấy hàng và giao dịch giữ nguyên), `PaymentStatus = Unpaid`. Đơn **PayOS** chỉ hiện cho tài xế khi đã `Paid`; đơn **tiền mặt** hiện ngay |
 | 3.1 | Phiên PayOS sống 10 phút (GB-13). Hết hạn mà chưa trả: web/app hiển thị MSG50 và nút tạo mã mới cho **cùng đơn**; mã cũ không nhận chuyển khoản nữa. Đơn PayOS vẫn `Unpaid` sau **30 phút** kể từ `created_at` thì tự hủy (đủ cho khoảng 3 mã); JOB-PAY-01 làm việc này cùng lúc đánh dấu mã hết hạn.<br>`CreateOrderPayment` nhận `platform` (`Web` \| `App`); server chọn `returnUrl`/`cancelUrl` từ cấu hình (`PayOS:ReturnUrls:Web` là trang chi tiết đơn, `PayOS:ReturnUrls:App` là deep link). **Client không gửi URL** (tránh open redirect). Trạng thái thanh toán **chỉ tin webhook**, không tin việc PayOS chuyển hướng về `returnUrl` |
 | 3.2 | Thời gian ghép đơn 10 phút (GB-24): đơn tiền mặt tính **từ lúc tạo**, đơn PayOS **từ lúc thanh toán xong** (`shipping_orders.paid_at`) |
 | 5.1 | Rút tiền: **không** giới hạn tối thiểu. Ví cọc đang âm thì phần nợ được trừ vào thu nhập trước, ví cọc về 0 và có giao dịch `CommissionDebtPaid`; thu nhập còn lại không đủ số muốn rút thì từ chối và không trừ gì. Yêu cầu rút bị từ chối chỉ hoàn số đã xin rút, nợ đã trả không hoàn lại (2026-11-02) |

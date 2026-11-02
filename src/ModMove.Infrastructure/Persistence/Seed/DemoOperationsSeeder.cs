@@ -104,8 +104,8 @@ internal static class DemoOperationsSeeder
             }, ct);
         await EnsureRatingAsync(db, c5, customer.Id, driver.Id, 2, "Tài xế nói chuyện cộc lốc.", now, ct);
 
-        // Cover remaining statuses (Pending, Accepted, Cancelled) so UC-DIS-01 monitoring tabs have all 8 statuses.
-        await EnsureOrderAsync(db, people, vehicleType, "MMDEMO011", OrderStatus.Pending, PaymentMethod.Cash, 170_000m, now, ct);
+        // Cover remaining statuses (PlaceOrder, Accepted, Cancelled) so UC-DIS-01 monitoring tabs have all 8 statuses.
+        await EnsureOrderAsync(db, people, vehicleType, "MMDEMO011", OrderStatus.PlaceOrder, PaymentMethod.Cash, 170_000m, now, ct);
         await EnsureOrderAsync(db, people, vehicleType, "MMDEMO012", OrderStatus.Accepted, PaymentMethod.PayOS, 195_000m, now, ct);
         await EnsureOrderAsync(db, people, vehicleType, "MMDEMO013", OrderStatus.Cancelled, PaymentMethod.Cash, 160_000m, now, ct);
     }

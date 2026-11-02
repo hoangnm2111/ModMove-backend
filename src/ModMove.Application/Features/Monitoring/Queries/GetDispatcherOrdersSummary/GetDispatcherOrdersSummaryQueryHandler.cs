@@ -25,7 +25,7 @@ internal sealed class GetDispatcherOrdersSummaryQueryHandler(ISqlConnectionFacto
 
         int CountOf(string status) => counts.TryGetValue(status, out var n) ? n : 0;
 
-        var pending = CountOf("Pending");
+        var placeOrder = CountOf("PlaceOrder");
         var accepted = CountOf("Accepted");
         var arrived = CountOf("Arrived");
         var pickedUp = CountOf("PickedUp");
@@ -33,10 +33,10 @@ internal sealed class GetDispatcherOrdersSummaryQueryHandler(ISqlConnectionFacto
         var delivered = CountOf("Delivered");
         var completed = CountOf("Completed");
         var cancelled = CountOf("Cancelled");
-        var total = pending + accepted + arrived + pickedUp + inTransit + delivered + completed + cancelled;
+        var total = placeOrder + accepted + arrived + pickedUp + inTransit + delivered + completed + cancelled;
 
         return new DispatcherOrdersSummaryResponse(
-            total, pending, accepted, arrived, pickedUp, inTransit, delivered, completed, cancelled);
+            total, placeOrder, accepted, arrived, pickedUp, inTransit, delivered, completed, cancelled);
     }
 
     private sealed class Row
