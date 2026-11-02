@@ -111,7 +111,7 @@ public sealed class DriverWallet : BaseAuditableEntity, IAggregateRoot
         WalletTransactionType type, long? orderId, decimal amount, decimal balanceAfter, WalletTransactionStatus status)
     {
         RowVersion++;
-        var tx = WalletTransaction.Create(type, orderId, amount, balanceAfter, status);
+        var tx = WalletTransaction.Create(Id, type, orderId, amount, balanceAfter, status);
         _transactions.Add(tx);
         return tx;
     }

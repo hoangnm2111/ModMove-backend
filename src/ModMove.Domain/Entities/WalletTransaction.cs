@@ -25,9 +25,10 @@ public sealed class WalletTransaction : BaseAuditableEntity
     public DateTimeOffset? ProcessedAt { get; private set; }
 
     internal static WalletTransaction Create(
-        WalletTransactionType type, long? orderId, decimal amount, decimal balanceAfter, WalletTransactionStatus status) =>
+        long walletId, WalletTransactionType type, long? orderId, decimal amount, decimal balanceAfter, WalletTransactionStatus status) =>
         new()
         {
+            WalletId = walletId,
             TransactionType = type,
             OrderId = orderId,
             Amount = amount,

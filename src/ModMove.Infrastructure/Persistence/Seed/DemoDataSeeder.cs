@@ -64,6 +64,28 @@ internal static class DemoDataSeeder
         }
 
         await DemoOperationsSeeder.SeedAsync(db, admin, dispatcher, customer, driverUser, profile, now, ct);
+
+        var driverWallet = await db.Set<DriverWallet>()
+            .Include(w => w.Transactions)
+            .FirstOrDefaultAsync(w => w.DriverProfileId == profile.Id, ct);
+        var completedDemoOrder = await db.Set<ShippingOrder>()
+            .FirstOrDefaultAsync(o => o.OrderCode == "MMDEMO010", ct);
+
+        if (driverWallet is not null
+            && completedDemoOrder is not null
+            && !driverWallet.Transactions.Any(t => t.TransactionType == WalletTransactionType.WithdrawEarnings))
+        {
+            if (!driverWallet.Transactions.Any(t => t.OrderId == completedDemoOrder.Id && t.TransactionType == WalletTransactionType.TripEarning))
+            {
+                driverWallet.CreditTripEarning(
+                    completedDemoOrder.Id,
+                    completedDemoOrder.TotalFee,
+                    completedDemoOrder.CommissionAmount ?? completedDemoOrder.CommissionFor(0.10m));
+            }
+
+            driverWallet.RequestWithdrawal(100_000m);
+            await db.SaveChangesAsync(ct);
+        }
     }
 
     /// <summary>Matches by email or phone, so an existing dev account is reused instead of colliding on the unique index (GB-01).</summary>
