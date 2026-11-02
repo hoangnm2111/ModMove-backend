@@ -41,7 +41,7 @@ public class CancelOrderTests
     private static CancelOrderCommand Cancel(ShippingOrder order) => new(order.Id, "CHANGED_PLAN", "Đổi ý");
 
     [Fact]
-    public async Task PlaceOrder_cash_order_is_cancelled_with_nothing_to_refund_2_1()
+    public async Task Pending_cash_order_is_cancelled_with_nothing_to_refund_2_1()
     {
         var s = Build();
         var order = AddOrder(s, s.Customer.Id);
@@ -177,7 +177,7 @@ public class CancelOrderTests
         var error = await Assert.ThrowsAsync<DomainException>(() => s.App.Sender.Send(Cancel(order)));
 
         Assert.Equal("ORDER_NOT_YOURS", error.Code);
-        Assert.Equal(OrderStatus.PlaceOrder, order.OrderStatus);
+        Assert.Equal(OrderStatus.Pending, order.OrderStatus);
         Assert.Equal(0, s.App.UnitOfWork.Saves);
         Assert.Empty(s.App.Refunds.Items);
     }
@@ -201,7 +201,7 @@ public class CancelOrderTests
         var error = await Assert.ThrowsAsync<ForbiddenAccessException>(() => s.App.Sender.Send(Cancel(order)));
 
         Assert.Equal("ACCOUNT_INACTIVE", error.Code);
-        Assert.Equal(OrderStatus.PlaceOrder, order.OrderStatus);
+        Assert.Equal(OrderStatus.Pending, order.OrderStatus);
     }
 
     [Fact]
@@ -280,7 +280,7 @@ public class CancelOrderTests
         var error = await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new CancelOrderCommand(order.Id, "NOPE")));
 
         Assert.Contains("ReasonCode", error.Errors.Keys);
-        Assert.Equal(OrderStatus.PlaceOrder, order.OrderStatus);
+        Assert.Equal(OrderStatus.Pending, order.OrderStatus);
     }
 
     [Fact]
@@ -315,7 +315,7 @@ public class CancelOrderTests
         var error = await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new CancelOrderCommand(order.Id, code)));
 
         Assert.Contains("Reason", error.Errors.Keys);
-        Assert.Equal(OrderStatus.PlaceOrder, order.OrderStatus);
+        Assert.Equal(OrderStatus.Pending, order.OrderStatus);
     }
 
     [Fact]
