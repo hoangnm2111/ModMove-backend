@@ -129,6 +129,24 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         RowVersion++; // a customer cancel racing the webhook must not miss the payment (409 instead)
     }
 
+    /// <summary>
+    /// UC-CUS-27, DECISIONS 3.1: whether this customer may get a PayOS code for the order now. The same check serves the
+    /// first code and every new code after one expired: a PayOS order that is Unpaid, not cancelled, and still within
+    /// 30 minutes of booking (after that JOB-PAY-01 cancels it).
+    /// </summary>
+    public void EnsureCanStartPayOsPayment(long customerId, DateTimeOffset now)
+    {
+        EnsureCustomer(customerId);
+        if (OrderStatus == OrderStatus.Cancelled)
+            throw new DomainException("This order was cancelled; it cannot be paid.", "ORDER_CANCELLED");
+        if (PaymentMethod != PaymentMethod.PayOS)
+            throw new DomainException("Only a PayOS order is paid online; a cash order is paid to the driver.");
+        if (PaymentStatus == PaymentStatus.Paid)
+            throw new DomainException("This order is already paid.");
+        if (now - CreatedAt >= BusinessRules.PayOsPaymentDeadline)
+            throw new DomainException("The time to pay this order is over: an order must be paid within 30 minutes of booking.");
+    }
+
     /// <summary>GB-08: the first driver to accept is assigned; a stale RowVersion makes the save fail for the others.</summary>
     public void Accept(long driverProfileId, long driverUserId, DateTimeOffset now)
     {

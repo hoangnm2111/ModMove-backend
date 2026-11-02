@@ -7,6 +7,7 @@ using ModMove.Infrastructure.ExternalServices.Cloudinary;
 using ModMove.Infrastructure.ExternalServices.Email;
 using ModMove.Infrastructure.BackgroundJobs;
 using ModMove.Infrastructure.ExternalServices.GoogleMaps;
+using ModMove.Infrastructure.ExternalServices.PayOS;
 using ModMove.Infrastructure.Identity;
 using ModMove.Infrastructure.Persistence;
 using ModMove.Infrastructure.Persistence.Interceptors;
@@ -60,6 +61,7 @@ public static class DependencyInjection
         services.AddScoped<IRatingRepository, RatingRepository>();
         services.AddScoped<IMasterDataRepository, MasterDataRepository>();
         services.AddScoped<IDriverLocationLogRepository, DriverLocationLogRepository>();
+        services.AddScoped<IPaymentTransactionRepository, PaymentTransactionRepository>();
 
         services.AddHostedService<GpsLogCleanupJob>();
 
@@ -111,6 +113,31 @@ public static class DependencyInjection
                 UploadPreset = configuration["Cloudinary:UploadPreset"] ?? "modmove",
             });
             services.AddSingleton<IFileStorage, CloudinaryFileStorage>();
+        }
+
+        // PayOS (GB-13, DECISIONS 3.1): payment links and the webhook signature. Same stand-in rule as above, but the
+        // stand-in rejects every webhook. Half-filled keys stop the app, like a short Jwt:SigningKey does.
+        if (string.IsNullOrWhiteSpace(configuration["PayOS:ClientId"]))
+        {
+            services.AddSingleton<IPaymentGateway, NotConfiguredPaymentGateway>();
+        }
+        else
+        {
+            var payOs = new PayOsOptions
+            {
+                ClientId = configuration["PayOS:ClientId"]!,
+                ApiKey = configuration["PayOS:ApiKey"] ?? "",
+                ChecksumKey = configuration["PayOS:ChecksumKey"] ?? "",
+                Endpoint = configuration["PayOS:Endpoint"] is { Length: > 0 } endpoint ? endpoint.TrimEnd('/') : new PayOsOptions().Endpoint,
+                ReturnUrlWeb = configuration["PayOS:ReturnUrls:Web"] ?? "",
+                ReturnUrlApp = configuration["PayOS:ReturnUrls:App"] ?? "",
+                CancelUrlWeb = configuration["PayOS:CancelUrls:Web"] ?? "",
+                CancelUrlApp = configuration["PayOS:CancelUrls:App"] ?? "",
+            };
+            if (string.IsNullOrWhiteSpace(payOs.ApiKey) || string.IsNullOrWhiteSpace(payOs.ChecksumKey))
+                throw new InvalidOperationException("PayOS:ClientId is set, so PayOS:ApiKey and PayOS:ChecksumKey must be set too.");
+            services.AddSingleton(payOs);
+            services.AddHttpClient<IPaymentGateway, PayOsPaymentGateway>();
         }
 
         return services;

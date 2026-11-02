@@ -647,4 +647,56 @@ public class ShippingOrderTests
         else
             Assert.Equal("INCIDENT_NOT_ALLOWED", Assert.IsType<DomainException>(error).Code);
     }
+
+    // UC-CUS-27, DECISIONS 3.1: who may get a PayOS code, and until when.
+    private static ShippingOrder PayOsOrderBookedAtNow(PaymentMethod method = PaymentMethod.PayOS)
+    {
+        var order = NewOrder(method, method == PaymentMethod.Cash ? PayerRole.Sender : null);
+        order.CreatedAt = Now;
+        return order;
+    }
+
+    [Fact]
+    public void An_unpaid_PayOS_order_may_get_a_code_for_its_customer_until_30_minutes_after_booking()
+    {
+        var order = PayOsOrderBookedAtNow();
+
+        order.EnsureCanStartPayOsPayment(customerId: 1, Now);
+        order.EnsureCanStartPayOsPayment(customerId: 1, Now.AddMinutes(29).AddSeconds(59));
+        var late = Assert.Throws<DomainException>(() => order.EnsureCanStartPayOsPayment(1, Now.AddMinutes(30)));
+
+        Assert.Null(late.Code);
+    }
+
+    [Fact]
+    public void A_code_for_another_customers_order_is_ORDER_NOT_YOURS_C10()
+    {
+        var order = PayOsOrderBookedAtNow();
+
+        var error = Assert.Throws<DomainException>(() => order.EnsureCanStartPayOsPayment(customerId: 2, Now));
+
+        Assert.Equal("ORDER_NOT_YOURS", error.Code);
+    }
+
+    [Fact]
+    public void A_cancelled_order_gets_no_code_ORDER_CANCELLED()
+    {
+        var order = PayOsOrderBookedAtNow();
+        order.Cancel("x", ChangedByRole.Customer, 1, Now);
+
+        var error = Assert.Throws<DomainException>(() => order.EnsureCanStartPayOsPayment(1, Now));
+
+        Assert.Equal("ORDER_CANCELLED", error.Code);
+    }
+
+    [Fact]
+    public void A_cash_order_and_a_paid_order_get_no_code()
+    {
+        var cash = PayOsOrderBookedAtNow(PaymentMethod.Cash);
+        var paid = PayOsOrderBookedAtNow();
+        paid.MarkPaid(Now);
+
+        Assert.Throws<DomainException>(() => cash.EnsureCanStartPayOsPayment(1, Now));
+        Assert.Throws<DomainException>(() => paid.EnsureCanStartPayOsPayment(1, Now));
+    }
 }
