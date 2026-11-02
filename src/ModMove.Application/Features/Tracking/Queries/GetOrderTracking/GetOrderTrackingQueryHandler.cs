@@ -1,3 +1,4 @@
+using System.Data;
 using Dapper;
 using Microsoft.Extensions.Logging;
 using ModMove.Application.Common;
@@ -29,6 +30,16 @@ internal sealed class GetOrderTrackingQueryHandler(
         WHERE o.id = @OrderId AND o.customer_id = @CustomerId
         """;
 
+    // The proof row exists once the cargo was picked up, so an earlier reassignment before pickup does not count.
+    private const string HandoverSql = """
+        SELECT i.latitude AS Latitude, i.longitude AS Longitude
+        FROM in_transit_incidents i
+        JOIN proof_of_deliveries p ON p.order_id = i.order_id
+        WHERE i.order_id = @OrderId AND i.resolution_decision = 'ReassignDriver'
+        ORDER BY i.resolved_at DESC, i.id DESC
+        LIMIT 1
+        """;
+
     public async Task<OrderTrackingResponse> Handle(GetOrderTrackingQuery request, CancellationToken cancellationToken)
     {
         var customerId = currentUser.RequireUserId();
@@ -43,7 +54,7 @@ internal sealed class GetOrderTrackingQueryHandler(
         var dropoff = new GeoPoint(row.DropoffLatitude, row.DropoffLongitude);
         var (driver, eta) = row.OrderStatus switch
         {
-            "Accepted" or "Arrived" => await DriverAsync(row, "Pickup", pickup, cancellationToken),
+            "Accepted" or "Arrived" => await ToCargoAsync(connection, request.OrderId, row, pickup, cancellationToken),
             "PickedUp" or "InTransit" => await DriverAsync(row, "Dropoff", dropoff, cancellationToken),
             _ => default,
         };
@@ -51,8 +62,21 @@ internal sealed class GetOrderTrackingQueryHandler(
         return new OrderTrackingResponse(request.OrderId, row.OrderStatus, pickup, dropoff, driver, eta);
     }
 
+    /// <summary>DECISIONS 7.2: after a reassignment mid-trip the new driver collects the cargo from the old vehicle, not at pickup.</summary>
+    private async Task<(DriverPositionResponse? Driver, TrackingEtaResponse? Eta)> ToCargoAsync(
+        IDbConnection connection, long orderId, Row row, GeoPoint pickup, CancellationToken cancellationToken)
+    {
+        var handover = await connection.QueryFirstOrDefaultAsync<HandoverRow>(
+            new CommandDefinition(HandoverSql, new { OrderId = orderId }, cancellationToken: cancellationToken));
+        if (handover is null)
+            return await DriverAsync(row, "Pickup", pickup, cancellationToken);
+
+        var vehicle = handover is { Latitude: { } latitude, Longitude: { } longitude } ? new GeoPoint(latitude, longitude) : null;
+        return await DriverAsync(row, "Handover", vehicle, cancellationToken);
+    }
+
     private async Task<(DriverPositionResponse? Driver, TrackingEtaResponse? Eta)> DriverAsync(
-        Row row, string target, GeoPoint stop, CancellationToken cancellationToken)
+        Row row, string target, GeoPoint? stop, CancellationToken cancellationToken)
     {
         if (row is not { DriverLatitude: { } latitude, DriverLongitude: { } longitude, DriverLocationAt: { } seenAt })
             return default;
@@ -60,7 +84,7 @@ internal sealed class GetOrderTrackingQueryHandler(
         var at = CustomerAccess.Utc(seenAt);
         var isStale = clock.GetUtcNow() - at > IncidentHandlingRules.GpsFreshWindow;
         var driver = new DriverPositionResponse(latitude, longitude, at, isStale);
-        if (isStale)
+        if (isStale || stop is null)
             return (driver, null);
 
         try
@@ -76,6 +100,12 @@ internal sealed class GetOrderTrackingQueryHandler(
             logger.LogWarning(ex, "No ETA from the map service");
             return (driver, null);
         }
+    }
+
+    private sealed class HandoverRow
+    {
+        public decimal? Latitude { get; init; }
+        public decimal? Longitude { get; init; }
     }
 
     private sealed class Row

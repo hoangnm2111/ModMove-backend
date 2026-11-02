@@ -16,5 +16,8 @@ public sealed record OrderTrackingResponse(
 /// <summary><see cref="IsStale"/>: no GPS for over 5 minutes, the driver counts as disconnected (6.4).</summary>
 public sealed record DriverPositionResponse(decimal Latitude, decimal Longitude, DateTimeOffset At, bool IsStale);
 
-/// <summary><see cref="Target"/>: Pickup or Dropoff. Null on the response when the position is stale or Google Maps failed or took over 3 seconds.</summary>
+/// <summary>
+/// <see cref="Target"/>: Pickup, Handover (the old vehicle, after a mid-trip reassignment, 7.2) or Dropoff. Null on the response
+/// when the position is stale, the handover location is unknown, or Google Maps failed or took over 3 seconds.
+/// </summary>
 public sealed record TrackingEtaResponse(string Target, int DurationMinutes);

@@ -43,6 +43,10 @@ public class OrderTrackingTests
         public string OrderStatus { get; set; } = "InTransit";
         public DateTime? LocationAt { get; set; } = SeenAt;
         public bool Found { get; set; } = true;
+
+        /// <summary>Where the incident behind a mid-trip reassignment happened; null = no such reassignment.</summary>
+        public (decimal? Latitude, decimal? Longitude)? Handover { get; set; }
+
         public List<(string Sql, IReadOnlyDictionary<string, object?> Parameters)> Executed { get; } = [];
 
         public Db()
@@ -52,6 +56,14 @@ public class OrderTrackingTests
                 Executed.Add((text, parameters));
                 if (text.Contains("FROM users"))
                     return Table(("AccountStatus", typeof(string), AccountStatus));
+                if (text.Contains("FROM in_transit_incidents"))
+                {
+                    var handover = Table(("Latitude", typeof(decimal), Handover?.Latitude), ("Longitude", typeof(decimal), Handover?.Longitude));
+                    if (Handover is null)
+                        handover.Rows.Clear();
+                    return handover;
+                }
+
                 var row = Table(
                     ("OrderStatus", typeof(string), OrderStatus),
                     ("PickupLatitude", typeof(decimal), 21.0m), ("PickupLongitude", typeof(decimal), 105.8m),
@@ -100,6 +112,57 @@ public class OrderTrackingTests
         var (from, to) = Assert.Single(db.Maps.Routes);
         Assert.Equal(new GeoPoint(21.05m, 105.85m), from);
         Assert.Equal(new GeoPoint((decimal)latitude, (decimal)longitude), to);
+    }
+
+    [Theory]
+    [InlineData("Accepted")]
+    [InlineData("Arrived")]
+    public async Task After_a_mid_trip_reassignment_the_eta_runs_to_the_old_vehicle_7_2(string status)
+    {
+        var db = new Db { OrderStatus = status, Handover = (21.07m, 105.87m) };
+
+        var tracking = await db.Sender().Send(new GetOrderTrackingQuery(1));
+
+        Assert.Equal(("Handover", 14), (tracking.Eta!.Target, tracking.Eta.DurationMinutes));
+        Assert.Equal(new GeoPoint(21.07m, 105.87m), Assert.Single(db.Maps.Routes).To);
+    }
+
+    [Fact]
+    public async Task Handover_without_a_known_location_has_no_eta_7_2()
+    {
+        var db = new Db { OrderStatus = "Accepted", Handover = (null, null) };
+
+        var tracking = await db.Sender().Send(new GetOrderTrackingQuery(1));
+
+        Assert.NotNull(tracking.Driver);
+        Assert.Null(tracking.Eta);
+        Assert.Empty(db.Maps.Routes);
+    }
+
+    [Fact]
+    public async Task Only_a_reassignment_after_pickup_on_this_order_counts_as_a_handover()
+    {
+        var db = new Db { OrderStatus = "Accepted" };
+
+        await db.Sender().Send(new GetOrderTrackingQuery(1));
+
+        var (sql, parameters) = db.Executed.Last(e => e.Sql.Contains("FROM in_transit_incidents"));
+        Assert.Contains("JOIN proof_of_deliveries", sql); // created when the cargo is picked up
+        Assert.Contains("resolution_decision = 'ReassignDriver'", sql);
+        Assert.Contains("ORDER BY i.resolved_at DESC", sql);
+        Assert.Equal(1L, parameters["OrderId"]);
+    }
+
+    [Theory]
+    [InlineData("PickedUp")]
+    [InlineData("InTransit")]
+    public async Task Once_the_new_driver_has_the_cargo_the_eta_runs_to_the_dropoff_7_2(string status)
+    {
+        var db = new Db { OrderStatus = status, Handover = (21.07m, 105.87m) };
+
+        var tracking = await db.Sender().Send(new GetOrderTrackingQuery(1));
+
+        Assert.Equal("Dropoff", tracking.Eta!.Target);
     }
 
     [Fact]
