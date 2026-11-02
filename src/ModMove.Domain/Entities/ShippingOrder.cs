@@ -53,6 +53,9 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     public OrderStatus OrderStatus { get; private set; } = OrderStatus.Pending;
     public string? CancellationReason { get; private set; }
 
+    /// <summary>The CANCELLATION_REASON code the customer picked; null when a Dispatcher or the System cancelled.</summary>
+    public string? CancellationReasonCode { get; private set; }
+
     public DateTimeOffset WarrantyAcceptedAt { get; private set; }
     public DateTimeOffset? AcceptedAt { get; private set; }
 
@@ -212,7 +215,8 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     /// RowVersion makes a second complaint saved at the same time fail with 409.
     /// </summary>
     public Refund FileComplaint(
-        long customerId, string reason, IEnumerable<string>? evidenceUrls, decimal requestedAmount, DateTimeOffset now)
+        long customerId, string reason, IEnumerable<string>? evidenceUrls, decimal requestedAmount, DateTimeOffset now,
+        string? reasonCode = null)
     {
         EnsureCustomer(customerId);
         if (!CanReceiveComplaint(now))
@@ -221,7 +225,7 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         EnsureRefundAmount(requestedAmount);
 
         RowVersion++;
-        return Refund.Request(Id, null, RefundSourceType.Complaint, reason, evidenceUrls, requestedAmount);
+        return Refund.Request(Id, null, RefundSourceType.Complaint, reason, evidenceUrls, requestedAmount, reasonCode);
     }
 
     /// <summary>
@@ -329,7 +333,7 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     /// full refund of what was paid online. From Arrived on, the goods are with the driver: the customer reports an
     /// incident and a Dispatcher decides (no refund). Returns the amount to refund (0 for unpaid or cash orders).
     /// </summary>
-    public decimal CancelByCustomer(long customerId, string reason, DateTimeOffset now)
+    public decimal CancelByCustomer(long customerId, string reason, DateTimeOffset now, string? reasonCode = null)
     {
         if (customerId != CustomerId)
             throw new DomainException("Only the customer who placed the order can cancel it.", "ORDER_NOT_YOURS");
@@ -339,6 +343,7 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
                 "ORDER_NOT_CANCELLABLE");
 
         Cancel(reason, ChangedByRole.Customer, customerId, now);
+        CancellationReasonCode = reasonCode;
         return PaymentStatus == PaymentStatus.Paid ? TotalFee : 0;
     }
 

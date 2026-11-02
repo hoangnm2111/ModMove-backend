@@ -135,6 +135,7 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnName("usage_limit");
 
                     b.Property<int>("UsedCount")
+                        .IsConcurrencyToken()
                         .HasColumnType("int")
                         .HasColumnName("used_count");
 
@@ -279,6 +280,8 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("DriverProfileId");
+
+                    b.HasIndex("RecordedAt");
 
                     b.HasIndex("OrderId", "RecordedAt");
 
@@ -994,6 +997,11 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetime(6)")
                         .HasColumnName("decided_at");
 
+                    b.Property<string>("DecisionNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("varchar(1000)")
+                        .HasColumnName("decision_note");
+
                     b.Property<string>("EvidenceUrls")
                         .HasColumnType("json")
                         .HasColumnName("evidence_urls");
@@ -1034,6 +1042,11 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("varchar(1000)")
                         .HasColumnName("reason");
+
+                    b.Property<string>("ReasonCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("reason_code");
 
                     b.Property<string>("RefundStatus")
                         .IsRequired()
@@ -1086,6 +1099,11 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("varchar(500)")
                         .HasColumnName("cancellation_reason");
+
+                    b.Property<string>("CancellationReasonCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("cancellation_reason_code");
 
                     b.Property<decimal?>("CommissionAmount")
                         .HasPrecision(15, 2)
