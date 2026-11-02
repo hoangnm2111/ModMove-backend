@@ -30,6 +30,7 @@ public class CustomerNotificationTests
     [InlineData(CustomerEvent.OrderCompleted, "ORDER_COMPLETED")]
     [InlineData(CustomerEvent.IncidentResolved, "INCIDENT_RESOLVED")]
     [InlineData(CustomerEvent.RefundDecided, "REFUND_DECIDED")]
+    [InlineData(CustomerEvent.OrderCancelled, "ORDER_CANCELLED")]
     public async Task Each_customer_event_of_8_3_reaches_the_customer_of_the_order(CustomerEvent customerEvent, string type)
     {
         var s = new TripSetup();

@@ -189,6 +189,12 @@ internal sealed class InMemoryRefunds : IRefundRepository
             .Where(r => r.OrderId == orderId && r.RefundStatus is RefundStatus.Requested or RefundStatus.Approved or RefundStatus.Processed)
             .Sum(r => r.ProposedAmount ?? r.RequestedAmount));
 
+    /// <summary>Customers whose orders have an open refund; refunds here do not know their order's customer.</summary>
+    public HashSet<long> CustomersWithOpenRefunds { get; } = [];
+
+    public Task<bool> HasOpenForCustomerAsync(long customerId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(CustomersWithOpenRefunds.Contains(customerId));
+
     public Task<Refund?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(r => r.Id == id));
 
@@ -246,8 +252,11 @@ internal sealed class InMemoryDriverProfiles : IDriverProfileRepository
 {
     public List<DriverProfile> Items { get; } = [];
 
-    public Task<DriverProfile?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Items.FirstOrDefault(d => d.Id == id));
+    public Task<DriverProfile?> GetByIdAsync(long id, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested(); // like the database call this stands in for
+        return Task.FromResult(Items.FirstOrDefault(d => d.Id == id));
+    }
 
     public Task<DriverProfile?> GetByIdWithApplicationsAndVehicleAsync(long id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(d => d.Id == id));
@@ -315,6 +324,9 @@ internal sealed class CountingUnitOfWork : IUnitOfWork
 {
     public int Saves { get; private set; }
 
+    /// <summary>Runs right after a save, e.g. to act like the client disconnecting at that moment.</summary>
+    public Action? AfterSave { get; set; }
+
     /// <summary>Pretends a unique index lost a race, like ApplicationDbContext turning a duplicate key into 409.</summary>
     public bool ThrowConflictOnSave { get; set; }
 
@@ -323,6 +335,7 @@ internal sealed class CountingUnitOfWork : IUnitOfWork
         if (ThrowConflictOnSave)
             throw new ModMove.Application.Common.Exceptions.ConflictException("A record with the same unique value already exists.");
         Saves++;
+        AfterSave?.Invoke();
         return Task.FromResult(1);
     }
 }
@@ -350,8 +363,13 @@ internal sealed class CapturingEmailSender : IEmailSender
 {
     public List<(string To, string Subject, string Body)> Sent { get; } = [];
 
+    /// <summary>Set to true to act like the SMTP server being down.</summary>
+    public bool Fail { get; set; }
+
     public Task SendAsync(string to, string subject, string htmlBody, CancellationToken cancellationToken)
     {
+        if (Fail)
+            throw new InvalidOperationException("SMTP is down");
         Sent.Add((to, subject, htmlBody));
         return Task.CompletedTask;
     }

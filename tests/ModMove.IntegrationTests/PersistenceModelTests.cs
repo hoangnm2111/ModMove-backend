@@ -17,6 +17,7 @@ public class PersistenceModelTests
     [InlineData(typeof(ShippingOrder), nameof(ShippingOrder.RowVersion))] // GB-08: first driver to accept wins
     [InlineData(typeof(DriverWallet), nameof(DriverWallet.RowVersion))]   // balance changes never lost
     [InlineData(typeof(Coupon), nameof(Coupon.UsedCount))]                // B11, GB-21: two orders cannot share the last use
+    [InlineData(typeof(Refund), nameof(Refund.RowVersion))]               // a withdrawal and an Admin decision cannot both win
     public void Column_is_a_concurrency_token(Type entity, string property)
     {
         using var db = NewContext();

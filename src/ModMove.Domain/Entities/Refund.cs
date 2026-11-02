@@ -44,6 +44,9 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
     public DateTimeOffset? DecidedAt { get; private set; }
     public DateTimeOffset? ProcessedAt { get; private set; }
 
+    /// <summary>Optimistic lock: of a customer withdrawing and an Administrator deciding at once, the later save is a 409.</summary>
+    public int RowVersion { get; private set; }
+
     /// <summary>
     /// DECISIONS B9: a cancellation refund skips the Dispatcher, so it is proposed at its full amount on creation and
     /// an Administrator can approve it at once. Incident and complaint refunds wait for <see cref="Propose"/>.
@@ -69,6 +72,7 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
         EnsureDispatcherStep();
         InfoRequestNote = note;
         CustomerReply = null; // a new question waits for a new answer (7.4)
+        RowVersion++;
     }
 
     /// <summary>
@@ -87,6 +91,7 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
 
         CustomerReply = reply;
         EvidenceUrls = evidence;
+        RowVersion++;
     }
 
     /// <summary>UC-DIS-09 / UC-DIS-15: full, partial or no refund (amount 0).</summary>
@@ -100,6 +105,7 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
         ProposedAmount = amount;
         ProposalReason = reason;
         ProposedBy = dispatcherId;
+        RowVersion++;
     }
 
     public void Approve(long adminId, DateTimeOffset now, string? note = null)
@@ -112,6 +118,7 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
         ApprovedBy = adminId;
         DecidedAt = now;
         DecisionNote = note;
+        RowVersion++;
     }
 
     public void RejectRefund(long adminId, DateTimeOffset now, string? note = null)
@@ -121,6 +128,7 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
         ApprovedBy = adminId;
         DecidedAt = now;
         DecisionNote = note;
+        RowVersion++;
     }
 
     public void MarkProcessed(string bankReferenceCode, DateTimeOffset now)
@@ -129,12 +137,14 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
         RefundStatus = RefundStatus.Processed;
         BankReferenceCode = bankReferenceCode;
         ProcessedAt = now;
+        RowVersion++;
     }
 
     public void MarkFailed()
     {
         EnsureStatus(RefundStatus.Approved);
         RefundStatus = RefundStatus.Failed;
+        RowVersion++;
     }
 
     /// <summary>UC-CUS-24: the customer drops a complaint or incident refund still under review. A cancellation refund is owed, so it stays.</summary>
@@ -144,6 +154,7 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
             throw new DomainException("A cancellation refund cannot be withdrawn.");
         EnsureStatus(RefundStatus.Requested);
         RefundStatus = RefundStatus.Withdrawn;
+        RowVersion++;
     }
 
     // DECISIONS B9: a cancellation refund is 100% of what was paid and skips the Dispatcher entirely.

@@ -387,6 +387,10 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         _statusHistories.Add(OrderStatusHistory.Create(from, OrderStatus.Accepted, ChangedByRole.Dispatcher, dispatcherId, note));
     }
 
+    /// <summary>
+    /// GB-23: delivered for 24 hours. An open complaint also holds the order (DECISIONS 7.3), but that needs the refunds
+    /// table, so the caller checks IRefundRepository.HasOpenComplaintAsync as well.
+    /// </summary>
     public bool CanBeAutoCompleted(DateTimeOffset now) =>
         OrderStatus == OrderStatus.Delivered && DeliveredAt is not null &&
         now - DeliveredAt >= BusinessRules.AutoCompleteAfterDelivery;

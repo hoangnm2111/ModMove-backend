@@ -30,4 +30,9 @@ public sealed class RefundRepository(ApplicationDbContext dbContext)
         Set.Where(r => r.OrderId == orderId
                 && (r.RefundStatus == RefundStatus.Requested || r.RefundStatus == RefundStatus.Approved || r.RefundStatus == RefundStatus.Processed))
             .SumAsync(r => r.ProposedAmount ?? r.RequestedAmount, cancellationToken);
+
+    public Task<bool> HasOpenForCustomerAsync(long customerId, CancellationToken cancellationToken = default) =>
+        Set.Where(r => r.RefundStatus == RefundStatus.Requested || r.RefundStatus == RefundStatus.Approved)
+            .Join(DbContext.Set<ShippingOrder>().Where(o => o.CustomerId == customerId), r => r.OrderId, o => o.Id, (r, _) => r.Id)
+            .AnyAsync(cancellationToken);
 }

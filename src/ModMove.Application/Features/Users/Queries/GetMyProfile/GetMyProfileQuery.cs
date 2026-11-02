@@ -11,5 +11,4 @@ public sealed record ProfileResponse(
     string PhoneNumber,
     string Email,
     string Role,
-    string? AvatarUrl,
     bool EmailVerified);

@@ -1059,6 +1059,11 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnType("decimal(15,2)")
                         .HasColumnName("requested_amount");
 
+                    b.Property<int>("RowVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("int")
+                        .HasColumnName("row_version");
+
                     b.Property<string>("SourceType")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -1346,11 +1351,6 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)")
                         .HasColumnName("account_status");
-
-                    b.Property<string>("AvatarUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("varchar(500)")
-                        .HasColumnName("avatar_url");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetime(6)")

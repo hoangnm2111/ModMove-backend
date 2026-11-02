@@ -14,7 +14,6 @@ public sealed record UserDetailResponse
     public string Role { get; init; } = string.Empty;
     public string AccountStatus { get; init; } = string.Empty;
     public bool EmailVerified { get; init; }
-    public string? AvatarUrl { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
     public DateTimeOffset? UpdatedAt { get; init; }
     public string? DriverApprovalStatus { get; init; }
@@ -33,7 +32,6 @@ public sealed record UserDetailResponse
         string role,
         string accountStatus,
         bool emailVerified,
-        string? avatarUrl,
         DateTimeOffset createdAt,
         DateTimeOffset? updatedAt,
         string? driverApprovalStatus,
@@ -49,7 +47,6 @@ public sealed record UserDetailResponse
         Role = role;
         AccountStatus = accountStatus;
         EmailVerified = emailVerified;
-        AvatarUrl = avatarUrl;
         CreatedAt = createdAt;
         UpdatedAt = updatedAt;
         DriverApprovalStatus = driverApprovalStatus;
