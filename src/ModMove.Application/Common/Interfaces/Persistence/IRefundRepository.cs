@@ -15,4 +15,10 @@ public interface IRefundRepository : IRepository<Refund>
 
     /// <summary>The refund still open (Requested or Approved) for an incident, or null; the Dispatcher works on it (UC-DIS-08, 14).</summary>
     Task<Refund?> GetOpenForIncidentAsync(long incidentId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// DECISIONS B9: what the order's refunds add up to so far: open or paid out, at the proposed amount once a Dispatcher
+    /// proposed one. Rejected, Failed and Withdrawn refunds paid nothing and do not count.
+    /// </summary>
+    Task<decimal> GetClaimedTotalForOrderAsync(long orderId, CancellationToken cancellationToken = default);
 }

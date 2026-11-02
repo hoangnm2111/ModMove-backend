@@ -24,11 +24,12 @@ internal sealed class RequestIncidentRefundCommandHandler(
         var order = await orders.GetByIdAsync(incident.OrderId, cancellationToken)
             ?? throw new NotFoundException(nameof(ShippingOrder), incident.OrderId);
 
-        // ORDER_NOT_YOURS and REFUND_AMOUNT_INVALID come from the order.
+        // ORDER_NOT_YOURS, REFUND_AMOUNT_INVALID, REFUND_NOT_ALLOWED and REFUND_TOTAL_EXCEEDED come from the order.
         var refund = order.RequestIncidentRefund(
             customer.Id, incident.Id, request.Reason.Trim(), request.EvidenceUrls, request.RequestedAmount);
         if (await refunds.HasOpenRefundForIncidentAsync(incident.Id, cancellationToken))
             throw new ConflictException("This incident already has an open refund request.");
+        order.EnsureRefundFits(request.RequestedAmount, await refunds.GetClaimedTotalForOrderAsync(order.Id, cancellationToken));
 
         refunds.Add(refund);
         await unitOfWork.SaveChangesAsync(cancellationToken); // a concurrent second request fails on RowVersion: 409

@@ -230,13 +230,16 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
 
     /// <summary>
     /// UC-CUS-17, DECISIONS B9: the customer asks for a refund because of an incident on this order, whatever the
-    /// incident's state. "One open refund per incident" is checked by the caller; RowVersion guards a concurrent one.
+    /// incident's state; only money paid through PayOS can come back. "One open refund per incident" and the order-wide
+    /// total (<see cref="EnsureRefundFits"/>) are checked by the caller; RowVersion guards a concurrent one.
     /// </summary>
     public Refund RequestIncidentRefund(
         long customerId, long incidentId, string reason, IEnumerable<string>? evidenceUrls, decimal requestedAmount)
     {
         EnsureCustomer(customerId);
         EnsureRefundAmount(requestedAmount);
+        if (PaymentMethod != PaymentMethod.PayOS || PaymentStatus != PaymentStatus.Paid)
+            throw new DomainException("An incident refund is only allowed for a paid PayOS order.", "REFUND_NOT_ALLOWED");
 
         RowVersion++;
         return Refund.Request(Id, incidentId, RefundSourceType.Incident, reason, evidenceUrls, requestedAmount);
@@ -264,6 +267,18 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         if (requestedAmount <= 0 || requestedAmount > TotalFee)
             throw new DomainException(
                 $"The amount requested must be more than 0 and at most the order total ({TotalFee:0} VND).", "REFUND_AMOUNT_INVALID");
+    }
+
+    /// <summary>
+    /// DECISIONS B9: all refunds of an order add up to at most its total. <paramref name="alreadyClaimed"/> comes from the
+    /// refunds table (IRefundRepository.GetClaimedTotalForOrderAsync).
+    /// </summary>
+    public void EnsureRefundFits(decimal requestedAmount, decimal alreadyClaimed)
+    {
+        if (alreadyClaimed + requestedAmount > TotalFee)
+            throw new DomainException(
+                $"The refunds of this order cannot exceed its total: at most {Math.Max(0, TotalFee - alreadyClaimed):0} VND can still be requested.",
+                "REFUND_TOTAL_EXCEEDED");
     }
 
     /// <summary>

@@ -184,6 +184,11 @@ internal sealed class InMemoryRefunds : IRefundRepository
     public Task<Refund?> GetOpenForIncidentAsync(long incidentId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.LastOrDefault(r => r.IncidentId == incidentId && r.RefundStatus is RefundStatus.Requested or RefundStatus.Approved));
 
+    public Task<decimal> GetClaimedTotalForOrderAsync(long orderId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items
+            .Where(r => r.OrderId == orderId && r.RefundStatus is RefundStatus.Requested or RefundStatus.Approved or RefundStatus.Processed)
+            .Sum(r => r.ProposedAmount ?? r.RequestedAmount));
+
     public Task<Refund?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(r => r.Id == id));
 
