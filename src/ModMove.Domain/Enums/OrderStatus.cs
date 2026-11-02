@@ -2,7 +2,7 @@ namespace ModMove.Domain.Enums;
 
 public enum OrderStatus
 {
-    Pending,
+    PlaceOrder,
     Accepted,
     Arrived,
     PickedUp,

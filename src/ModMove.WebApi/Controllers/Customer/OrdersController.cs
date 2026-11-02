@@ -38,7 +38,7 @@ public sealed class OrdersController : ApiControllerBase
         return StatusCode(StatusCodes.Status201Created, result);
     }
 
-    /// <summary>Cancel while Pending or Accepted (UC-CUS-29). A paid PayOS order gets a 100% refund for the Administrator.</summary>
+    /// <summary>Cancel while PlaceOrder or Accepted (UC-CUS-29). A paid PayOS order gets a 100% refund for the Administrator.</summary>
     [HttpPost("{id:long}/cancel")]
     public async Task<IActionResult> Cancel(long id, CancelOrderRequest request, CancellationToken cancellationToken)
     {

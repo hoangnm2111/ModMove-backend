@@ -178,7 +178,7 @@ public class OrderTrackingTests
     }
 
     [Theory]
-    [InlineData("Pending")]
+    [InlineData("PlaceOrder")]
     [InlineData("Delivered")]
     [InlineData("Completed")]
     [InlineData("Cancelled")]
