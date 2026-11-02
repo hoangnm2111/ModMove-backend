@@ -41,6 +41,22 @@ public class ReportIncidentByCustomerTests
     }
 
     [Fact]
+    public async Task The_driver_is_not_shown_what_the_customer_wrote()
+    {
+        var s = new TripSetup();
+        var order = s.PickedUp();
+
+        await s.App.Sender.Send(new ReportIncidentByCustomerCommand(
+            order.Id, IncidentType.Other, "Tài xế thái độ không tốt", null, null, null));
+
+        var notification = Assert.IsType<Notification>(Assert.Single(s.App.Realtime.Sent, x => x.Target == "user").Payload);
+        Assert.Contains(order.OrderCode, notification.Title);
+        Assert.DoesNotContain("thái độ", notification.Title + notification.Body);
+        var dispatchers = Assert.IsType<Notification>(Assert.Single(s.App.Realtime.Sent, x => x.Target == "dispatchers").Payload);
+        Assert.Equal("Tài xế thái độ không tốt", dispatchers.Body);
+    }
+
+    [Fact]
     public async Task After_delivery_the_customer_files_a_complaint_instead_7_3()
     {
         var s = new TripSetup();

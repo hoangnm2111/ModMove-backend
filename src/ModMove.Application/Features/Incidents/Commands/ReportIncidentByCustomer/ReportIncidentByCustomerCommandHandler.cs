@@ -39,8 +39,9 @@ internal sealed class ReportIncidentByCustomerCommandHandler(
             }), cancellationToken);
 
         var driverUserId = await driverProfiles.DriverUserIdAsync(order, cancellationToken);
+        // The report may be about the driver, so the customer's words go to Dispatchers only.
         await notifications.NotifyDriverAsync(driverUserId, order, "INCIDENT_REPORTED",
-            $"Khách báo sự cố đơn {order.OrderCode}", incident.Description, cancellationToken,
+            $"Khách báo sự cố đơn {order.OrderCode}", "Điều phối viên sẽ xử lý và liên hệ khi cần.", cancellationToken,
             ("incidentId", incident.Id.ToString(CultureInfo.InvariantCulture)));
         return new IncidentCreatedResponse(incident.Id);
     }
