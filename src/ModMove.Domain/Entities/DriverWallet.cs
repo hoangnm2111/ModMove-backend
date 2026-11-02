@@ -70,13 +70,24 @@ public sealed class DriverWallet : BaseAuditableEntity, IAggregateRoot
         return Record(WalletTransactionType.CommissionDeduction, orderId, commission, DepositBalance, WalletTransactionStatus.Completed);
     }
 
-    /// <summary>UC-DRV-22: the amount is held at once; an Administrator pays it out manually (GB-27).</summary>
+    /// <summary>
+    /// UC-DRV-22: the amount is held at once; an Administrator pays it out manually (GB-27). Commission owed on a negative
+    /// deposit is paid from earnings first (5.1). A rejected withdrawal gives back the amount only; the debt stays paid.
+    /// </summary>
     public WalletTransaction RequestWithdrawal(decimal amount)
     {
         EnsureActive();
         EnsurePositive(amount);
-        if (EarningsBalance < amount)
-            throw new DomainException("The earnings balance is not enough for this withdrawal.");
+        var debt = Math.Max(0, -DepositBalance);
+        if (EarningsBalance - debt < amount)
+            throw new DomainException("The earnings balance, after the commission owed on the deposit, is not enough for this withdrawal.");
+
+        if (debt > 0)
+        {
+            EarningsBalance -= debt;
+            DepositBalance = 0;
+            Record(WalletTransactionType.CommissionDebtPaid, null, debt, DepositBalance, WalletTransactionStatus.Completed);
+        }
 
         EarningsBalance -= amount;
         return Record(WalletTransactionType.WithdrawEarnings, null, amount, EarningsBalance, WalletTransactionStatus.Pending);

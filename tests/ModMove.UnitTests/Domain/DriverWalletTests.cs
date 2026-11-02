@@ -172,4 +172,73 @@ public class DriverWalletTests
 
         Assert.Equal(89_000m, wallet.EarningsBalance);
     }
+
+    /// <summary>Earnings 90,000 and a deposit of -10,000.</summary>
+    private static DriverWallet WalletOwingCommission()
+    {
+        var wallet = DriverWallet.Create(1);
+        wallet.CreditTripEarning(10, 100_000, 10_000);
+        wallet.TopUpDeposit(50_000);
+        wallet.DeductCommissionFromDeposit(11, 60_000);
+        return wallet;
+    }
+
+    [Fact]
+    public void Withdrawal_pays_the_deposit_debt_from_earnings_first_5_1()
+    {
+        var wallet = WalletOwingCommission();
+
+        var withdrawal = wallet.RequestWithdrawal(50_000);
+
+        Assert.Equal((30_000m, 0m), (wallet.EarningsBalance, wallet.DepositBalance));
+        Assert.Equal((50_000m, 30_000m), (withdrawal.Amount, withdrawal.BalanceAfter));
+        var paid = Assert.Single(wallet.Transactions, t => t.TransactionType == WalletTransactionType.CommissionDebtPaid);
+        Assert.Equal((10_000m, 0m, WalletTransactionStatus.Completed), (paid.Amount, paid.BalanceAfter, paid.TransactionStatus));
+    }
+
+    [Fact]
+    public void Withdrawal_can_take_all_earnings_left_after_the_debt_5_1()
+    {
+        var wallet = WalletOwingCommission();
+
+        wallet.RequestWithdrawal(80_000);
+
+        Assert.Equal((0m, 0m), (wallet.EarningsBalance, wallet.DepositBalance));
+    }
+
+    [Fact]
+    public void Withdrawal_above_what_is_left_after_the_debt_changes_nothing_5_1()
+    {
+        var wallet = WalletOwingCommission();
+        var before = wallet.Transactions.Count;
+
+        Assert.Throws<DomainException>(() => wallet.RequestWithdrawal(80_001));
+
+        Assert.Equal((90_000m, -10_000m), (wallet.EarningsBalance, wallet.DepositBalance));
+        Assert.Equal(before, wallet.Transactions.Count);
+    }
+
+    [Fact]
+    public void Rejected_withdrawal_gives_back_the_amount_but_the_debt_stays_paid_5_1()
+    {
+        var wallet = WalletOwingCommission();
+        var withdrawal = wallet.RequestWithdrawal(50_000);
+
+        wallet.RejectWithdrawal(withdrawal, adminId: 2, Now);
+
+        Assert.Equal((80_000m, 0m), (wallet.EarningsBalance, wallet.DepositBalance));
+    }
+
+    [Fact]
+    public void Withdrawal_leaves_a_positive_deposit_alone_5_1()
+    {
+        var wallet = DriverWallet.Create(1);
+        wallet.CreditTripEarning(10, 100_000, 10_000);
+        wallet.TopUpDeposit(50_000);
+
+        wallet.RequestWithdrawal(90_000);
+
+        Assert.Equal((0m, 50_000m), (wallet.EarningsBalance, wallet.DepositBalance));
+        Assert.DoesNotContain(wallet.Transactions, t => t.TransactionType == WalletTransactionType.CommissionDebtPaid);
+    }
 }
