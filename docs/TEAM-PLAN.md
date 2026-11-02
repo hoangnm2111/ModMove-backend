@@ -48,7 +48,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [x] Gửi email Gmail SMTP (Development không có SMTP thì ghi OTP ra log)
 - [x] Google Maps (`IMapService`: Geocoding + Distance Matrix hoặc Routes API, DECISIONS 3.4) và `FareCalculator` (B1)
 - [x] `POST api/public/fareestimate`: loại xe, tải trọng và lọt thùng theo món lớn nhất (GB-10, 4.2: dùng `VehicleType.CanCarry`), phí bốc xếp, coupon (GB-21) với mã lỗi riêng `COUPON_NOT_FOUND`, `COUPON_INACTIVE`, `COUPON_EXPIRED`, `COUPON_LIMIT_REACHED`, `COUPON_MIN_ORDER_NOT_MET`
-- [x] Cloudinary (`IFileStorage`) + `POST api/customer/uploads` (JPG/PNG ≤ 5 MB, GB-06); ảnh đại diện và ảnh hàng chỉ nhận URL thuộc domain Cloudinary của nhóm
+- [x] Cloudinary (`IFileStorage`) + `POST api/customer/uploads` (JPG/PNG ≤ 5 MB, GB-06); ảnh hàng chỉ nhận URL thuộc domain Cloudinary của nhóm
 - [x] Tạo đơn (GST-17): cam kết không hàng cấm (4.3), 1–5 ảnh, mã đơn `MMyyyyMMddNNN` giờ VN, coupon `used_count++` (B11), **chỉ tiền mặt** ở Phase 1; **không có sửa đơn** (4.1)
 - [x] Danh sách, tìm, chi tiết, lịch sử đơn của khách (CUS-08..10, 20)
 
@@ -66,7 +66,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [ ] REST theo dõi đơn: vị trí cuối và ETA (CUS-13)
 - [ ] Danh mục `api/public/lookups/...`, mã loại hàng và mã lý do khi tạo đơn, hủy, khiếu nại; danh sách coupon cho khách (GST-10, 14, CUS-21, 29)
 - [ ] Khách thấy lý do quyết định hoàn tiền (CUS-23); tài xế nhận `INCIDENT_REPORTED`, `RATING_RECEIVED`
-- [ ] JOB-GPS-01 (xóa GPS log quá 30 ngày): đã có `PurgeOldLocationLogsCommand` và repository; còn job định kỳ, chờ duyệt package `Microsoft.Extensions.Hosting.Abstractions`
+- [ ] JOB-GPS-01 (xóa GPS log quá 30 ngày): `GpsLogCleanupJob` chạy mỗi 24 giờ; job của Hoàng kế thừa `PeriodicCommandJob`
 - [ ] Bảng mã lỗi cho frontend trong `api/README.md` đủ cho mọi endpoint (9.4)
 
 ## 5. Hoàng: Admin / Driver / Payments
@@ -86,10 +86,10 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [ ] Admin duyệt hoàn tiền (cả hoàn tiền do hủy không qua Dispatcher, 3.3) và chi trả tay; truyền lý do cho khách vào tham số `note` của `Refund.Approve`/`RejectRefund` (CUS-23); trước khi duyệt gọi `order.EnsureRefundFits(0, await refunds.GetClaimedTotalForOrderAsync(order.Id))` để tổng hoàn của đơn không vượt `total_fee` (B9); duyệt rút tiền (ADM-24)
 
 **Phase 3**
-- [ ] JOB-PAY-01 (mã hết hạn sau 10 phút; hủy đơn PayOS vẫn `Unpaid` sau 30 phút từ `created_at`, 3.1), JOB-MATCH-01 (từ lúc tạo hoặc lúc trả, 3.2: `IsMatchingExpired`), JOB-ORDER-01 (`CanBeAutoCompleted`, rồi `order.Complete(rate, System, null, now)` + `OrderSettlement.SettleAsync` trong `Features/Orders` như ConfirmReceipt của Hiếu, để ví được tất toán giống nhau)
+- [ ] JOB-PAY-01 (mã hết hạn sau 10 phút; hủy đơn PayOS vẫn `Unpaid` sau 30 phút từ `created_at`, 3.1), JOB-MATCH-01 (từ lúc tạo hoặc lúc trả, 3.2: `IsMatchingExpired`), JOB-ORDER-01 (`CanBeAutoCompleted`, bỏ qua đơn có khiếu nại mở (`HasOpenComplaintAsync`, 7.3), rồi `order.Complete(rate, System, null, now)` + `OrderSettlement.SettleAsync` trong `Features/Orders` như ConfirmReceipt của Hiếu, để ví được tất toán giống nhau)
 - [ ] Báo cáo, doanh thu (8.1: tổng `commission_amount` của đơn `Completed`, giờ VN), xuất Excel (B16, xin duyệt package)
 - [ ] Thông báo cho tài xế theo bảng sự kiện 8.3, gọi qua `INotificationService` (B17)
-- [ ] Thông báo cho **khách** khi chính bước của Hoàng đổi trạng thái (8.3): nhận đơn `CustomerEvent.OrderAccepted`, đến điểm lấy `DriverArrived`, gửi ảnh lấy hàng `PickupPhotosToReview`, giao hàng `OrderDelivered`, JOB-ORDER-01 `OrderCompleted`, Admin duyệt/chi hoàn tiền `RefundDecided`: gọi `NotifyCustomerAsync`, và `PublishOrderStatusAsync` sau mỗi lần đổi trạng thái đơn (B12)
+- [ ] Thông báo cho **khách** khi chính bước của Hoàng đổi trạng thái (8.3): nhận đơn `CustomerEvent.OrderAccepted`, đến điểm lấy `DriverArrived`, gửi ảnh lấy hàng `PickupPhotosToReview`, giao hàng `OrderDelivered`, JOB-ORDER-01 `OrderCompleted`, Admin duyệt/chi hoàn tiền `RefundDecided`, job tự hủy đơn `OrderCancelled`: gọi `NotifyCustomerAsync`, và `PublishOrderStatusAsync` sau mỗi lần đổi trạng thái đơn (B12)
 
 ## 6. Huy: Dispatcher
 
