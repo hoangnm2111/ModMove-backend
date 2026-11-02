@@ -8,7 +8,8 @@ using ModMove.Application.Common.Messaging;
 
 namespace ModMove.Application.Features.Orders.Queries.GetMyOrderDetail;
 
-internal sealed class GetMyOrderDetailQueryHandler(ISqlConnectionFactory connectionFactory, ICurrentUserService currentUser)
+internal sealed class GetMyOrderDetailQueryHandler(
+    ISqlConnectionFactory connectionFactory, ICurrentUserService currentUser, TimeProvider time)
     : IQueryHandler<GetMyOrderDetailQuery, OrderDetailResponse>
 {
     private const string OrderSql = """
@@ -19,20 +20,24 @@ internal sealed class GetMyOrderDetailQueryHandler(ISqlConnectionFactory connect
                o.has_loading_service AS HasLoadingService, o.distance_fee AS DistanceFee, o.service_fee AS ServiceFee,
                o.discount_amount AS DiscountAmount, o.total_fee AS TotalFee, o.payment_method AS PaymentMethod,
                o.payer_role AS PayerRole, o.payment_status AS PaymentStatus, o.created_at AS CreatedAt,
-               du.full_name AS DriverName, du.phone_number AS DriverPhone, v.license_plate AS LicensePlate
+               du.full_name AS DriverName, du.phone_number AS DriverPhone, v.license_plate AS LicensePlate,
+               cp.discount_code AS CouponCode
         FROM shipping_orders o
         JOIN vehicle_types vt ON vt.id = o.vehicle_type_id
         LEFT JOIN driver_profiles dp ON dp.id = o.driver_profile_id
         LEFT JOIN users du ON du.id = dp.user_id
         LEFT JOIN vehicles v ON v.driver_profile_id = dp.id
+        LEFT JOIN coupons cp ON cp.id = o.coupon_id
         WHERE o.id = @OrderId AND o.customer_id = @CustomerId
         """;
 
     private const string CargoSql = """
-        SELECT cargo_type AS CargoType, quantity AS Quantity, weight_kg AS WeightKg, length_cm AS LengthCm,
-               width_cm AS WidthCm, height_cm AS HeightCm, photo_urls AS PhotoUrls, special_notes AS SpecialNotes
-        FROM cargo_details
-        WHERE order_id = @OrderId
+        SELECT cd.cargo_type AS CargoType, cd.quantity AS Quantity, cd.weight_kg AS WeightKg, cd.length_cm AS LengthCm,
+               cd.width_cm AS WidthCm, cd.height_cm AS HeightCm, cd.photo_urls AS PhotoUrls, cd.special_notes AS SpecialNotes,
+               m.name AS CargoTypeName
+        FROM cargo_details cd
+        LEFT JOIN master_data_items m ON m.category = 'CARGO_TYPE' AND m.code = cd.cargo_type
+        WHERE cd.order_id = @OrderId
         """;
 
     private const string ProofSql = """
@@ -41,6 +46,15 @@ internal sealed class GetMyOrderDetailQueryHandler(ISqlConnectionFactory connect
                delivery_photo_url AS DeliveryPhotoUrl, delivery_completion_time AS DeliveryCompletionTime
         FROM proof_of_deliveries
         WHERE order_id = @OrderId
+        """;
+
+    // Latest PayOS attempt only: a new code for the same order replaces the old one (3.1).
+    private const string PaymentSql = """
+        SELECT transaction_status AS TransactionStatus, checkout_url AS CheckoutUrl, expires_at AS ExpiresAt, paid_at AS PaidAt
+        FROM payment_transactions
+        WHERE order_id = @OrderId AND payment_method = 'PayOS'
+        ORDER BY id DESC
+        LIMIT 1
         """;
 
     private const string HistorySql = """
@@ -64,6 +78,7 @@ internal sealed class GetMyOrderDetailQueryHandler(ISqlConnectionFactory connect
         var c = await connection.QuerySingleAsync<CargoRow>(new CommandDefinition(CargoSql, parameters, cancellationToken: cancellationToken));
         var p = await connection.QuerySingleOrDefaultAsync<ProofRow>(new CommandDefinition(ProofSql, parameters, cancellationToken: cancellationToken));
         var history = await connection.QueryAsync<HistoryRow>(new CommandDefinition(HistorySql, parameters, cancellationToken: cancellationToken));
+        var pay = await connection.QuerySingleOrDefaultAsync<PaymentRow>(new CommandDefinition(PaymentSql, parameters, cancellationToken: cancellationToken));
 
         return new OrderDetailResponse(
             o.Id, o.OrderCode, o.OrderStatus, o.PickupAddress, o.DropoffAddress, o.VehicleTypeName,
@@ -72,13 +87,23 @@ internal sealed class GetMyOrderDetailQueryHandler(ISqlConnectionFactory connect
             o.PaymentMethod, o.PayerRole, o.PaymentStatus, CustomerAccess.Utc(o.CreatedAt),
             new CargoResponse(
                 c.CargoType, c.Quantity, c.WeightKg, c.LengthCm, c.WidthCm, c.HeightCm,
-                JsonSerializer.Deserialize<List<string>>(c.PhotoUrls) ?? [], c.SpecialNotes),
+                JsonSerializer.Deserialize<List<string>>(c.PhotoUrls) ?? [], c.SpecialNotes, c.CargoTypeName),
             o.DriverName is null ? null : new DriverResponse(o.DriverName, o.DriverPhone ?? "", o.LicensePlate),
             p is null ? null : new ProofResponse(
                 p.PickupPhotoUrls is null ? [] : JsonSerializer.Deserialize<List<string>>(p.PickupPhotoUrls) ?? [],
                 p.ProofStatus, p.PickupSubmissionCount, p.RejectionReason, p.DeliveryPhotoUrl,
                 p.DeliveryCompletionTime is { } delivered ? CustomerAccess.Utc(delivered) : null),
-            history.Select(h => new StatusHistoryResponse(h.FromStatus, h.ToStatus, h.ChangedByRole, h.Note, CustomerAccess.Utc(h.ChangedAt))).ToList());
+            history.Select(h => new StatusHistoryResponse(h.FromStatus, h.ToStatus, h.ChangedByRole, h.Note, CustomerAccess.Utc(h.ChangedAt))).ToList(),
+            o.CouponCode, pay is null ? null : ToPayment(pay));
+    }
+
+    private PaymentResponse ToPayment(PaymentRow row)
+    {
+        var expiresAt = SqlHelpers.ToUtc(row.ExpiresAt);
+        // Expired once a job marks it, or already while still Pending past ExpiresAt.
+        var expired = row.TransactionStatus == "Expired" || (row.TransactionStatus == "Pending" && expiresAt <= time.GetUtcNow());
+        var payable = row.TransactionStatus == "Pending" && !expired;
+        return new PaymentResponse(row.TransactionStatus, payable ? row.CheckoutUrl : null, expiresAt, SqlHelpers.ToUtc(row.PaidAt), expired);
     }
 
     private sealed class OrderRow
@@ -105,6 +130,7 @@ internal sealed class GetMyOrderDetailQueryHandler(ISqlConnectionFactory connect
         public string? DriverName { get; init; }
         public string? DriverPhone { get; init; }
         public string? LicensePlate { get; init; }
+        public string? CouponCode { get; init; }
     }
 
     private sealed class CargoRow
@@ -117,6 +143,7 @@ internal sealed class GetMyOrderDetailQueryHandler(ISqlConnectionFactory connect
         public int HeightCm { get; init; }
         public string PhotoUrls { get; init; } = "[]";
         public string? SpecialNotes { get; init; }
+        public string? CargoTypeName { get; init; }
     }
 
     private sealed class ProofRow
@@ -127,6 +154,14 @@ internal sealed class GetMyOrderDetailQueryHandler(ISqlConnectionFactory connect
         public string? RejectionReason { get; init; }
         public string? DeliveryPhotoUrl { get; init; }
         public DateTime? DeliveryCompletionTime { get; init; }
+    }
+
+    private sealed class PaymentRow
+    {
+        public string TransactionStatus { get; init; } = "";
+        public string? CheckoutUrl { get; init; }
+        public DateTime? ExpiresAt { get; init; }
+        public DateTime? PaidAt { get; init; }
     }
 
     private sealed class HistoryRow

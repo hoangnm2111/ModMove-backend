@@ -58,7 +58,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [x] Tracking: `TrackingHub` SignalR theo B12: `access_token` trên query string; `JoinOrder` kiểm tra đơn là của khách (`ORDER_NOT_YOURS`); `SendLocation` phát tới `order-{id}` và group `dispatchers`; Dispatcher tự vào `dispatchers` theo role
 - [x] Phía khách của sự cố, hoàn tiền, khiếu nại (CUS-15..18, 21..24; 7.3, 7.4 `ReplyToInfoRequest`) — cùng tuần với Huy
 - [x] Đánh giá (CUS-25, 26; trong 1 ngày sau hoàn tất, 7.5)
-- [ ] Nối thanh toán PayOS vào đặt đơn qua `CreateOrderPayment` của Hoàng (B10, 3.1) (chờ Hoàng merge vào `develop`; hiện tạo đơn PayOS vẫn trả `PAYMENT_METHOD_NOT_SUPPORTED`)
+- [ ] Nối thanh toán PayOS vào đặt đơn qua `CreateOrderPayment` của Hoàng (B10, 3.1): tạo đơn đã nhận PayOS (`Pending` + `Unpaid`) và chi tiết đơn có `payment`; còn chờ `CreateOrderPayment` + webhook của Hoàng (hợp đồng ở mục "Chờ Hoàng" trong `api/README.md`)
 - [x] `INotificationService` (B17): gửi FCM tới app và SignalR `NotificationReceived` qua `Clients.User`; không lưu lịch sử. Gửi thông báo cho khách theo bảng sự kiện 8.3
 - [x] Logout nhận kèm FCM token của app, chỉ xóa token nếu khớp token đang lưu (9.2)
 

@@ -3,8 +3,6 @@ using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
 using ModMove.Domain.Entities;
-using ModMove.Domain.Enums;
-using ModMove.Domain.Exceptions;
 
 namespace ModMove.Application.Features.Orders.Commands.CreateOrder;
 
@@ -20,14 +18,12 @@ internal sealed class CreateOrderCommandHandler(
     {
         var customer = await currentUser.LoadUserAsync(users, cancellationToken);
 
-        if (request.PaymentMethod != PaymentMethod.Cash)
-            throw new DomainException("Only cash payment is available for now.", "PAYMENT_METHOD_NOT_SUPPORTED");
-
         var cargo = request.Cargo;
         var trip = await pricing.PriceAsync(new PricingInput(
             request.VehicleTypeId, request.PickupAddress, request.DropoffAddress,
             cargo.WeightKg, cargo.LengthCm, cargo.WidthCm, cargo.HeightCm,
             request.HasLoadingService, request.CouponCode), cancellationToken);
+        trip.Fare.EnsureMatches(request.ExpectedTotalFee); // before anything is saved or the coupon is counted
 
         var now = clock.GetUtcNow();
         var (dayStart, dayEnd) = OrderCode.VietnamDay(now);

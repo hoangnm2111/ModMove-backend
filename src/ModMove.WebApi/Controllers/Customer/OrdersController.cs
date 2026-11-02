@@ -11,17 +11,17 @@ namespace ModMove.WebApi.Controllers.Customer;
 
 public sealed class OrdersController : ApiControllerBase
 {
-    /// <summary>Your orders, newest first (CUS-08, 09, 20). <c>view</c>: All, Active, History; <c>search</c>: code, address, receiver.</summary>
+    /// <summary>Your orders, newest first (CUS-08, 09, 20). <c>view</c>: All, Active, History, Completed, Cancelled; filters: search, status, fromDate, toDate, receiverPhone.</summary>
     [HttpGet]
     public Task<PagedResult<OrderSummaryResponse>> GetMine([FromQuery] GetMyOrdersQuery query, CancellationToken cancellationToken) =>
         Sender.Send(query, cancellationToken);
 
-    /// <summary>One of your orders with cargo, driver and status history (CUS-10). Not yours → 404.</summary>
+    /// <summary>One of your orders with cargo, driver, status history, coupon and PayOS payment (CUS-10). Not yours → 404.</summary>
     [HttpGet("{id:long}")]
     public Task<OrderDetailResponse> GetById(long id, CancellationToken cancellationToken) =>
         Sender.Send(new GetMyOrderDetailQuery(id), cancellationToken);
 
-    /// <summary>Book a cash order (UC-GST-17). Price is computed again server-side, the same way as the fare estimate.</summary>
+    /// <summary>Book a cash or PayOS order (UC-GST-17). Price is computed again server-side; a different expectedTotalFee → 422 FARE_CHANGED.</summary>
     [HttpPost]
     public async Task<IActionResult> Create(CreateOrderCommand command, CancellationToken cancellationToken)
     {
