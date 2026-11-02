@@ -282,6 +282,9 @@ internal sealed class InMemoryDriverProfiles : IDriverProfileRepository
 
 internal sealed class InMemoryDriverWallets : IDriverWalletRepository
 {
+    private static readonly System.Reflection.PropertyInfo WalletIdProperty =
+        typeof(WalletTransaction).GetProperty(nameof(WalletTransaction.WalletId))!;
+
     public List<DriverWallet> Items { get; } = [];
 
     public Task<DriverWallet?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
@@ -290,14 +293,37 @@ internal sealed class InMemoryDriverWallets : IDriverWalletRepository
     public Task<DriverWallet?> GetByDriverProfileIdAsync(long driverProfileId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(w => w.DriverProfileId == driverProfileId));
 
+    public Task<DriverWallet?> GetByTransactionIdWithTransactionsAsync(long transactionId, CancellationToken cancellationToken = default)
+    {
+        SyncTransactions();
+        return Task.FromResult(Items.FirstOrDefault(w => w.Transactions.Any(t => t.Id == transactionId)));
+    }
+
     public void Add(DriverWallet aggregate)
     {
         if (aggregate.Id == 0)
             TestIds.Set(aggregate, Items.Count + 1);
         Items.Add(aggregate);
+        SyncTransactions();
     }
-    public void Update(DriverWallet aggregate) { }
+
+    public void Update(DriverWallet aggregate) => SyncTransactions();
     public void Remove(DriverWallet aggregate) => Items.Remove(aggregate);
+
+    private void SyncTransactions()
+    {
+        var nextTxId = Items.SelectMany(w => w.Transactions).Select(t => t.Id).DefaultIfEmpty(0).Max() + 1;
+        foreach (var wallet in Items)
+        {
+            foreach (var tx in wallet.Transactions)
+            {
+                if (tx.WalletId == 0 && wallet.Id != 0)
+                    WalletIdProperty.SetValue(tx, wallet.Id);
+                if (tx.Id == 0)
+                    TestIds.Set(tx, nextTxId++);
+            }
+        }
+    }
 }
 
 internal sealed class InMemoryRefreshTokens : IRefreshTokenRepository
@@ -442,6 +468,62 @@ internal sealed class FakeMapService : IMapService
     public Task<RouteInfo> GetRouteAsync(GeoPoint from, GeoPoint to, CancellationToken cancellationToken) => Task.FromResult(Route);
 }
 
+/// <summary>Stands in for PayOS: every code gets a link and a QR; tests read what was asked and cancelled.</summary>
+internal sealed class FakePaymentGateway : IPaymentGateway
+{
+    public List<(long Code, decimal Amount, string Description, PaymentPlatform Platform, DateTimeOffset ExpiresAt)> Created { get; } = [];
+    public List<long> Cancelled { get; } = [];
+
+    /// <summary>Set to true to act like PayOS being down.</summary>
+    public bool Fail { get; set; }
+
+    public Task<PaymentLink> CreatePaymentLinkAsync(
+        long payosOrderCode, decimal amount, string description, PaymentPlatform platform,
+        DateTimeOffset expiresAt, CancellationToken cancellationToken)
+    {
+        if (Fail)
+            throw new InvalidOperationException("PayOS is down");
+        Created.Add((payosOrderCode, amount, description, platform, expiresAt));
+        return Task.FromResult(new PaymentLink($"https://pay.payos.vn/web/{payosOrderCode}", $"qr-{payosOrderCode}"));
+    }
+
+    public const string ValidSignature = "valid-payos-signature";
+
+    public Task CancelPaymentLinkAsync(long payosOrderCode, CancellationToken cancellationToken)
+    {
+        Cancelled.Add(payosOrderCode);
+        return Task.CompletedTask;
+    }
+
+    public bool VerifyWebhookSignature(string rawBody, string signature) =>
+        !string.IsNullOrWhiteSpace(rawBody) && signature == ValidSignature;
+}
+
+internal sealed class InMemoryPaymentTransactions : IPaymentTransactionRepository
+{
+    public List<PaymentTransaction> Items { get; } = [];
+
+    public Task<IReadOnlyList<PaymentTransaction>> GetPendingPayOsForOrderAsync(long orderId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<PaymentTransaction>>(Items
+            .Where(p => p.OrderId == orderId && p.PaymentMethod == PaymentMethod.PayOS && p.TransactionStatus == PaymentTransactionStatus.Pending)
+            .ToList());
+
+    public Task<PaymentTransaction?> GetByPayOsOrderCodeAsync(long payosOrderCode, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(p => p.PayosOrderCode == payosOrderCode));
+
+    public Task<PaymentTransaction?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(p => p.Id == id));
+
+    public void Add(PaymentTransaction aggregate)
+    {
+        if (aggregate.Id == 0)
+            TestIds.Set(aggregate, Items.Count + 1);
+        Items.Add(aggregate);
+    }
+    public void Update(PaymentTransaction aggregate) { }
+    public void Remove(PaymentTransaction aggregate) => Items.Remove(aggregate);
+}
+
 /// <summary>Stands in for Cloudinary; the team's cloud is called "demo" here.</summary>
 internal sealed class FakeFileStorage : IFileStorage
 {
@@ -488,9 +570,12 @@ internal sealed class TestApp
     public CapturingEmailSender Email { get; } = new();
     public FakeFileStorage Files { get; } = new();
     public FakeMapService Maps { get; } = new();
+    public FakePaymentGateway Gateway { get; } = new();
+    public InMemoryPaymentTransactions Payments { get; } = new();
     public InMemoryCoupons Coupons { get; } = new();
     public InMemoryRepository<VehicleType> VehicleTypes { get; } = new();
     public InMemoryPlatformSettings Settings { get; } = new();
+    public FakeSql Sql { get; } = new();
     public MutableTime Time { get; } = new(Start);
     public ISender Sender { get; }
 
@@ -531,9 +616,13 @@ internal sealed class TestApp
             .AddSingleton<IEmailSender>(Email)
             .AddSingleton<IFileStorage>(Files)
             .AddSingleton<IMapService>(Maps)
+            .AddSingleton<IPaymentGateway>(Gateway)
+            .AddSingleton<IRepository<PaymentTransaction>>(Payments)
+            .AddSingleton<IPaymentTransactionRepository>(Payments)
             .AddSingleton<ICouponRepository>(Coupons)
             .AddSingleton<IRepository<VehicleType>>(VehicleTypes)
             .AddSingleton<IPlatformSettings>(Settings)
+            .AddSingleton<ISqlConnectionFactory>(Sql)
             .AddSingleton<ICurrentUserService>(new FakeCurrentUser(signedInUserId))
             .AddSingleton<TimeProvider>(Time)
             .BuildServiceProvider()

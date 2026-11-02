@@ -77,8 +77,11 @@ namespace ModMove.IntegrationTests
         [InlineData(typeof(WebApi.Controllers.Driver.FakeJobsController), "api/driver/[controller]")]
         [InlineData(typeof(WebApi.Controllers.Dispatcher.FakeIncidentsController), "api/dispatcher/[controller]")]
         [InlineData(typeof(WebApi.Controllers.Admin.FakeUsersController), "api/admin/[controller]")]
+        [InlineData(typeof(WebApi.Controllers.Admin.RefundsController), "api/admin/[controller]")]
+        [InlineData(typeof(WebApi.Controllers.Admin.WithdrawalsController), "api/admin/[controller]")]
         [InlineData(typeof(WebApi.Controllers.Public.FakeVehicleTypesController), "api/public/[controller]")]
         [InlineData(typeof(WebApi.Controllers.Webhooks.FakePayOsController), "api/webhooks/[controller]")]
+        [InlineData(typeof(WebApi.Controllers.Webhooks.PayOsController), "api/webhooks/[controller]")]
         public void Route_comes_from_the_role_folder(Type controller, string expected)
         {
             Assert.Equal(expected, Apply(controller).Selectors[0].AttributeRouteModel!.Template);
@@ -89,6 +92,8 @@ namespace ModMove.IntegrationTests
         [InlineData(typeof(WebApi.Controllers.Driver.FakeJobsController), "Driver")]
         [InlineData(typeof(WebApi.Controllers.Dispatcher.FakeIncidentsController), "Dispatcher")]
         [InlineData(typeof(WebApi.Controllers.Admin.FakeUsersController), "Administrator")]
+        [InlineData(typeof(WebApi.Controllers.Admin.RefundsController), "Administrator")]
+        [InlineData(typeof(WebApi.Controllers.Admin.WithdrawalsController), "Administrator")]
         public async Task Role_folder_allows_only_its_own_role(Type controller, string role)
         {
             var model = Apply(controller);
@@ -103,6 +108,7 @@ namespace ModMove.IntegrationTests
         [Theory]
         [InlineData(typeof(WebApi.Controllers.Public.FakeVehicleTypesController))]
         [InlineData(typeof(WebApi.Controllers.Webhooks.FakePayOsController))]
+        [InlineData(typeof(WebApi.Controllers.Webhooks.PayOsController))]
         public void Public_and_webhook_controllers_stay_anonymous(Type controller)
         {
             Assert.Empty(Apply(controller).Filters.OfType<AuthorizeFilter>());

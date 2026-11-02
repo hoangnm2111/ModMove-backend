@@ -108,6 +108,7 @@ internal static class DemoOperationsSeeder
         await EnsureOrderAsync(db, people, vehicleType, "MMDEMO011", OrderStatus.PlaceOrder, PaymentMethod.Cash, 170_000m, now, ct);
         await EnsureOrderAsync(db, people, vehicleType, "MMDEMO012", OrderStatus.Accepted, PaymentMethod.PayOS, 195_000m, now, ct);
         await EnsureOrderAsync(db, people, vehicleType, "MMDEMO013", OrderStatus.Cancelled, PaymentMethod.Cash, 160_000m, now, ct);
+        await EnsureOrderAsync(db, people, vehicleType, "MMDEMO014", OrderStatus.PlaceOrder, PaymentMethod.PayOS, 200_000m, now, ct, markPaid: false);
     }
 
     private static async Task EnsureExtraDriverAsync(
@@ -167,11 +168,18 @@ internal static class DemoOperationsSeeder
 
     private static async Task<ShippingOrder> EnsureOrderAsync(
         ApplicationDbContext db, People people, VehicleType vehicleType, string code, OrderStatus target,
-        PaymentMethod method, decimal fee, DateTimeOffset now, CancellationToken ct)
+        PaymentMethod method, decimal fee, DateTimeOffset now, CancellationToken ct, bool markPaid = true)
     {
         var existing = await db.Set<ShippingOrder>().FirstOrDefaultAsync(o => o.OrderCode == code, ct);
         if (existing is not null)
+        {
+            if (!markPaid && existing.PaymentStatus == PaymentStatus.Unpaid)
+            {
+                existing.CreatedAt = now;
+                await db.SaveChangesAsync(ct);
+            }
             return existing;
+        }
 
         var cargo = CargoDetail.Create("Đồ gia dụng", 3, 120m, 100, 60, 50, [Photo], null);
         var order = ShippingOrder.Create(
@@ -181,7 +189,7 @@ internal static class DemoOperationsSeeder
             "Nguyễn Văn Nhận", "0911000001", 12.4m, 35, false,
             fee, 0m, 0m, method, method == PaymentMethod.Cash ? PayerRole.Sender : null, cargo, now);
 
-        if (method == PaymentMethod.PayOS)
+        if (method == PaymentMethod.PayOS && markPaid)
             order.MarkPaid(now);
 
         if (target == OrderStatus.Cancelled)
