@@ -92,6 +92,9 @@ internal sealed class InMemoryOrders : IShippingOrderRepository
     public Task<int> CountCreatedBetweenAsync(DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.Count(o => o.CreatedAt >= fromUtc && o.CreatedAt < toUtc));
 
+    public Task<IReadOnlyList<ShippingOrder>> GetPendingAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<ShippingOrder>>(Items.Where(o => o.OrderStatus == OrderStatus.Pending).ToList());
+
     public Task<ShippingOrder?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(o => o.Id == id));
 
@@ -269,6 +272,10 @@ internal sealed class InMemoryDriverProfiles : IDriverProfileRepository
 
     public Task<DriverProfile?> GetByApplicationIdWithApplicationsAndVehicleAsync(long applicationId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(d => d.Applications.Any(a => a.Id == applicationId)));
+
+    public Task<IReadOnlyList<DriverProfile>> GetOnlineApprovedWithVehicleAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<DriverProfile>>(
+            Items.Where(d => d.ApprovalStatus == ApprovalStatus.Approved && d.OnlineStatus == OnlineStatus.Online).ToList());
 
     public void Add(DriverProfile aggregate)
     {

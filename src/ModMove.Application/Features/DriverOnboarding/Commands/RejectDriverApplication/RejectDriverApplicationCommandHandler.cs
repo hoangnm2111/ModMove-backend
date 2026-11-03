@@ -3,6 +3,7 @@ using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
+using ModMove.Application.Common.Notifications;
 
 namespace ModMove.Application.Features.DriverOnboarding.Commands.RejectDriverApplication;
 
@@ -13,6 +14,7 @@ internal sealed class RejectDriverApplicationCommandHandler(
     ICurrentUserService currentUser,
     TimeProvider clock,
     IPushNotificationService? pushNotifications = null,
+    IRealtimeNotifier? realtime = null,
     ILogger<RejectDriverApplicationCommandHandler>? logger = null) : ICommandHandler<RejectDriverApplicationCommand>
 {
     public async Task Handle(RejectDriverApplicationCommand request, CancellationToken cancellationToken)
@@ -37,7 +39,30 @@ internal sealed class RejectDriverApplicationCommandHandler(
         // 3. Save changes
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        // 4. Send push notification to driver (DECISIONS B17, 8.3)
+        // 4. Send push + real-time notification to driver (DECISIONS B17, 8.3)
+        var (type, title, body) = DriverNotifications.GetTemplate(DriverEvent.ApplicationRejected);
+        var data = new Dictionary<string, string>
+        {
+            ["type"] = type,
+            ["applicationId"] = application.Id.ToString(),
+        };
+
+        if (realtime is not null)
+        {
+            try
+            {
+                await realtime.SendToUserAsync(
+                    driverProfile.UserId,
+                    "NotificationReceived",
+                    new Notification(type, title, body, data),
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "Failed to send SignalR notification for rejected driver application {ApplicationId}", application.Id);
+            }
+        }
+
         if (pushNotifications is not null)
         {
             try
@@ -45,16 +70,7 @@ internal sealed class RejectDriverApplicationCommandHandler(
                 var user = await users.GetByIdAsync(driverProfile.UserId, cancellationToken);
                 if (!string.IsNullOrWhiteSpace(user?.FcmToken))
                 {
-                    await pushNotifications.SendAsync(
-                        user.FcmToken,
-                        "Hồ sơ tài xế bị từ chối",
-                        "Hồ sơ đăng ký tài xế của bạn chưa được duyệt. Vui lòng kiểm tra lý do và gửi lại thông tin.",
-                        new Dictionary<string, string>
-                        {
-                            ["type"] = "DRIVER_APPLICATION_REJECTED",
-                            ["applicationId"] = application.Id.ToString()
-                        },
-                        cancellationToken);
+                    await pushNotifications.SendAsync(user.FcmToken, title, body, data, cancellationToken);
                 }
             }
             catch (Exception ex)
