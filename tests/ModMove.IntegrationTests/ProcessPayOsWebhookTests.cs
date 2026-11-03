@@ -85,6 +85,47 @@ public class ProcessPayOsWebhookTests
     }
 
     [Fact]
+    public async Task Valid_webhook_for_order_payment_broadcasts_NEW_MATCHING_ORDER_to_nearby_eligible_drivers_8_3()
+    {
+        var s = Build();
+        var order = AddOrder(s); // pickup at (21.0m, 105.8m), vehicleTypeId = 1
+
+        // Seed an online, approved driver within 5km with matching vehicleTypeId = 1
+        var driverUser = User.Create("Tài Xế A", "0900000011", "drv@x.vn", "h", UserRole.Driver, emailVerified: true);
+        driverUser.SetFcmToken("fcm-drv-nearby");
+        s.App.Users.Add(driverUser);
+
+        var profile = DriverProfile.Create(driverUser.Id, "079090000001", "790000000001", "f.jpg", "b.jpg");
+        TestIds.Set(profile, 11);
+        var vehicle = Vehicle.Create(profile.Id, 1, "51C-123.45", 1000m, "250x160x160", "r.jpg", "i.jpg", "v.jpg");
+        TestIds.Set(vehicle, 11);
+        profile.Approve(vehicle);
+        profile.GoOnline();
+
+        var paidTime = Now.AddMinutes(2);
+        profile.UpdateLocation(21.01m, 105.81m, paidTime.AddSeconds(-30)); // ~1.51 km away, fresh GPS
+        s.App.DriverProfiles.Add(profile);
+
+        await s.App.Sender.Send(new CreateOrderPaymentCommand(order.Id, PaymentPlatform.Web));
+        var transaction = Assert.Single(s.App.Payments.Items);
+        s.App.Time.Now = paidTime;
+
+        await s.App.Sender.Send(new ProcessPayOsWebhookCommand(WebhookJson(transaction.PayosOrderCode!.Value, 180_000m)));
+
+        var realtimeNotif = Assert.Single(s.App.Realtime.Sent);
+        Assert.Equal("user", realtimeNotif.Target);
+        Assert.Equal(driverUser.Id.ToString(), realtimeNotif.Id);
+        Assert.Equal("NotificationReceived", realtimeNotif.EventName);
+        var notifPayload = Assert.IsType<Notification>(realtimeNotif.Payload);
+        Assert.Equal("NEW_MATCHING_ORDER", notifPayload.Type);
+        Assert.Equal(order.Id.ToString(), notifPayload.Data?["orderId"]);
+
+        var pushSent = Assert.Single(s.App.Push.Sent);
+        Assert.Equal("fcm-drv-nearby", pushSent.Token);
+        Assert.Equal("NEW_MATCHING_ORDER", pushSent.Data?["type"]);
+    }
+
+    [Fact]
     public async Task Valid_webhook_for_a_driver_deposit_top_up_credits_the_wallet_DRV21()
     {
         var s = Build();

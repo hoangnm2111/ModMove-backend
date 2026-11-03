@@ -173,7 +173,7 @@ internal static class DemoOperationsSeeder
         var existing = await db.Set<ShippingOrder>().FirstOrDefaultAsync(o => o.OrderCode == code, ct);
         if (existing is not null)
         {
-            if (!markPaid && existing.PaymentStatus == PaymentStatus.Unpaid)
+            if (existing.OrderStatus == OrderStatus.Pending)
             {
                 existing.CreatedAt = now;
                 await db.SaveChangesAsync(ct);

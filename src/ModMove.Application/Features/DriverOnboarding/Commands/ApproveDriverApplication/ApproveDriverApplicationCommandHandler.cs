@@ -3,8 +3,8 @@ using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
+using ModMove.Application.Common.Notifications;
 using ModMove.Domain.Entities;
-using ModMove.Domain.Exceptions;
 
 namespace ModMove.Application.Features.DriverOnboarding.Commands.ApproveDriverApplication;
 
@@ -17,6 +17,7 @@ internal sealed class ApproveDriverApplicationCommandHandler(
     ICurrentUserService currentUser,
     TimeProvider clock,
     IPushNotificationService? pushNotifications = null,
+    IRealtimeNotifier? realtime = null,
     ILogger<ApproveDriverApplicationCommandHandler>? logger = null) : ICommandHandler<ApproveDriverApplicationCommand>
 {
     public async Task Handle(ApproveDriverApplicationCommand request, CancellationToken cancellationToken)
@@ -69,7 +70,30 @@ internal sealed class ApproveDriverApplicationCommandHandler(
         // 4. Save changes
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        // 5. Send push notification to driver (DECISIONS B17, 8.3)
+        // 5. Send push + real-time notification to driver (DECISIONS B17, 8.3)
+        var (type, title, body) = DriverNotifications.GetTemplate(DriverEvent.ApplicationApproved);
+        var data = new Dictionary<string, string>
+        {
+            ["type"] = type,
+            ["applicationId"] = application.Id.ToString(),
+        };
+
+        if (realtime is not null)
+        {
+            try
+            {
+                await realtime.SendToUserAsync(
+                    driverProfile.UserId,
+                    "NotificationReceived",
+                    new Notification(type, title, body, data),
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "Failed to send SignalR notification for approved driver application {ApplicationId}", application.Id);
+            }
+        }
+
         if (pushNotifications is not null)
         {
             try
@@ -77,16 +101,7 @@ internal sealed class ApproveDriverApplicationCommandHandler(
                 var user = await users.GetByIdAsync(driverProfile.UserId, cancellationToken);
                 if (!string.IsNullOrWhiteSpace(user?.FcmToken))
                 {
-                    await pushNotifications.SendAsync(
-                        user.FcmToken,
-                        "Hồ sơ tài xế đã được phê duyệt",
-                        "Chúc mừng bạn! Hồ sơ đăng ký đối tác tài xế ModMove của bạn đã được phê duyệt thành công.",
-                        new Dictionary<string, string>
-                        {
-                            ["type"] = "DRIVER_APPLICATION_APPROVED",
-                            ["applicationId"] = application.Id.ToString()
-                        },
-                        cancellationToken);
+                    await pushNotifications.SendAsync(user.FcmToken, title, body, data, cancellationToken);
                 }
             }
             catch (Exception ex)
