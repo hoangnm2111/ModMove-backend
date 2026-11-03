@@ -76,7 +76,8 @@ public sealed record DispatcherOrderCargoDetails(
     int WidthCm,
     int HeightCm,
     IReadOnlyList<string> PhotoUrls,
-    string? SpecialNotes);
+    string? SpecialNotes,
+    string? CargoTypeName = null);
 
 public sealed record DispatcherOrderProofDetails(
     IReadOnlyList<string> PickupPhotoUrls,

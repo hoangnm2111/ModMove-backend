@@ -25,4 +25,6 @@ public sealed record ComplaintListItemResponse(
     string Stage,
     string RefundStatus,
     DateTimeOffset? DeliveredAt,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? ReasonCode = null,
+    string? ReasonCodeName = null);
