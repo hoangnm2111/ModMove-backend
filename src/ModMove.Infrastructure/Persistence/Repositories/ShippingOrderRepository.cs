@@ -34,4 +34,7 @@ public sealed class ShippingOrderRepository(ApplicationDbContext dbContext)
 
     public Task<int> CountCreatedBetweenAsync(DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken = default) =>
         Set.CountAsync(o => o.CreatedAt >= fromUtc && o.CreatedAt < toUtc, cancellationToken);
+
+    public async Task<IReadOnlyList<ShippingOrder>> GetPendingAsync(CancellationToken cancellationToken = default) =>
+        await Set.Where(o => o.OrderStatus == OrderStatus.Pending).ToListAsync(cancellationToken);
 }
