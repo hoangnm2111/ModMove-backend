@@ -184,6 +184,11 @@ internal sealed class InMemoryRefunds : IRefundRepository
     public Task<Refund?> GetOpenForIncidentAsync(long incidentId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.LastOrDefault(r => r.IncidentId == incidentId && r.RefundStatus is RefundStatus.Requested or RefundStatus.Approved));
 
+    public Task<List<Refund>> GetOpenForOrderAsync(long orderId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items
+            .Where(r => r.OrderId == orderId && r.RefundStatus is RefundStatus.Requested or RefundStatus.Approved)
+            .ToList());
+
     public Task<decimal> GetClaimedTotalForOrderAsync(long orderId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items
             .Where(r => r.OrderId == orderId && r.RefundStatus is RefundStatus.Requested or RefundStatus.Approved or RefundStatus.Processed)
@@ -226,6 +231,32 @@ internal sealed class InMemoryRatings : IRatingRepository
     }
     public void Update(Rating aggregate) { }
     public void Remove(Rating aggregate) => Items.Remove(aggregate);
+}
+
+internal sealed class InMemoryIncidents : IIncidentRepository
+{
+    public List<InTransitIncident> Items { get; } = [];
+
+    public Task<InTransitIncident?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.FirstOrDefault(i => i.Id == id));
+
+    public void Add(InTransitIncident aggregate)
+    {
+        if (aggregate.Id == 0)
+            TestIds.Set(aggregate, Items.Count + 1);
+        Items.Add(aggregate);
+    }
+
+    public void Update(InTransitIncident aggregate) { }
+    public void Remove(InTransitIncident aggregate) => Items.Remove(aggregate);
+
+    public Task<List<InTransitIncident>> GetOpenForOrderAsync(
+        long orderId, long excludeIncidentId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items
+            .Where(i => i.OrderId == orderId
+                && i.Id != excludeIncidentId
+                && i.ResolutionStatus is IncidentResolutionStatus.Open or IncidentResolutionStatus.InProgress)
+            .ToList());
 }
 
 internal sealed class InMemoryCoupons : ICouponRepository
@@ -561,7 +592,7 @@ internal sealed class TestApp
     public InMemoryDriverProfiles DriverProfiles { get; } = new();
     public InMemoryDriverWallets DriverWallets { get; } = new();
     public InMemoryRatings Ratings { get; } = new();
-    public InMemoryRepository<InTransitIncident> Incidents { get; } = new();
+    public InMemoryIncidents Incidents { get; } = new();
     public InMemoryLocationLogs LocationLogs { get; } = new();
     public InMemoryMasterData MasterData { get; } = new();
     public CapturingRealtimeNotifier Realtime { get; } = new();
@@ -604,6 +635,7 @@ internal sealed class TestApp
             .AddSingleton<IDriverProfileRepository>(DriverProfiles)
             .AddSingleton<IDriverWalletRepository>(DriverWallets)
             .AddSingleton<IRatingRepository>(Ratings)
+            .AddSingleton<IIncidentRepository>(Incidents)
             .AddSingleton<IRepository<InTransitIncident>>(Incidents)
             .AddSingleton<IRepository<DriverLocationLog>>(LocationLogs)
             .AddSingleton<IDriverLocationLogRepository>(LocationLogs)

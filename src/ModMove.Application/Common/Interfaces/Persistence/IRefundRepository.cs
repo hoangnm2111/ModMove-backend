@@ -17,6 +17,12 @@ public interface IRefundRepository : IRepository<Refund>
     Task<Refund?> GetOpenForIncidentAsync(long incidentId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// All refunds still open (Requested or Approved) on the order across incidents, complaints and cancellation.
+    /// Used when cancelling an order due to an incident to adjust open claims and check limits.
+    /// </summary>
+    Task<List<Refund>> GetOpenForOrderAsync(long orderId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// DECISIONS B9: what the order's refunds add up to so far: open or paid out, at the proposed amount once a Dispatcher
     /// proposed one. Rejected, Failed and Withdrawn refunds paid nothing and do not count.
     /// </summary>
