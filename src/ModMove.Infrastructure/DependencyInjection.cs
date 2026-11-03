@@ -5,6 +5,7 @@ using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Infrastructure.ExternalServices.Cloudinary;
 using ModMove.Infrastructure.ExternalServices.Email;
+using ModMove.Infrastructure.ExternalServices.Firebase;
 using ModMove.Infrastructure.BackgroundJobs;
 using ModMove.Infrastructure.ExternalServices.GoogleMaps;
 using ModMove.Infrastructure.ExternalServices.PayOS;
@@ -64,6 +65,7 @@ public static class DependencyInjection
         services.AddScoped<IPaymentTransactionRepository, PaymentTransactionRepository>();
 
         services.AddHostedService<GpsLogCleanupJob>();
+        services.AddHostedService<CancelUnmatchedOrdersJob>();
 
         // Read side (Queries): raw connection for Dapper.
         services.AddSingleton<ISqlConnectionFactory>(new SqlConnectionFactory(connectionString));
@@ -138,6 +140,19 @@ public static class DependencyInjection
                 throw new InvalidOperationException("PayOS:ClientId is set, so PayOS:ApiKey and PayOS:ChecksumKey must be set too.");
             services.AddSingleton(payOs);
             services.AddHttpClient<IPaymentGateway, PayOsPaymentGateway>();
+        }
+
+        // Firebase Cloud Messaging (DECISIONS C3, B17, 8.3, 9.2): push notifications to the mobile app.
+        // Without credentials, a log-only stand-in is used so every flow works on local developer machines.
+        var firebase = FirebaseOptions.TryLoad(configuration);
+        if (firebase is null)
+        {
+            services.AddSingleton<IPushNotificationService, LogOnlyPushNotificationService>();
+        }
+        else
+        {
+            services.AddSingleton(firebase);
+            services.AddHttpClient<IPushNotificationService, FcmPushNotificationService>().RemoveAllLoggers();
         }
 
         return services;
