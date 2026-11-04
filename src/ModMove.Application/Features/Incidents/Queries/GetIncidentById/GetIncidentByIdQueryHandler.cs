@@ -21,7 +21,7 @@ internal sealed class GetIncidentByIdQueryHandler(ISqlConnectionFactory connecti
                o.pickup_address AS PickupAddress, o.dropoff_address AS DropoffAddress,
                o.payment_method AS PaymentMethod, o.payment_status AS PaymentStatus,
                o.total_fee AS TotalFee, o.delivered_at AS DeliveredAt,
-               c.cargo_type AS CargoType, c.quantity AS CargoQuantity, c.weight_kg AS CargoWeightKg,
+               c.cargo_type AS CargoType, m_cargo.name AS CargoTypeName, c.quantity AS CargoQuantity, c.weight_kg AS CargoWeightKg,
                c.length_cm AS CargoLengthCm, c.width_cm AS CargoWidthCm, c.height_cm AS CargoHeightCm,
                c.special_notes AS CargoSpecialNotes, c.photo_urls AS CargoPhotoUrlsJson,
                cust.id AS CustomerId, cust.full_name AS CustomerFullName, cust.phone_number AS CustomerPhone,
@@ -32,6 +32,7 @@ internal sealed class GetIncidentByIdQueryHandler(ISqlConnectionFactory connecti
         FROM in_transit_incidents i
         JOIN shipping_orders o ON o.id = i.order_id
         LEFT JOIN cargo_details c ON c.order_id = o.id
+        LEFT JOIN master_data_items m_cargo ON m_cargo.category = 'CARGO_TYPE' AND m_cargo.code = c.cargo_type
         JOIN users cust ON cust.id = o.customer_id
         JOIN users reporter ON reporter.id = i.reported_by
         LEFT JOIN users handler ON handler.id = i.handled_by
@@ -83,7 +84,8 @@ internal sealed class GetIncidentByIdQueryHandler(ISqlConnectionFactory connecti
             ? new IncidentCargoDetails(
                 row.CargoType, row.CargoQuantity ?? 0, row.CargoWeightKg ?? 0,
                 row.CargoLengthCm ?? 0, row.CargoWidthCm ?? 0, row.CargoHeightCm ?? 0,
-                row.CargoSpecialNotes, SqlHelpers.ParseJsonList(row.CargoPhotoUrlsJson))
+                row.CargoSpecialNotes, SqlHelpers.ParseJsonList(row.CargoPhotoUrlsJson),
+                row.CargoTypeName)
             : null;
 
         var order = new IncidentOrderDetails(
@@ -166,6 +168,7 @@ internal sealed class GetIncidentByIdQueryHandler(ISqlConnectionFactory connecti
         public decimal TotalFee { get; init; }
         public DateTime? DeliveredAt { get; init; }
         public string? CargoType { get; init; }
+        public string? CargoTypeName { get; init; }
         public int? CargoQuantity { get; init; }
         public decimal? CargoWeightKg { get; init; }
         public int? CargoLengthCm { get; init; }

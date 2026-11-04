@@ -12,6 +12,7 @@ internal sealed class GetComplaintByIdQueryHandler(ISqlConnectionFactory connect
 {
     private const string ComplaintSql = """
         SELECT r.id AS Id, r.order_id AS OrderId, o.order_code AS OrderCode, o.order_status AS OrderStatus,
+               r.reason_code AS ReasonCode, rr.name AS ReasonCodeName,
                r.reason AS Reason, r.evidence_urls AS EvidenceUrlsJson,
                r.requested_amount AS RequestedAmount, r.proposed_amount AS ProposedAmount,
                r.proposal_reason AS ProposalReason, r.proposed_by AS ProposedById,
@@ -22,7 +23,7 @@ internal sealed class GetComplaintByIdQueryHandler(ISqlConnectionFactory connect
                o.pickup_address AS PickupAddress, o.dropoff_address AS DropoffAddress,
                o.payment_method AS PaymentMethod, o.payment_status AS PaymentStatus,
                o.total_fee AS TotalFee, o.delivered_at AS DeliveredAt, o.completed_at AS CompletedAt,
-               c.cargo_type AS CargoType, c.quantity AS CargoQuantity, c.weight_kg AS CargoWeightKg,
+               c.cargo_type AS CargoType, m_cargo.name AS CargoTypeName, c.quantity AS CargoQuantity, c.weight_kg AS CargoWeightKg,
                c.length_cm AS CargoLengthCm, c.width_cm AS CargoWidthCm, c.height_cm AS CargoHeightCm,
                 c.special_notes AS CargoSpecialNotes, c.photo_urls AS CargoPhotoUrlsJson,
                cust.id AS CustomerId, cust.full_name AS CustomerName, cust.phone_number AS CustomerPhone,
@@ -36,6 +37,8 @@ internal sealed class GetComplaintByIdQueryHandler(ISqlConnectionFactory connect
         JOIN users cust ON cust.id = o.customer_id
         LEFT JOIN users proposer ON proposer.id = r.proposed_by
         LEFT JOIN cargo_details c ON c.order_id = o.id
+        LEFT JOIN master_data_items m_cargo ON m_cargo.category = 'CARGO_TYPE' AND m_cargo.code = c.cargo_type
+        LEFT JOIN master_data_items rr ON rr.category = 'COMPLAINT_REASON' AND rr.code = r.reason_code
         LEFT JOIN driver_profiles dp ON dp.id = o.driver_profile_id
         LEFT JOIN users drv_user ON drv_user.id = dp.user_id
         LEFT JOIN vehicles v ON v.driver_profile_id = dp.id
@@ -92,7 +95,8 @@ internal sealed class GetComplaintByIdQueryHandler(ISqlConnectionFactory connect
             ? new ComplaintCargoDetails(
                 row.CargoType, row.CargoQuantity ?? 0, row.CargoWeightKg ?? 0,
                 row.CargoLengthCm ?? 0, row.CargoWidthCm ?? 0, row.CargoHeightCm ?? 0,
-                row.CargoSpecialNotes, SqlHelpers.ParseJsonList(row.CargoPhotoUrlsJson))
+                row.CargoSpecialNotes, SqlHelpers.ParseJsonList(row.CargoPhotoUrlsJson),
+                row.CargoTypeName)
             : null;
 
         var order = new ComplaintOrderDetails(
@@ -147,7 +151,8 @@ internal sealed class GetComplaintByIdQueryHandler(ISqlConnectionFactory connect
             SqlHelpers.ToUtc(row.DecidedAt),
             SqlHelpers.ToUtc(row.ProcessedAt),
             SqlHelpers.ToUtc(row.CreatedAt),
-            order, customer, driver, evidence, rating, incidents, histories);
+            order, customer, driver, evidence, rating, incidents, histories,
+            row.ReasonCode, row.ReasonCodeName);
     }
 
     private sealed class Row
@@ -156,6 +161,8 @@ internal sealed class GetComplaintByIdQueryHandler(ISqlConnectionFactory connect
         public long OrderId { get; init; }
         public string OrderCode { get; init; } = "";
         public string OrderStatus { get; init; } = "";
+        public string? ReasonCode { get; init; }
+        public string? ReasonCodeName { get; init; }
         public string Reason { get; init; } = "";
         public string? EvidenceUrlsJson { get; init; }
         public decimal RequestedAmount { get; init; }
@@ -178,6 +185,7 @@ internal sealed class GetComplaintByIdQueryHandler(ISqlConnectionFactory connect
         public DateTime? DeliveredAt { get; init; }
         public DateTime? CompletedAt { get; init; }
         public string? CargoType { get; init; }
+        public string? CargoTypeName { get; init; }
         public int? CargoQuantity { get; init; }
         public decimal? CargoWeightKg { get; init; }
         public int? CargoLengthCm { get; init; }

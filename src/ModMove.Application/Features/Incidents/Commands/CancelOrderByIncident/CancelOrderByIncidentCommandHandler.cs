@@ -13,7 +13,7 @@ namespace ModMove.Application.Features.Incidents.Commands.CancelOrderByIncident;
 internal sealed class CancelOrderByIncidentCommandHandler(
     ICurrentUserService currentUser,
     IUserRepository users,
-    IRepository<InTransitIncident> incidents,
+    IIncidentRepository incidents,
     IShippingOrderRepository orders,
     IRefundRepository refunds,
     IDriverProfileRepository driverProfiles,
@@ -54,30 +54,51 @@ internal sealed class CancelOrderByIncidentCommandHandler(
             ? $"{reason} [Cargo: {disposition}]"
             : reason;
 
-        var openIncidentRefund = await refunds.GetOpenForIncidentAsync(incident.Id, cancellationToken);
-        if (request.Refund)
+        var openRefunds = await refunds.GetOpenForOrderAsync(order.Id, cancellationToken);
+        var zeroedOutSum = 0m;
+        foreach (var r in openRefunds)
         {
-            if (openIncidentRefund is { RefundStatus: RefundStatus.Approved })
-                throw new DomainException("An incident refund on this order has already been approved.");
-
-            if (openIncidentRefund is { RefundStatus: RefundStatus.Requested, SourceType: RefundSourceType.Incident })
-                openIncidentRefund.Propose(0m, $"Superseded by full cancellation refund: {reason}", dispatcher.Id);
-
-            refunds.Add(Refund.Request(order.Id, incident.Id, RefundSourceType.Cancellation, reason, null, order.TotalFee));
+            if (r.RefundStatus == RefundStatus.Requested && r.SourceType == RefundSourceType.Incident)
+            {
+                zeroedOutSum += r.ProposedAmount ?? r.RequestedAmount;
+                r.Propose(
+                    0m,
+                    request.Refund
+                        ? $"Superseded by order cancellation #{incident.Id}: {reason}"
+                        : $"Order cancelled without refund: {reason}",
+                    dispatcher.Id);
+            }
         }
-        else if (openIncidentRefund is { RefundStatus: RefundStatus.Requested, SourceType: RefundSourceType.Incident })
+
+        var totalClaimedFromDb = await refunds.GetClaimedTotalForOrderAsync(order.Id, cancellationToken);
+        var actualAlreadyClaimed = Math.Max(0m, totalClaimedFromDb - zeroedOutSum);
+        var remaining = Math.Max(0m, order.TotalFee - actualAlreadyClaimed);
+
+        if (request.Refund && remaining > 0m)
         {
-            openIncidentRefund.Propose(0m, $"Order cancelled without refund: {reason}", dispatcher.Id);
+            order.EnsureRefundFits(remaining, actualAlreadyClaimed);
+            refunds.Add(Refund.Request(order.Id, incident.Id, RefundSourceType.Cancellation, reason, null, remaining));
         }
 
         var now = clock.GetUtcNow();
         order.Cancel(note, ChangedByRole.Dispatcher, dispatcher.Id, now);
         incident.Resolve(IncidentDecision.CancelOrder, note, dispatcher.Id, now);
+
+        var otherOpenIncidents = await incidents.GetOpenForOrderAsync(order.Id, incident.Id, cancellationToken);
+        foreach (var other in otherOpenIncidents)
+        {
+            other.CancelIncident($"Đơn đã hủy theo sự cố #{incident.Id}", dispatcher.Id, now);
+        }
+
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         var driverUserId = await driverProfiles.DriverUserIdAsync(order, cancellationToken);
         var customerDetail = request.Refund
-            ? $"Đơn đã bị hủy và chuyển duyệt hoàn 100% tiền cước. {note}"
+            ? (remaining == order.TotalFee
+                ? $"Đơn đã bị hủy và chuyển duyệt hoàn 100% tiền cước. {note}"
+                : remaining > 0m
+                    ? $"Đơn đã bị hủy và chuyển duyệt hoàn phần cước còn lại ({remaining:N0} đ). {note}"
+                    : $"Đơn đã bị hủy (toàn bộ tiền cước đã được duyệt hoàn trước đó). {note}")
             : $"Đơn đã bị hủy. {note}";
         await IncidentNotifications.NotifyOrderCancelledAsync(
             notifications, order, driverUserId, incident, customerDetail, note, cancellationToken);
