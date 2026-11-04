@@ -251,5 +251,96 @@ public class IncidentResolutionTests
         Assert.Single(s.SentTo(s.Customer), n => n.Type == "INCIDENT_RESOLVED");
         Assert.Single(s.SentTo(s.Driver), n => n.Type == "INCIDENT_DECIDED");
     }
+
+    [Fact]
+    public async Task CancelOrderByIncident_WithMultipleOpenIncidents_AutoCancelsRemainingOpenIncidents_WithoutDuplicateOrderCancelledNotifications()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit(PaymentMethod.PayOS);
+        var incidentA = s.Incident(order, IncidentType.VehicleBreakdown);
+        var incidentB = s.Incident(order, IncidentType.DamagedCargo);
+        var incidentC = s.Incident(order, IncidentType.Other);
+        incidentC.CancelIncident("Đã hủy trước", s.Dispatcher.Id, DispatcherSetup.Now);
+
+        await s.App.Sender.Send(new CancelOrderByIncidentCommand(
+            incidentA.Id, "Xe hỏng nặng", Refund: true, CargoDisposition.ReturnToPickup));
+
+        Assert.Equal(OrderStatus.Cancelled, order.OrderStatus);
+        Assert.Equal(IncidentResolutionStatus.Resolved, incidentA.ResolutionStatus);
+        Assert.Equal(IncidentDecision.CancelOrder, incidentA.ResolutionDecision);
+
+        Assert.Equal(IncidentResolutionStatus.Cancelled, incidentB.ResolutionStatus);
+        Assert.Equal($"Đơn đã hủy theo sự cố #{incidentA.Id}", incidentB.ResolutionNote);
+        Assert.Equal(s.Dispatcher.Id, incidentB.HandledBy);
+
+        Assert.Equal("Đã hủy trước", incidentC.ResolutionNote);
+        Assert.Single(s.SentTo(s.Customer), n => n.Type == "INCIDENT_RESOLVED");
+    }
+
+    [Fact]
+    public async Task CancelOrderByIncident_WithOpenRequestedIncidentRefundOnOtherIncident_ProposesZeroOnAllRequested_AndCreatesRefundForRemaining()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit(PaymentMethod.PayOS);
+        var incidentA = s.Incident(order, IncidentType.VehicleBreakdown);
+        var incidentB = s.Incident(order, IncidentType.DamagedCargo);
+        var openRefundB = s.IncidentRefund(order, incidentB, requested: 180_000);
+
+        await s.App.Sender.Send(new CancelOrderByIncidentCommand(
+            incidentA.Id, "Xe hỏng nặng", Refund: true, CargoDisposition.ReturnToPickup));
+
+        Assert.Equal(0m, openRefundB.ProposedAmount);
+        Assert.Equal(s.Dispatcher.Id, openRefundB.ProposedBy);
+
+        var cancellationRefund = s.App.Refunds.Items.FirstOrDefault(r => r.SourceType == RefundSourceType.Cancellation);
+        Assert.NotNull(cancellationRefund);
+        Assert.Equal(180_000m, cancellationRefund.RequestedAmount);
+        Assert.Equal(180_000m, cancellationRefund.ProposedAmount);
+    }
+
+    [Fact]
+    public async Task CancelOrderByIncident_WhenPriorRefundAlreadyApproved_OnlyRefundsRemainingAmount()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit(PaymentMethod.PayOS);
+        var incidentA = s.Incident(order, IncidentType.VehicleBreakdown);
+        var incidentB = s.Incident(order, IncidentType.DamagedCargo);
+        var approvedRefundB = s.IncidentRefund(order, incidentB, requested: 50_000);
+        approvedRefundB.Propose(50_000m, "Duyệt 50k", s.Dispatcher.Id);
+        approvedRefundB.Approve(99L, DispatcherSetup.Now);
+
+        await s.App.Sender.Send(new CancelOrderByIncidentCommand(
+            incidentA.Id, "Xe hỏng", Refund: true, CargoDisposition.ReturnToPickup));
+
+        var cancellationRefund = s.App.Refunds.Items.FirstOrDefault(r => r.SourceType == RefundSourceType.Cancellation);
+        Assert.NotNull(cancellationRefund);
+        Assert.Equal(130_000m, cancellationRefund.RequestedAmount);
+        Assert.Equal(130_000m, cancellationRefund.ProposedAmount);
+
+        var notification = s.SentTo(s.Customer).First(n => n.Type == "INCIDENT_RESOLVED");
+        Assert.Contains("130", notification.Body);
+        Assert.Contains("phần cước còn lại", notification.Body);
+    }
+
+    [Fact]
+    public async Task CancelOrderByIncident_WhenPriorRefundCoveredEntireTotal_CancelsOrderWithoutCreatingNewRefund()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit(PaymentMethod.PayOS);
+        var incidentA = s.Incident(order, IncidentType.VehicleBreakdown);
+        var incidentB = s.Incident(order, IncidentType.DamagedCargo);
+        var approvedRefundB = s.IncidentRefund(order, incidentB, requested: 180_000);
+        approvedRefundB.Propose(180_000m, "Duyệt toàn bộ", s.Dispatcher.Id);
+        approvedRefundB.Approve(99L, DispatcherSetup.Now);
+
+        await s.App.Sender.Send(new CancelOrderByIncidentCommand(
+            incidentA.Id, "Xe hỏng", Refund: true, CargoDisposition.ReturnToPickup));
+
+        Assert.Equal(OrderStatus.Cancelled, order.OrderStatus);
+        Assert.Null(s.App.Refunds.Items.FirstOrDefault(r => r.SourceType == RefundSourceType.Cancellation));
+
+        var notification = s.SentTo(s.Customer).First(n => n.Type == "INCIDENT_RESOLVED");
+        Assert.Contains("toàn bộ tiền cước đã được duyệt hoàn trước đó", notification.Body);
+    }
 }
 

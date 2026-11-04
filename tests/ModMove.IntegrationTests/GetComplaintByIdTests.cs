@@ -25,6 +25,8 @@ public class GetComplaintByIdTests
         table.Columns.Add("OrderId", typeof(long));
         table.Columns.Add("OrderCode", typeof(string));
         table.Columns.Add("OrderStatus", typeof(string));
+        table.Columns.Add("ReasonCode", typeof(string));
+        table.Columns.Add("ReasonCodeName", typeof(string));
         table.Columns.Add("Reason", typeof(string));
         table.Columns.Add("EvidenceUrlsJson", typeof(string));
         table.Columns.Add("RequestedAmount", typeof(decimal));
@@ -51,6 +53,7 @@ public class GetComplaintByIdTests
 
         // Cargo
         table.Columns.Add("CargoType", typeof(string));
+        table.Columns.Add("CargoTypeName", typeof(string));
         table.Columns.Add("CargoQuantity", typeof(int));
         table.Columns.Add("CargoWeightKg", typeof(decimal));
         table.Columns.Add("CargoLengthCm", typeof(int));
@@ -131,11 +134,11 @@ public class GetComplaintByIdTests
         var complaintTable = CreateComplaintTable();
         var now = new DateTime(2026, 10, 20, 10, 0, 0, DateTimeKind.Unspecified);
         complaintTable.Rows.Add(
-            1L, 10L, "MMDEMO006", "Delivered", "Hàng bị trầy xước", "[\"c_img1\"]",
+            1L, 10L, "MMDEMO006", "Delivered", "DAMAGED_CARGO", "Hàng bị hư hỏng", "Hàng bị trầy xước", "[\"c_img1\"]",
             240000m, 120000m, "Hư hỏng 50%", 2L, "Dispatcher ModMove",
             "Cần thêm ảnh mặt đáy", "Đã gửi thêm ảnh", "Requested", DBNull.Value, DBNull.Value, DBNull.Value, now,
             "12 Nguyễn Huệ, Q1", "45 Lê Văn Việt, Thủ Đức", "PayOS", "Paid", 240000m, now.AddHours(-1), DBNull.Value,
-            "Tủ gỗ", 1, 40m, 120, 60, 80, "Cẩn thận", "[\"cargo1\",\"cargo2\"]",
+            "FURNITURE", "Đồ nội thất", 1, 40m, 120, 60, 80, "Cẩn thận", "[\"cargo1\",\"cargo2\"]",
             3L, "Khách hàng Demo", "0900000003",
             1L, 4L, "Tài xế Demo", "0900000004", "51C-123.45", "Xe tải 1 tấn",
             "[\"p_img1\",\"p_img2\"]", "d_img1", now.AddHours(-1), "Verified",
@@ -155,6 +158,8 @@ public class GetComplaintByIdTests
         Assert.Equal(1, res.Id);
         Assert.Equal(10, res.OrderId);
         Assert.Equal("MMDEMO006", res.OrderCode);
+        Assert.Equal("DAMAGED_CARGO", res.ReasonCode);
+        Assert.Equal("Hàng bị hư hỏng", res.ReasonCodeName);
         Assert.Equal("Hàng bị trầy xước", res.Reason);
         Assert.Equal(["c_img1"], res.EvidenceUrls);
         Assert.Equal(240000m, res.RequestedAmount);
@@ -166,7 +171,9 @@ public class GetComplaintByIdTests
 
         // Cargo as the customer declared it, to compare with the pickup and delivery photos (UC-DIS-13)
         Assert.NotNull(res.Order.Cargo);
-        Assert.Equal(["cargo1", "cargo2"], res.Order.Cargo!.PhotoUrls);
+        Assert.Equal("FURNITURE", res.Order.Cargo!.CargoType);
+        Assert.Equal("Đồ nội thất", res.Order.Cargo.CargoTypeName);
+        Assert.Equal(["cargo1", "cargo2"], res.Order.Cargo.PhotoUrls);
 
         // Verification evidence
         Assert.NotNull(res.VerificationEvidence);

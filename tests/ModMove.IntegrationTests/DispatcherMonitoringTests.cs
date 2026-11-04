@@ -174,6 +174,7 @@ public class DispatcherMonitoringTests
         orderTable.Columns.Add("DriverLastLongitude", typeof(decimal));
         orderTable.Columns.Add("DriverLastLocationAt", typeof(DateTime));
         orderTable.Columns.Add("CargoType", typeof(string));
+        orderTable.Columns.Add("CargoTypeName", typeof(string));
         orderTable.Columns.Add("CargoQuantity", typeof(int));
         orderTable.Columns.Add("CargoWeightKg", typeof(decimal));
         orderTable.Columns.Add("CargoLengthCm", typeof(int));
@@ -197,7 +198,7 @@ public class DispatcherMonitoringTests
             Now.AddMinutes(-40).UtcDateTime, Now.AddMinutes(-38).UtcDateTime, Now.AddMinutes(-35).UtcDateTime, DBNull.Value, DBNull.Value,
             2L, "Nguyễn Văn Khách", "0901234567", "khach@x.vn",
             3L, 30L, "Trần Tài Xế", "0907654321", "29A-88888", 21.025m, 105.825m, Now.AddMinutes(-1).UtcDateTime,
-            "FURNITURE", 2, 120m, 150, 80, 90, "[\"https://res.cloudinary.com/demo/c1.jpg\"]", "Hàng dễ vỡ",
+            "FURNITURE", "Đồ nội thất", 2, 120m, 150, 80, 90, "[\"https://res.cloudinary.com/demo/c1.jpg\"]", "Hàng dễ vỡ",
             "[\"https://res.cloudinary.com/demo/p1.jpg\",\"https://res.cloudinary.com/demo/p2.jpg\"]", "Verified", 1, DBNull.Value, DBNull.Value, DBNull.Value);
         sql.Results.Enqueue(orderTable);
 
@@ -257,6 +258,8 @@ public class DispatcherMonitoringTests
         Assert.Equal("MM20261020055", detail.OrderCode);
         Assert.Equal("Nguyễn Văn Khách", detail.Customer.FullName);
         Assert.Equal("29A-88888", detail.Driver!.LicensePlate);
+        Assert.Equal("FURNITURE", detail.Cargo!.CargoType);
+        Assert.Equal("Đồ nội thất", detail.Cargo.CargoTypeName);
         Assert.Single(detail.Cargo!.PhotoUrls);
         Assert.Equal(2, detail.Proof!.PickupPhotoUrls.Count);
         Assert.Single(detail.StatusHistories);

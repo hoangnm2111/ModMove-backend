@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
+using ModMove.Domain.Entities;
 using ModMove.Infrastructure.ExternalServices.Cloudinary;
 using ModMove.Infrastructure.ExternalServices.Email;
 using ModMove.Infrastructure.ExternalServices.Firebase;
@@ -59,6 +60,8 @@ public static class DependencyInjection
         services.AddScoped<IDriverProfileRepository, DriverProfileRepository>();
         services.AddScoped<IDriverWalletRepository, DriverWalletRepository>();
         services.AddScoped<IRefundRepository, RefundRepository>();
+        services.AddScoped<IIncidentRepository, IncidentRepository>();
+        services.AddScoped<IRepository<InTransitIncident>>(sp => sp.GetRequiredService<IIncidentRepository>());
         services.AddScoped<IRatingRepository, RatingRepository>();
         services.AddScoped<IMasterDataRepository, MasterDataRepository>();
         services.AddScoped<IDriverLocationLogRepository, DriverLocationLogRepository>();
