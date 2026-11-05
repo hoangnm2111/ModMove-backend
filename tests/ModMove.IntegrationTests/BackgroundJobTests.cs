@@ -18,9 +18,11 @@ public class BackgroundJobTests
         public int FailFirst { get; init; }
         public int Enough { get; init; } = 1;
         public Task Reached => _enough.Task;
+        public SynchronizationContext? SeenContext { get; private set; }
 
         public Task<object?> Send(object request, CancellationToken cancellationToken = default)
         {
+            SeenContext = SynchronizationContext.Current;
             lock (Sent)
             {
                 Sent.Add(request);
@@ -51,11 +53,17 @@ public class BackgroundJobTests
     private static IServiceScopeFactory Scopes(ISender sender) =>
         new ServiceCollection().AddSingleton(sender).BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
 
-    private static async Task RunUntilReachedAsync(IHostedService job, RecordingSender sender)
+    private static Task RunUntilReachedAsync(IHostedService job, RecordingSender sender) =>
+        HostedJobRunner.RunUntilAsync(job, sender.Reached);
+
+    [Fact]
+    public async Task Job_runner_keeps_the_job_off_the_threads_xunit_runs_tests_on()
     {
-        await job.StartAsync(CancellationToken.None);
-        await sender.Reached.WaitAsync(TimeSpan.FromSeconds(10));
-        await job.StopAsync(CancellationToken.None);
+        var sender = new RecordingSender();
+
+        await RunUntilReachedAsync(new FastJob(Scopes(sender), TimeProvider.System), sender);
+
+        Assert.Null(sender.SeenContext);
     }
 
     [Fact]
