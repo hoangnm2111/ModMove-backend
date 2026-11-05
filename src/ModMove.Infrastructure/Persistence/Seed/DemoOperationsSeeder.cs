@@ -76,15 +76,15 @@ internal static class DemoOperationsSeeder
         // Complaints (Refund, SourceType Complaint), one per stage of the Complaint Handling Console. Delivered orders
         // are inside the 24-hour window (DECISIONS 7.3); the closed one belongs to an order that completed on its own.
         var c1 = await EnsureOrderAsync(db, people, vehicleType, "MMDEMO006", OrderStatus.Delivered, PaymentMethod.PayOS, 240_000m, now, ct);
-        await EnsureComplaintAsync(db, c1, "Hàng bị hỏng khi giao: tủ bị trầy xước nhiều chỗ.", 240_000m,
+        await EnsureComplaintAsync(db, c1, "Hàng bị hỏng khi giao: tủ bị trầy xước nhiều chỗ.", 240_000m, "DAMAGED_CARGO",
             refund => { }, ct);
 
         var c2 = await EnsureOrderAsync(db, people, vehicleType, "MMDEMO007", OrderStatus.Delivered, PaymentMethod.Cash, 200_000m, now, ct);
-        await EnsureComplaintAsync(db, c2, "Thiếu 2 thùng đồ so với lúc lấy hàng.", 200_000m,
+        await EnsureComplaintAsync(db, c2, "Thiếu 2 thùng đồ so với lúc lấy hàng.", 200_000m, "OTHER",
             refund => refund.RequestMoreInfo("Vui lòng gửi ảnh hàng khi nhận và danh sách đồ bị thiếu."), ct);
 
         var c3 = await EnsureOrderAsync(db, people, vehicleType, "MMDEMO008", OrderStatus.Delivered, PaymentMethod.PayOS, 280_000m, now, ct);
-        await EnsureComplaintAsync(db, c3, "Tài xế giao muộn hơn 2 giờ so với dự kiến.", 100_000m,
+        await EnsureComplaintAsync(db, c3, "Tài xế giao muộn hơn 2 giờ so với dự kiến.", 100_000m, "LATE_DELIVERY",
             refund =>
             {
                 refund.RequestMoreInfo("Bạn có tin nhắn hoặc ảnh chụp thời điểm nhận hàng không?");
@@ -92,11 +92,11 @@ internal static class DemoOperationsSeeder
             }, ct);
 
         var c4 = await EnsureOrderAsync(db, people, vehicleType, "MMDEMO009", OrderStatus.Delivered, PaymentMethod.PayOS, 320_000m, now, ct);
-        await EnsureComplaintAsync(db, c4, "Hàng bị ướt do xe không che bạt.", 320_000m,
+        await EnsureComplaintAsync(db, c4, "Hàng bị ướt do xe không che bạt.", 320_000m, "DAMAGED_CARGO",
             refund => refund.Propose(160_000m, "Ảnh giao hàng cho thấy bạt che chưa kín, đề xuất hoàn 50%.", dispatcher.Id), ct);
 
         var c5 = await EnsureOrderAsync(db, people, vehicleType, "MMDEMO010", OrderStatus.Completed, PaymentMethod.PayOS, 210_000m, now, ct);
-        await EnsureComplaintAsync(db, c5, "Tài xế thái độ không tốt, yêu cầu hoàn tiền.", 210_000m,
+        await EnsureComplaintAsync(db, c5, "Tài xế thái độ không tốt, yêu cầu hoàn tiền.", 210_000m, "SERVICE_ATTITUDE",
             refund =>
             {
                 refund.Propose(0m, "Không có bằng chứng về thái độ; ảnh giao hàng bình thường.", dispatcher.Id);
@@ -173,7 +173,7 @@ internal static class DemoOperationsSeeder
         var existing = await db.Set<ShippingOrder>().FirstOrDefaultAsync(o => o.OrderCode == code, ct);
         if (existing is not null)
         {
-            if (!markPaid && existing.PaymentStatus == PaymentStatus.Unpaid)
+            if (existing.OrderStatus == OrderStatus.Pending)
             {
                 existing.CreatedAt = now;
                 await db.SaveChangesAsync(ct);
@@ -181,7 +181,7 @@ internal static class DemoOperationsSeeder
             return existing;
         }
 
-        var cargo = CargoDetail.Create("Đồ gia dụng", 3, 120m, 100, 60, 50, [Photo], null);
+        var cargo = CargoDetail.Create("APPLIANCE", 3, 120m, 100, 60, 50, [Photo], null);
         var order = ShippingOrder.Create(
             code, people.Customer.Id, vehicleType.Id, null,
             "12 Nguyễn Huệ, Quận 1, TP.HCM", 10.7769m, 106.7009m,
@@ -251,12 +251,12 @@ internal static class DemoOperationsSeeder
 
     private static async Task EnsureComplaintAsync(
         ApplicationDbContext db, ShippingOrder order, string reason, decimal requestedAmount,
-        Action<Refund> advance, CancellationToken ct)
+        string reasonCode, Action<Refund> advance, CancellationToken ct)
     {
         if (await db.Set<Refund>().AnyAsync(r => r.OrderId == order.Id && r.SourceType == RefundSourceType.Complaint, ct))
             return;
 
-        var refund = Refund.Request(order.Id, null, RefundSourceType.Complaint, reason, [Photo], requestedAmount);
+        var refund = Refund.Request(order.Id, null, RefundSourceType.Complaint, reason, [Photo], requestedAmount, reasonCode);
         advance(refund);
         db.Add(refund);
         await db.SaveChangesAsync(ct);

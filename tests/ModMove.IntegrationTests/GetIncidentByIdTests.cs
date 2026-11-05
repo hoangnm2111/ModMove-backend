@@ -51,6 +51,7 @@ public class GetIncidentByIdTests
 
         // Cargo fields
         table.Columns.Add("CargoType", typeof(string));
+        table.Columns.Add("CargoTypeName", typeof(string));
         table.Columns.Add("CargoQuantity", typeof(int));
         table.Columns.Add("CargoWeightKg", typeof(decimal));
         table.Columns.Add("CargoLengthCm", typeof(int));
@@ -136,7 +137,7 @@ public class GetIncidentByIdTests
             10.7769m, 106.7009m, "Resolved", "ContinueTrip", "Đã thay lốp phụ",
             4L, "Tài xế Demo", "Driver", 2L, "Dispatcher ModMove", now.AddMinutes(45), now,
             "12 Nguyễn Huệ, Q1", "45 Lê Văn Việt, Thủ Đức", "Cash", "Paid", 180000m, DBNull.Value,
-            "Gia dụng", 2, 50m, 60, 40, 30, "Hàng dễ vỡ", "[\"cargo1\",\"cargo2\"]",
+            "APPLIANCE", "Đồ điện gia dụng", 2, 50m, 60, 40, 30, "Hàng dễ vỡ", "[\"cargo1\",\"cargo2\"]",
             3L, "Khách hàng Demo", "0900000003",
             1L, 4L, "Tài xế Demo", "0900000004", "51C-123.45", "Xe tải 1 tấn",
             "[\"pick1\",\"pick2\"]", "pod1", now.AddMinutes(40), "Verified");
@@ -182,7 +183,8 @@ public class GetIncidentByIdTests
         Assert.Equal("Paid", res.Order.PaymentStatus);
         Assert.Equal(180000m, res.Order.TotalFee);
         Assert.NotNull(res.Order.Cargo);
-        Assert.Equal("Gia dụng", res.Order.Cargo!.CargoType);
+        Assert.Equal("APPLIANCE", res.Order.Cargo!.CargoType);
+        Assert.Equal("Đồ điện gia dụng", res.Order.Cargo.CargoTypeName);
         Assert.Equal(2, res.Order.Cargo.Quantity);
         Assert.Equal(50m, res.Order.Cargo.WeightKg);
         Assert.Equal(["cargo1", "cargo2"], res.Order.Cargo.PhotoUrls);
@@ -230,7 +232,7 @@ public class GetIncidentByIdTests
             DBNull.Value, DBNull.Value, "Open", DBNull.Value, DBNull.Value,
             3L, "Khách hàng Demo", "Customer", DBNull.Value, DBNull.Value, DBNull.Value, now,
             "A", "B", "PayOS", "Unpaid", 100000m, DBNull.Value,
-            DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value,
+            DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value,
             3L, "Khách hàng Demo", "0900000003",
             DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value,
             DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value);

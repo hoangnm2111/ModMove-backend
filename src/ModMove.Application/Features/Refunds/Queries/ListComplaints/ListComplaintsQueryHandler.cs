@@ -23,6 +23,7 @@ internal sealed class ListComplaintsQueryHandler(ISqlConnectionFactory connectio
         FROM refunds r
         JOIN shipping_orders o ON o.id = r.order_id
         JOIN users cust ON cust.id = o.customer_id
+        LEFT JOIN master_data_items rr ON rr.category = 'COMPLAINT_REASON' AND rr.code = r.reason_code
         WHERE r.source_type = 'Complaint'
           AND (@Stage IS NULL OR (
         """ + StageExpression + """
@@ -32,7 +33,8 @@ internal sealed class ListComplaintsQueryHandler(ISqlConnectionFactory connectio
 
     private const string PageSql = """
         SELECT r.id AS Id, r.order_id AS OrderId, o.order_code AS OrderCode,
-               cust.full_name AS CustomerName, r.reason AS Reason,
+               cust.full_name AS CustomerName, r.reason_code AS ReasonCode, rr.name AS ReasonCodeName,
+               r.reason AS Reason,
                r.requested_amount AS RequestedAmount, r.proposed_amount AS ProposedAmount,
         """ + "\n" + StageExpression + " AS Stage,\n" + """
                r.refund_status AS RefundStatus, o.delivered_at AS DeliveredAt,
@@ -71,7 +73,8 @@ internal sealed class ListComplaintsQueryHandler(ISqlConnectionFactory connectio
         var items = rows.Select(r => new ComplaintListItemResponse(
             r.Id, r.OrderId, r.OrderCode, r.CustomerName, r.Reason,
             r.RequestedAmount, r.ProposedAmount, r.Stage, r.RefundStatus,
-            SqlHelpers.ToUtc(r.DeliveredAt), SqlHelpers.ToUtc(r.CreatedAt))).ToList();
+            SqlHelpers.ToUtc(r.DeliveredAt), SqlHelpers.ToUtc(r.CreatedAt),
+            r.ReasonCode, r.ReasonCodeName)).ToList();
 
         return new PagedResult<ComplaintListItemResponse>(items, request.Page, request.PageSize, total);
     }
@@ -82,6 +85,8 @@ internal sealed class ListComplaintsQueryHandler(ISqlConnectionFactory connectio
         public long OrderId { get; init; }
         public string OrderCode { get; init; } = "";
         public string CustomerName { get; init; } = "";
+        public string? ReasonCode { get; init; }
+        public string? ReasonCodeName { get; init; }
         public string Reason { get; init; } = "";
         public decimal RequestedAmount { get; init; }
         public decimal? ProposedAmount { get; init; }

@@ -30,6 +30,7 @@ public class DriverApplicationApprovalTests
         public InMemoryRepository<VehicleType> VehicleTypes { get; } = new();
         public CountingUnitOfWork UnitOfWork { get; } = new();
         public CapturingPushNotifications Push { get; } = new();
+        public CapturingRealtimeNotifier Realtime { get; } = new();
         public MutableTime Time { get; } = new(TestApp.Start);
         public ISender Sender { get; }
 
@@ -52,6 +53,7 @@ public class DriverApplicationApprovalTests
                 .AddSingleton<IRepository<VehicleType>>(VehicleTypes)
                 .AddSingleton<IUnitOfWork>(UnitOfWork)
                 .AddSingleton<IPushNotificationService>(Push)
+                .AddSingleton<IRealtimeNotifier>(Realtime)
                 .AddSingleton<ICurrentUserService>(new FakeCurrentUser(signedInAsAdmin ? Admin.Id : null))
                 .AddSingleton<TimeProvider>(Time)
                 .BuildServiceProvider()

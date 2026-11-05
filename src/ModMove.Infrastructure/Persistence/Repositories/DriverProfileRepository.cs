@@ -24,4 +24,9 @@ public sealed class DriverProfileRepository(ApplicationDbContext dbContext)
         Set.Include(d => d.Applications)
            .Include(d => d.Vehicle)
            .FirstOrDefaultAsync(d => d.Applications.Any(a => a.Id == applicationId), cancellationToken);
+
+    public async Task<IReadOnlyList<DriverProfile>> GetOnlineApprovedWithVehicleAsync(CancellationToken cancellationToken = default) =>
+        await Set.Include(d => d.Vehicle)
+            .Where(d => d.ApprovalStatus == Domain.Enums.ApprovalStatus.Approved && d.OnlineStatus == Domain.Enums.OnlineStatus.Online)
+            .ToListAsync(cancellationToken);
 }

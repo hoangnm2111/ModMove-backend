@@ -26,6 +26,11 @@ public sealed class RefundRepository(ApplicationDbContext dbContext)
                 && (r.RefundStatus == RefundStatus.Requested || r.RefundStatus == RefundStatus.Approved),
             cancellationToken);
 
+    public Task<List<Refund>> GetOpenForOrderAsync(long orderId, CancellationToken cancellationToken = default) =>
+        Set.Where(r => r.OrderId == orderId
+                && (r.RefundStatus == RefundStatus.Requested || r.RefundStatus == RefundStatus.Approved))
+            .ToListAsync(cancellationToken);
+
     public Task<decimal> GetClaimedTotalForOrderAsync(long orderId, CancellationToken cancellationToken = default) =>
         Set.Where(r => r.OrderId == orderId
                 && (r.RefundStatus == RefundStatus.Requested || r.RefundStatus == RefundStatus.Approved || r.RefundStatus == RefundStatus.Processed))

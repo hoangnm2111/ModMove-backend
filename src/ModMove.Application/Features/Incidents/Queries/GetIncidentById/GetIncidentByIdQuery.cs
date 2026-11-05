@@ -55,7 +55,8 @@ public sealed record IncidentCargoDetails(
     int WidthCm,
     int HeightCm,
     string? SpecialNotes,
-    IReadOnlyList<string> PhotoUrls);
+    IReadOnlyList<string> PhotoUrls,
+    string? CargoTypeName = null);
 
 public sealed record IncidentCustomerDetails(
     long Id,

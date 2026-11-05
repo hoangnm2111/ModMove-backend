@@ -55,6 +55,7 @@ internal sealed class GetDispatcherOrderByIdQueryHandler(ISqlConnectionFactory c
                dp.last_longitude AS DriverLastLongitude,
                dp.last_location_at AS DriverLastLocationAt,
                c.cargo_type AS CargoType,
+               m_cargo.name AS CargoTypeName,
                c.quantity AS CargoQuantity,
                c.weight_kg AS CargoWeightKg,
                c.length_cm AS CargoLengthCm,
@@ -72,6 +73,7 @@ internal sealed class GetDispatcherOrderByIdQueryHandler(ISqlConnectionFactory c
         JOIN vehicle_types vt ON vt.id = o.vehicle_type_id
         JOIN users cust ON cust.id = o.customer_id
         LEFT JOIN cargo_details c ON c.order_id = o.id
+        LEFT JOIN master_data_items m_cargo ON m_cargo.category = 'CARGO_TYPE' AND m_cargo.code = c.cargo_type
         LEFT JOIN driver_profiles dp ON dp.id = o.driver_profile_id
         LEFT JOIN users drv_user ON drv_user.id = dp.user_id
         LEFT JOIN vehicles v ON v.driver_profile_id = dp.id
@@ -179,7 +181,8 @@ internal sealed class GetDispatcherOrderByIdQueryHandler(ISqlConnectionFactory c
             ? new DispatcherOrderCargoDetails(
                 row.CargoType, row.CargoQuantity ?? 0, row.CargoWeightKg ?? 0m,
                 row.CargoLengthCm ?? 0, row.CargoWidthCm ?? 0, row.CargoHeightCm ?? 0,
-                SqlHelpers.ParseJsonList(row.CargoPhotoUrlsJson), row.CargoSpecialNotes)
+                SqlHelpers.ParseJsonList(row.CargoPhotoUrlsJson), row.CargoSpecialNotes,
+                row.CargoTypeName)
             : null;
 
         var proof = row.ProofStatus is not null
@@ -263,6 +266,7 @@ internal sealed class GetDispatcherOrderByIdQueryHandler(ISqlConnectionFactory c
         public decimal? DriverLastLongitude { get; init; }
         public DateTime? DriverLastLocationAt { get; init; }
         public string? CargoType { get; init; }
+        public string? CargoTypeName { get; init; }
         public int? CargoQuantity { get; init; }
         public decimal? CargoWeightKg { get; init; }
         public int? CargoLengthCm { get; init; }
