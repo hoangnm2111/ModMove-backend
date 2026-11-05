@@ -49,7 +49,7 @@ internal sealed class RegisterCommandHandler(
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
-        await AuthRules.SendOtpAsync(emailSender, email, code, OtpPurpose.Register, logger, cancellationToken);
+        await AuthRules.SendOtpAsync(emailSender, user.Email, code, OtpPurpose.Register, logger, cancellationToken);
 
         return new RegisterResponse(user.Id, email);
     }
