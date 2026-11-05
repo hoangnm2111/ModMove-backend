@@ -19,6 +19,9 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         // The loser's save fails with ConflictException (409) instead of resetting the counter.
         builder.Property(u => u.FailedLoginCount).IsConcurrencyToken();
 
+        // A-02: registering again read the account as unverified; if it was verified meanwhile, the loser gets 409.
+        builder.Property(u => u.EmailVerified).IsConcurrencyToken();
+
         builder.HasIndex(u => u.PhoneNumber).IsUnique(); // GB-01
         builder.HasIndex(u => u.Email).IsUnique();       // GB-01
     }

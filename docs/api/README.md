@@ -17,12 +17,12 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 |---|---|---|---|
 | POST | `api/public/auth/login` | Mọi role | Trả `accessToken`, `refreshToken`, `userId`, `fullName`, `role` |
 | POST | `api/public/auth/refresh` | Mọi role | `{ refreshToken }` → cặp token mới |
-| POST | `api/public/auth/register` | Web, app | Luôn tạo Customer; gửi OTP về email. Gửi mail lỗi vẫn trả thành công và tài khoản vẫn được tạo, nên màn hình nhập OTP phải luôn có nút gửi lại (`otp/resend`). Đăng ký lại email chưa xác minh: thành công, thông tin lần mới được dùng và có OTP mới, tính chung giới hạn GB-25 (đủ 3 lần thì vẫn thành công nhưng không gửi, không đổi gì). Email đã xác minh, tài khoản `Inactive`/`Locked`, khác vai trò hoặc số điện thoại của tài khoản khác → 409 (A-02) |
+| POST | `api/public/auth/register` | Web, app | Luôn tạo Customer; gửi OTP về email. Email chỉ nhận ký tự ASCII in được (không dấu), sai → 400 `VALIDATION`. Gửi mail lỗi vẫn trả thành công và tài khoản vẫn được tạo, nên màn hình nhập OTP phải luôn có nút gửi lại (`otp/resend`). Đăng ký lại email chưa xác minh: thành công, thông tin lần mới được dùng và có OTP mới, tính chung giới hạn GB-25 (đủ 3 lần thì vẫn thành công nhưng không gửi, không đổi gì). Email đã xác minh, tài khoản `Inactive`/`Locked`, khác vai trò hoặc số điện thoại của tài khoản khác → 409 (A-02) |
 | POST | `api/public/auth/register-driver` | Chỉ app | Luôn tạo Driver; OTP như `register` |
-| POST | `api/public/auth/verify-email` | Web, app | `{ email, code }` → 204 |
+| POST | `api/public/auth/verify-email` | Web, app | `{ email, code, password }` → 204. `password` là mật khẩu đã đăng ký; chỉ kiểm tra sau khi mã đúng, sai → 422 `VERIFY_PASSWORD_MISMATCH`, mã vẫn dùng được; hướng người dùng tới quên mật khẩu trước, vì đăng ký lại không có tác dụng khi đã đủ 3 lần gửi. Trùng thao tác khác → 409: mã có thể đã bị thay, nếu thử lại nhận `OTP_INVALID` thì xin mã mới (A-02) |
 | POST | `api/public/auth/otp/resend` | Web, app | `{ email, purpose: Register \| ResetPassword }` → luôn 204 |
 | POST | `api/public/auth/forgot-password` | Web, app | `{ email }` → luôn 204 |
-| POST | `api/public/auth/reset-password` | Web, app | `{ email, code, newPassword }` → 204 |
+| POST | `api/public/auth/reset-password` | Web, app | `{ email, code, newPassword }` → 204. Trùng lúc có người xin mã mới → 409: mật khẩu chưa đổi nhưng các phiên có thể đã bị đăng xuất, xin mã mới rồi làm lại |
 | GET | `api/public/vehicletypes` | Ai cũng được | Loại xe đang dùng, sức chứa, giá |
 | GET | `api/public/policies` | Ai cũng được | Chính sách (`code`, `name`, `description`) |
 | GET | `api/public/serviceinfo` | Ai cũng được | Giới thiệu, khu vực, lợi ích |
@@ -136,6 +136,7 @@ Kết nối với JWT trên query string: `/hubs/tracking?access_token=<accessTo
 | `TOO_MANY_REQUESTS` | 429 | Vượt giới hạn tần suất |
 | `BUSINESS_RULE` | 422 | Vi phạm luật nghiệp vụ không có mã riêng |
 | `OTP_INVALID` | 422 | Mã OTP sai, hết hạn, đã dùng, hoặc đã nhập sai quá 5 lần |
+| `VERIFY_PASSWORD_MISMATCH` | 422 | Xác minh email với mã đúng nhưng mật khẩu khác mật khẩu đã đăng ký; tài khoản chưa được kích hoạt (A-02) |
 | `WRONG_PASSWORD` | 422 | Mật khẩu hiện tại sai khi đổi mật khẩu |
 | `ACCOUNT_HAS_OPEN_ORDERS` | 422 | Xóa tài khoản khi còn đơn chưa xong |
 | `ACCOUNT_HAS_OPEN_REFUNDS` | 422 | Xóa tài khoản khi còn khoản hoàn đang mở: chờ xong hoặc rút yêu cầu trước (B8) |
