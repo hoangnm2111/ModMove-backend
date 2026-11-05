@@ -6,6 +6,7 @@ using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Domain.Entities;
 using ModMove.Infrastructure.ExternalServices.Cloudinary;
 using ModMove.Infrastructure.ExternalServices.Email;
+using ModMove.Infrastructure.ExternalServices.Excel;
 using ModMove.Infrastructure.ExternalServices.Firebase;
 using ModMove.Infrastructure.BackgroundJobs;
 using ModMove.Infrastructure.ExternalServices.GoogleMaps;
@@ -69,10 +70,13 @@ public static class DependencyInjection
 
         services.AddHostedService<GpsLogCleanupJob>();
         services.AddHostedService<CancelUnmatchedOrdersJob>();
+        services.AddHostedService<ExpireStalePaymentsJob>();
+        services.AddHostedService<AutoCompleteDeliveredOrdersJob>();
 
         // Read side (Queries): raw connection for Dapper.
         services.AddSingleton<ISqlConnectionFactory>(new SqlConnectionFactory(connectionString));
         services.AddSingleton<IPlatformSettings, PlatformSettings>();
+        services.AddSingleton<IExcelExporter, OpenXmlExcelExporter>();
 
         // External adapters; ports are in Application/Common/Interfaces/Ports.cs.
         // Email is registered only when SMTP is configured; Program.cs adds a log-only sender in Development.
