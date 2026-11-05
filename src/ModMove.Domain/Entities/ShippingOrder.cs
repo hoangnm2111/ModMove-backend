@@ -426,6 +426,15 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         return start is not null && now - start >= BusinessRules.MatchingTimeout;
     }
 
+    /// <summary>
+    /// DECISIONS 3.1: an unpaid PayOS order still Pending 30 minutes after booking is cancelled by JOB-PAY-01.
+    /// </summary>
+    public bool IsPaymentExpired(DateTimeOffset now) =>
+        OrderStatus == OrderStatus.Pending &&
+        PaymentMethod == PaymentMethod.PayOS &&
+        PaymentStatus == PaymentStatus.Unpaid &&
+        now - CreatedAt >= BusinessRules.PayOsPaymentDeadline;
+
     private void TransitionTo(OrderStatus to, ChangedByRole by, long? userId, string? note, DateTimeOffset _)
     {
         if (!AllowedTransitions[OrderStatus].Contains(to))
