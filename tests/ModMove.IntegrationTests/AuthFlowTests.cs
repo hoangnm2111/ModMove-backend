@@ -105,12 +105,99 @@ public class AuthFlowTests
     [Theory]
     [InlineData("an@example.com", "0999999999")] // same email, different case
     [InlineData("other@example.com", "0912345678")] // same phone
-    public async Task Email_and_phone_must_be_unique_GB01(string email, string phone)
+    public async Task Email_and_phone_of_a_verified_account_stay_taken_GB01(string email, string phone)
+    {
+        var app = await RegisteredAsync();
+        app.Users.Items[0].VerifyEmail();
+
+        await Assert.ThrowsAsync<ConflictException>(() =>
+            app.Sender.Send(RegisterCommand.From(Valid with { Email = email, PhoneNumber = phone }, UserRole.Customer)));
+    }
+
+    [Fact]
+    public async Task Registering_again_before_verifying_sends_a_new_code_and_the_latest_details_win_A02()
+    {
+        var app = await RegisteredAsync();
+        var firstCode = app.Email.LastCode();
+
+        var again = await app.Sender.Send(RegisterCommand.From(
+            Valid with { FullName = "An Tran", PhoneNumber = "0999999999", Password = "newsecret123" }, UserRole.Customer));
+
+        var user = Assert.Single(app.Users.Items);
+        Assert.Equal((user.Id, "an@example.com"), (again.UserId, again.Email));
+        Assert.Equal(("An Tran", "0999999999"), (user.FullName, user.PhoneNumber));
+        Assert.Equal(2, app.Email.Sent.Count);
+        Assert.Single(app.Otps.Items);
+
+        if (firstCode != app.Email.LastCode())
+            await Assert.ThrowsAsync<DomainException>(() => app.Sender.Send(new VerifyEmailCommand(Valid.Email, firstCode)));
+        await app.Sender.Send(new VerifyEmailCommand(Valid.Email, app.Email.LastCode()));
+        await app.Sender.Send(new LoginCommand(Valid.Email, "newsecret123"));
+        await Assert.ThrowsAsync<UnauthorizedException>(() => app.Sender.Send(new LoginCommand(Valid.Email, Valid.Password)));
+    }
+
+    [Fact]
+    public async Task Registering_again_shares_the_send_limit_and_at_the_limit_changes_nothing_GB25()
+    {
+        var app = await RegisteredAsync(); // email 1
+        await app.Sender.Send(new ResendOtpCommand(Valid.Email, OtpPurpose.Register)); // email 2
+        await app.Sender.Send(RegisterCommand.From(Valid, UserRole.Customer)); // email 3
+
+        var result = await app.Sender.Send(RegisterCommand.From(
+            Valid with { FullName = "An Tran", PhoneNumber = "0999999999", Password = "newsecret123" }, UserRole.Customer));
+
+        Assert.Equal("an@example.com", result.Email);
+        Assert.Equal(3, app.Email.Sent.Count);
+        Assert.Equal(("An Nguyen", "0912345678"), (app.Users.Items[0].FullName, app.Users.Items[0].PhoneNumber));
+
+        await app.Sender.Send(new VerifyEmailCommand(Valid.Email, app.Email.LastCode()));
+        await app.Sender.Send(new LoginCommand(Valid.Email, Valid.Password));
+    }
+
+    [Theory]
+    [InlineData(AccountStatus.Inactive)]
+    [InlineData(AccountStatus.Locked)]
+    public async Task Closed_or_locked_account_cannot_register_again(AccountStatus status)
+    {
+        var app = await RegisteredAsync();
+        app.Users.Items[0].ChangeStatus(status);
+
+        await Assert.ThrowsAsync<ConflictException>(() => app.Sender.Send(RegisterCommand.From(Valid, UserRole.Customer)));
+
+        Assert.Single(app.Email.Sent);
+    }
+
+    [Fact]
+    public async Task Registering_again_with_another_role_stays_taken_B6()
+    {
+        var app = await RegisteredAsync();
+
+        await Assert.ThrowsAsync<ConflictException>(() => app.Sender.Send(RegisterCommand.From(Valid, UserRole.Driver)));
+
+        Assert.Equal(UserRole.Customer, app.Users.Items[0].Role);
+        Assert.Single(app.Email.Sent);
+    }
+
+    [Fact]
+    public async Task Registering_again_cannot_take_the_phone_of_another_account_GB01()
+    {
+        var app = await RegisteredAsync();
+        await app.Sender.Send(RegisterCommand.From(Valid with { Email = "other@example.com", PhoneNumber = "0999999999" }, UserRole.Customer));
+
+        await Assert.ThrowsAsync<ConflictException>(() =>
+            app.Sender.Send(RegisterCommand.From(Valid with { PhoneNumber = "0999999999" }, UserRole.Customer)));
+
+        Assert.Equal("0912345678", app.Users.Items[0].PhoneNumber);
+        Assert.Equal(2, app.Email.Sent.Count);
+    }
+
+    [Fact]
+    public async Task New_email_cannot_take_the_phone_of_an_unverified_account_GB01()
     {
         var app = await RegisteredAsync();
 
         await Assert.ThrowsAsync<ConflictException>(() =>
-            app.Sender.Send(RegisterCommand.From(Valid with { Email = email, PhoneNumber = phone }, UserRole.Customer)));
+            app.Sender.Send(RegisterCommand.From(Valid with { Email = "other@example.com" }, UserRole.Customer)));
     }
 
     [Fact]

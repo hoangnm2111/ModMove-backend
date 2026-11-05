@@ -236,6 +236,21 @@ public class UserAndCouponTests
         Assert.Equal(180_000m, refund.ProposedAmount);
     }
 
+    [Theory]
+    [InlineData(false, AccountStatus.Active, UserRole.Customer, true)]
+    [InlineData(true, AccountStatus.Active, UserRole.Customer, false)]
+    [InlineData(false, AccountStatus.Inactive, UserRole.Customer, false)]
+    [InlineData(false, AccountStatus.Locked, UserRole.Customer, false)]
+    [InlineData(false, AccountStatus.Active, UserRole.Driver, false)]
+    public void Only_an_unverified_active_account_of_the_same_role_can_register_again_A02(
+        bool verified, AccountStatus status, UserRole role, bool expected)
+    {
+        var user = User.Create("An", "0912345678", "an@example.com", "hash", UserRole.Customer, verified);
+        user.ChangeStatus(status);
+
+        Assert.Equal(expected, user.CanRegisterAgainAs(role));
+    }
+
     private static Refund OpenComplaint() => Refund.Request(1, null, RefundSourceType.Complaint, "Hàng vỡ", null, 100_000);
 
     private static Refund ProposedComplaint()
