@@ -37,4 +37,7 @@ public sealed class ShippingOrderRepository(ApplicationDbContext dbContext)
 
     public async Task<IReadOnlyList<ShippingOrder>> GetPendingAsync(CancellationToken cancellationToken = default) =>
         await Set.Where(o => o.OrderStatus == OrderStatus.Pending).ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<ShippingOrder>> GetDeliveredOrdersAsync(CancellationToken cancellationToken = default) =>
+        await Set.Where(o => o.OrderStatus == OrderStatus.Delivered && o.DeliveredAt != null).ToListAsync(cancellationToken);
 }

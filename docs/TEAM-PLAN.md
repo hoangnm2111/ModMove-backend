@@ -90,8 +90,8 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 
 **Phase 3**
 - [x] JOB-MATCH-01 (từ lúc tạo hoặc lúc trả, 3.2: `IsMatchingExpired`), tự động tạo hoàn tiền 100% cho đơn PayOS (3.3)
-- [ ] JOB-PAY-01 (mã hết hạn sau 10 phút; hủy đơn PayOS vẫn `Unpaid` sau 30 phút từ `created_at`, 3.1), JOB-ORDER-01 (`CanBeAutoCompleted`, bỏ qua đơn có khiếu nại mở (`HasOpenComplaintAsync`, 7.3), rồi `order.Complete(rate, System, null, now)` + `OrderSettlement.SettleAsync` trong `Features/Orders` như ConfirmReceipt của Hiếu, để ví được tất toán giống nhau)
-- [ ] Báo cáo, doanh thu (8.1: tổng `commission_amount` của đơn `Completed`, giờ VN), xuất Excel (B16, xin duyệt package)
+- [x] JOB-PAY-01 (mã hết hạn sau 10 phút; hủy đơn PayOS vẫn `Unpaid` sau 30 phút từ `created_at`, 3.1), JOB-ORDER-01 (`CanBeAutoCompleted`, bỏ qua đơn có khiếu nại mở (`HasOpenComplaintAsync`, 7.3), rồi `order.Complete(rate, System, null, now)` + `OrderSettlement.SettleAsync` trong `Features/Orders` như ConfirmReceipt của Hiếu, để ví được tất toán giống nhau)
+- [x] Báo cáo, doanh thu (8.1: tổng `commission_amount` của đơn `Completed`, giờ VN), xuất Excel (B16, xin duyệt package)
 - [x] Thông báo cho tài xế theo bảng sự kiện 8.3, gọi qua `INotificationService` (B17)
 - [ ] Thông báo cho **khách** khi chính bước của Hoàng đổi trạng thái (8.3): nhận đơn `CustomerEvent.OrderAccepted`, đến điểm lấy `DriverArrived`, gửi ảnh lấy hàng `PickupPhotosToReview`, giao hàng `OrderDelivered`, JOB-ORDER-01 `OrderCompleted`, Admin duyệt/chi hoàn tiền `RefundDecided`, job tự hủy đơn `OrderCancelled`: gọi `NotifyCustomerAsync`, và `PublishOrderStatusAsync` sau mỗi lần đổi trạng thái đơn (B12)
 
