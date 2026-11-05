@@ -637,6 +637,7 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
 
                     b.Property<string>("CodeHash")
+                        .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(60)
                         .HasColumnType("varchar(60)")
@@ -1363,6 +1364,7 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnName("email");
 
                     b.Property<bool>("EmailVerified")
+                        .IsConcurrencyToken()
                         .HasColumnType("tinyint(1)")
                         .HasColumnName("email_verified");
 

@@ -184,9 +184,8 @@ public class CancelUnmatchedOrdersJobTests
         var scopes = new ServiceCollection().AddSingleton<ISender>(sender).BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
         var job = new CancelUnmatchedOrdersJob(scopes, TimeProvider.System, NullLogger<CancelUnmatchedOrdersJob>.Instance);
 
-        await job.StartAsync(CancellationToken.None);
-        var command = await sender.FirstCommand.WaitAsync(TimeSpan.FromSeconds(5));
-        await job.StopAsync(CancellationToken.None);
+        await HostedJobRunner.RunUntilAsync(job, sender.FirstCommand);
+        var command = await sender.FirstCommand;
 
         Assert.IsType<CancelUnmatchedOrdersCommand>(command);
     }
