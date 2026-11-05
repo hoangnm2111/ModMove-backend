@@ -123,6 +123,33 @@ public class ShippingOrderMatchingTests
         Assert.True(order.IsMatchingExpired(paidAt.AddSeconds(600)));
     }
 
+    [Theory]
+    [InlineData(1799, false)]
+    [InlineData(1800, true)]
+    [InlineData(1801, true)]
+    public void Unpaid_PayOS_order_IsPaymentExpired_measures_30_minutes_from_CreatedAt_DECISIONS_3_1(int elapsedSeconds, bool expectedExpired)
+    {
+        var order = CreateOrder(PaymentMethod.PayOS);
+
+        Assert.Equal(expectedExpired, order.IsPaymentExpired(Now.AddSeconds(elapsedSeconds)));
+    }
+
+    [Fact]
+    public void Paid_PayOS_order_cash_order_and_cancelled_order_are_never_payment_expired()
+    {
+        var paidPayOs = CreateOrder(PaymentMethod.PayOS);
+        paidPayOs.MarkPaid(Now.AddMinutes(5));
+
+        var cash = CreateOrder(PaymentMethod.Cash);
+
+        var cancelledPayOs = CreateOrder(PaymentMethod.PayOS);
+        cancelledPayOs.CancelByCustomer(customerId: 1, "Đổi ý", Now.AddMinutes(2));
+
+        Assert.False(paidPayOs.IsPaymentExpired(Now.AddMinutes(35)));
+        Assert.False(cash.IsPaymentExpired(Now.AddMinutes(35)));
+        Assert.False(cancelledPayOs.IsPaymentExpired(Now.AddMinutes(35)));
+    }
+
     [Fact]
     public void GeoDistance_HaversineKm_returns_zero_for_same_coordinates_and_accurate_distance_for_nearby_points()
     {
