@@ -2,6 +2,8 @@ using System.Security.Cryptography;
 using FluentValidation;
 using Microsoft.Extensions.Logging;
 using ModMove.Application.Common.Interfaces;
+using ModMove.Application.Common.Interfaces.Persistence;
+using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 
 namespace ModMove.Application.Features.Auth;
@@ -27,6 +29,18 @@ internal static class AuthRules
 
     /// <summary>Six random digits from a cryptographic source.</summary>
     public static string NewOtpCode() => RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+
+    /// <summary>Starts a code or replaces the current one; false at the GB-25 limit, when nothing changes and nothing may be sent.</summary>
+    public static async Task<bool> TryIssueOtpAsync(
+        IOtpRepository otps, string email, OtpPurpose purpose, string codeHash, DateTimeOffset now, CancellationToken ct)
+    {
+        var latest = await otps.GetLatestAsync(email, purpose, ct);
+        if (latest is not null && latest.VerifiedAt is null)
+            return latest.TryResend(codeHash, now);
+
+        otps.Add(OtpVerification.Issue(email, purpose, codeHash, now));
+        return true;
+    }
 
     /// <summary>
     /// The account or code is already saved, so a mail failure is only logged: the user asks again with otp/resend, and a

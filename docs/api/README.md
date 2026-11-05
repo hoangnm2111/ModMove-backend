@@ -17,7 +17,7 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 |---|---|---|---|
 | POST | `api/public/auth/login` | Mọi role | Trả `accessToken`, `refreshToken`, `userId`, `fullName`, `role` |
 | POST | `api/public/auth/refresh` | Mọi role | `{ refreshToken }` → cặp token mới |
-| POST | `api/public/auth/register` | Web, app | Luôn tạo Customer; gửi OTP về email. Gửi mail lỗi vẫn trả thành công và tài khoản vẫn được tạo, nên màn hình nhập OTP phải luôn có nút gửi lại (`otp/resend`) |
+| POST | `api/public/auth/register` | Web, app | Luôn tạo Customer; gửi OTP về email. Gửi mail lỗi vẫn trả thành công và tài khoản vẫn được tạo, nên màn hình nhập OTP phải luôn có nút gửi lại (`otp/resend`). Đăng ký lại email chưa xác minh: thành công, thông tin lần mới được dùng và có OTP mới, tính chung giới hạn GB-25 (đủ 3 lần thì vẫn thành công nhưng không gửi, không đổi gì). Email đã xác minh, tài khoản `Inactive`/`Locked`, khác vai trò hoặc số điện thoại của tài khoản khác → 409 (A-02) |
 | POST | `api/public/auth/register-driver` | Chỉ app | Luôn tạo Driver; OTP như `register` |
 | POST | `api/public/auth/verify-email` | Web, app | `{ email, code }` → 204 |
 | POST | `api/public/auth/otp/resend` | Web, app | `{ email, purpose: Register \| ResetPassword }` → luôn 204 |
