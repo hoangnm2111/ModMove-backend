@@ -28,4 +28,7 @@ public interface IShippingOrderRepository : IRepository<ShippingOrder>
 
     /// <summary>All orders still in <see cref="Domain.Enums.OrderStatus.Pending"/>, for timeout background jobs (JOB-MATCH-01, JOB-PAY-01).</summary>
     Task<IReadOnlyList<ShippingOrder>> GetPendingAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>All orders still in <see cref="Domain.Enums.OrderStatus.Delivered"/>, for the 24-hour auto-completion job (JOB-ORDER-01, GB-23).</summary>
+    Task<IReadOnlyList<ShippingOrder>> GetDeliveredOrdersAsync(CancellationToken cancellationToken = default);
 }
