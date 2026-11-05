@@ -20,8 +20,14 @@ internal static class AuthRules
             .Matches("[A-Za-z]").WithMessage("Password must contain a letter.")
             .Matches("[0-9]").WithMessage("Password must contain a digit.");
 
+    /// <summary>
+    /// Printable ASCII only (A-02): the email columns use utf8mb4_unicode_ci, which ignores accents and invisible characters,
+    /// so a lookalike address on another domain would find the real account and receive its codes.
+    /// </summary>
     public static IRuleBuilderOptions<T, string> ValidEmail<T>(this IRuleBuilder<T, string> rule) =>
-        rule.NotEmpty().MaximumLength(100).EmailAddress();
+        rule.NotEmpty().MaximumLength(100).EmailAddress()
+            .Must(email => email is null || email.Trim().All(c => c is > ' ' and < '\x7F'))
+            .WithMessage("Email must contain only unaccented letters, digits and standard symbols.");
 
     /// <summary>Vietnamese mobile number: 10 digits starting with 0 (fits users.phone_number VARCHAR(15)).</summary>
     public static IRuleBuilderOptions<T, string> ValidPhone<T>(this IRuleBuilder<T, string> rule) =>
