@@ -3,6 +3,7 @@ using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
+using ModMove.Application.Common.Notifications;
 
 namespace ModMove.Application.Features.Wallets.Commands.ApproveWithdrawal;
 
@@ -34,19 +35,13 @@ internal sealed class ApproveWithdrawalCommandHandler(
         var driverProfile = await driverProfiles.GetByIdAsync(wallet.DriverProfileId, cancellationToken);
         if (driverProfile is not null)
         {
-            await notifications.NotifyAsync(
+            await notifications.NotifyWithdrawalApprovedAsync(
                 driverProfile.UserId,
-                new Notification(
-                    "WITHDRAWAL_DECIDED",
-                    "Yêu cầu rút tiền đã hoàn tất",
-                    $"Yêu cầu rút {transaction.Amount:N0} VND đã được chuyển khoản. Mã tham chiếu: {referenceCode}.",
-                    new Dictionary<string, string>
-                    {
-                        ["transactionId"] = transaction.Id.ToString(),
-                        ["walletId"] = wallet.Id.ToString(),
-                        ["status"] = transaction.TransactionStatus.ToString(),
-                        ["referenceCode"] = referenceCode,
-                    }),
+                wallet.Id,
+                transaction.Id,
+                transaction.Amount,
+                transaction.TransactionStatus.ToString(),
+                referenceCode,
                 cancellationToken);
         }
     }

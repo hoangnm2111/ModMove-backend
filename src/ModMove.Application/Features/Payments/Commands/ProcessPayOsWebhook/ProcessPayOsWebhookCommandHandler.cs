@@ -4,6 +4,7 @@ using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
+using ModMove.Application.Common.Notifications;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 using ModMove.Domain.Exceptions;
@@ -16,7 +17,10 @@ internal sealed class ProcessPayOsWebhookCommandHandler(
     IShippingOrderRepository orders,
     IDriverWalletRepository wallets,
     IUnitOfWork unitOfWork,
-    TimeProvider clock) : ICommandHandler<ProcessPayOsWebhookCommand>
+    TimeProvider clock,
+    IDriverProfileRepository? driverProfiles = null,
+    IPlatformSettings? settings = null,
+    INotificationService? notifications = null) : ICommandHandler<ProcessPayOsWebhookCommand>
 {
     private const string SuccessCode = "00";
 
@@ -52,6 +56,7 @@ internal sealed class ProcessPayOsWebhookCommandHandler(
         if (!transaction.MarkPaid(now))
             return;
 
+        ShippingOrder? paidOrder = null;
         if (transaction.OrderId is { } orderId)
         {
             var order = await orders.GetByIdAsync(orderId, cancellationToken)
@@ -59,6 +64,7 @@ internal sealed class ProcessPayOsWebhookCommandHandler(
 
             // Throws ORDER_CANCELLED if the order was cancelled before the payment arrived.
             order.MarkPaid(now);
+            paidOrder = order;
 
             foreach (var other in await payments.GetPendingPayOsForOrderAsync(order.Id, cancellationToken))
             {
@@ -75,6 +81,17 @@ internal sealed class ProcessPayOsWebhookCommandHandler(
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // DECISIONS 6.4, 8.3: PayOS orders enter the matching pool only once PaidAt is set.
+        // Notify eligible nearby online drivers immediately via FCM + SignalR.
+        if (paidOrder is not null
+            && notifications is not null
+            && driverProfiles is not null
+            && settings is not null)
+        {
+            await notifications.NotifyNearbyDriversOfNewOrderAsync(
+                paidOrder, driverProfiles, wallets, orders, settings, now, cancellationToken);
+        }
     }
 
     private static string ExtractSignature(string rawBody)

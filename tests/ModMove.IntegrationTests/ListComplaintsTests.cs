@@ -26,6 +26,8 @@ public class ListComplaintsTests
         table.Columns.Add("OrderId", typeof(long));
         table.Columns.Add("OrderCode", typeof(string));
         table.Columns.Add("CustomerName", typeof(string));
+        table.Columns.Add("ReasonCode", typeof(string));
+        table.Columns.Add("ReasonCodeName", typeof(string));
         table.Columns.Add("Reason", typeof(string));
         table.Columns.Add("RequestedAmount", typeof(decimal));
         table.Columns.Add("ProposedAmount", typeof(decimal));
@@ -45,10 +47,10 @@ public class ListComplaintsTests
     {
         var table = NewTable();
         table.Rows.Add(
-            1L, 10L, "MMDEMO006", "Khách hàng Demo", "Hàng trầy xước", 240000m, DBNull.Value,
+            1L, 10L, "MMDEMO006", "Khách hàng Demo", "DAMAGED_CARGO", "Hàng bị hư hỏng", "Hàng trầy xước", 240000m, DBNull.Value,
             "NeedsReview", "Requested", Delivered, Created, 5);
         table.Rows.Add(
-            2L, 11L, "MMDEMO007", "Khách hàng Demo", "Thiếu hàng", 200000m, DBNull.Value,
+            2L, 11L, "MMDEMO007", "Khách hàng Demo", DBNull.Value, DBNull.Value, "Thiếu hàng", 200000m, DBNull.Value,
             "WaitingForCustomer", "Requested", Delivered, Created.AddHours(1), 5);
         var sql = new FakeSql { Result = table };
 
@@ -64,6 +66,8 @@ public class ListComplaintsTests
         Assert.Equal(10, first.OrderId);
         Assert.Equal("MMDEMO006", first.OrderCode);
         Assert.Equal("Khách hàng Demo", first.CustomerName);
+        Assert.Equal("DAMAGED_CARGO", first.ReasonCode);
+        Assert.Equal("Hàng bị hư hỏng", first.ReasonCodeName);
         Assert.Equal("Hàng trầy xước", first.Reason);
         Assert.Equal(240000m, first.RequestedAmount);
         Assert.Null(first.ProposedAmount);
@@ -74,6 +78,8 @@ public class ListComplaintsTests
         Assert.Equal(TimeSpan.Zero, first.CreatedAt.Offset);
 
         Assert.Equal("WaitingForCustomer", page.Items[1].Stage);
+        Assert.Null(page.Items[1].ReasonCode);
+        Assert.Null(page.Items[1].ReasonCodeName);
     }
 
     [Fact]
@@ -81,7 +87,7 @@ public class ListComplaintsTests
     {
         var table = NewTable();
         table.Rows.Add(
-            1L, 10L, "MMDEMO006", "Khách hàng Demo", "Lý do", 100000m, DBNull.Value,
+            1L, 10L, "MMDEMO006", "Khách hàng Demo", DBNull.Value, DBNull.Value, "Lý do", 100000m, DBNull.Value,
             "NeedsReview", "Requested", Delivered, Created, 1);
         var sql = new FakeSql { Result = table };
 

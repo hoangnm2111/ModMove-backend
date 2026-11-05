@@ -16,4 +16,7 @@ public interface IDriverProfileRepository : IRepository<DriverProfile>
     Task<DriverProfile?> GetByUserIdAsync(long userId, CancellationToken cancellationToken = default);
 
     Task<DriverProfile?> GetByApplicationIdWithApplicationsAndVehicleAsync(long applicationId, CancellationToken cancellationToken = default);
+
+    /// <summary>All Approved and Online driver profiles with their Vehicle loaded, for matching notifications (DECISIONS B5, 8.3).</summary>
+    Task<IReadOnlyList<DriverProfile>> GetOnlineApprovedWithVehicleAsync(CancellationToken cancellationToken = default);
 }

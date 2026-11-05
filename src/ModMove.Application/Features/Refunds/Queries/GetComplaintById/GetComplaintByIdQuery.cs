@@ -34,7 +34,9 @@ public sealed record ComplaintDetailResponse(
     ComplaintVerificationEvidence? VerificationEvidence,
     ComplaintRatingDetails? Rating,
     IReadOnlyList<ComplaintIncidentSummary> Incidents,
-    IReadOnlyList<ComplaintOrderStatusHistoryItem> StatusHistories);
+    IReadOnlyList<ComplaintOrderStatusHistoryItem> StatusHistories,
+    string? ReasonCode = null,
+    string? ReasonCodeName = null);
 
 public sealed record ComplaintOrderDetails(
     long Id,
@@ -57,7 +59,8 @@ public sealed record ComplaintCargoDetails(
     int WidthCm,
     int HeightCm,
     string? SpecialNotes,
-    IReadOnlyList<string> PhotoUrls);
+    IReadOnlyList<string> PhotoUrls,
+    string? CargoTypeName = null);
 
 public sealed record ComplaintCustomerDetails(
     long Id,

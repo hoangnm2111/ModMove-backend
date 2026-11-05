@@ -77,21 +77,22 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [x] Tài khoản (ADM-04..07): danh sách, chi tiết, khóa/mở (`Locked`, chỉ Admin mở; khóa thì gọi `RevokeAllForUserAsync`), tạo Dispatcher với mật khẩu cố định (B7)
 - [x] Hồ sơ tài xế: phía Driver (DRV-03..07) và phía Admin duyệt (ADM-08, 09); `driver_wallets` tạo khi duyệt lần đầu
 - [x] Adapter PayOS (`PayOsPaymentGateway` + `NotConfiguredPaymentGateway`)
-- [ ] Adapter FCM (`IPushNotificationService`)
+- [x] Adapter FCM (`IPushNotificationService`)
 
 **Phase 2**
 - [x] Thanh toán đơn hàng PayOS (CUS-27): tạo lại mã khi hết 10 phút (3.1), `CreateOrderPayment` nhận `platform` (`Web` | `App`) và chọn `returnUrl` từ cấu hình `PayOS:ReturnUrls:*`, client không gửi URL (3.1), webhook `POST api/webhooks/payos` (sai chữ ký → từ chối, gọi trùng → idempotent, đối soát số tiền), `ShippingOrder.MarkPaid(now)` và cộng ví cọc khi webhook báo thành công
 - [ ] Tạo link nạp cọc ví tài xế qua PayOS (DRV-21 ≥ 50.000đ)
-- [ ] Matching (DRV-08..10, B5): đơn PayOS chỉ hiện khi đã trả; GB-08/09; đơn tiền mặt cần ví cọc ≥ `MIN_COD_DEPOSIT` và ≥ hoa hồng của đơn (GB-16: `DriverWallet.CanReceiveCod(minDeposit, order.CommissionFor(rate))`, dùng cả khi đổi tài xế); ẩn tài xế mất GPS quá 5 phút (6.4)
+- [x] Matching (DRV-08..10, B5): đơn PayOS chỉ hiện khi đã trả; GB-08/09; đơn tiền mặt cần ví cọc ≥ `MIN_COD_DEPOSIT` và ≥ hoa hồng của đơn (GB-16: `DriverWallet.CanReceiveCod(minDeposit, order.CommissionFor(rate))`, dùng cả khi đổi tài xế); ẩn tài xế mất GPS quá 5 phút (6.4)
 - [ ] Trips (DRV-11..16, 18, 19): không có hủy từ tài xế (6.1); không có người nhận thì vẫn giao và gửi POD (2.7)
 - [ ] Ví (DRV-17, 20..23): thu COD, rút tiền không tối thiểu (5.1), thu nhập = `DriverEarning`; số rút tối đa hiển thị = `earningsBalance + min(depositBalance, 0)`, `DriverWallet.RequestWithdrawal` tự trừ nợ ví cọc trước (5.1)
 - [x] Admin duyệt hoàn tiền (cả hoàn tiền do hủy không qua Dispatcher, 3.3) và chi trả tay (`RefundsController`: `GET`, `approve`, `reject`, `payout`); truyền lý do cho khách vào tham số `note` của `Refund.Approve`/`RejectRefund` (CUS-23); trước khi duyệt gọi `order.EnsureRefundFits(0, await refunds.GetClaimedTotalForOrderAsync(order.Id))` để tổng hoàn của đơn không vượt `total_fee` (B9); gửi `CustomerEvent.RefundDecided` (8.3)
 - [x] Admin duyệt rút tiền tài xế (ADM-24)
 
 **Phase 3**
-- [ ] JOB-PAY-01 (mã hết hạn sau 10 phút; hủy đơn PayOS vẫn `Unpaid` sau 30 phút từ `created_at`, 3.1), JOB-MATCH-01 (từ lúc tạo hoặc lúc trả, 3.2: `IsMatchingExpired`), JOB-ORDER-01 (`CanBeAutoCompleted`, bỏ qua đơn có khiếu nại mở (`HasOpenComplaintAsync`, 7.3), rồi `order.Complete(rate, System, null, now)` + `OrderSettlement.SettleAsync` trong `Features/Orders` như ConfirmReceipt của Hiếu, để ví được tất toán giống nhau)
+- [x] JOB-MATCH-01 (từ lúc tạo hoặc lúc trả, 3.2: `IsMatchingExpired`), tự động tạo hoàn tiền 100% cho đơn PayOS (3.3)
+- [ ] JOB-PAY-01 (mã hết hạn sau 10 phút; hủy đơn PayOS vẫn `Unpaid` sau 30 phút từ `created_at`, 3.1), JOB-ORDER-01 (`CanBeAutoCompleted`, bỏ qua đơn có khiếu nại mở (`HasOpenComplaintAsync`, 7.3), rồi `order.Complete(rate, System, null, now)` + `OrderSettlement.SettleAsync` trong `Features/Orders` như ConfirmReceipt của Hiếu, để ví được tất toán giống nhau)
 - [ ] Báo cáo, doanh thu (8.1: tổng `commission_amount` của đơn `Completed`, giờ VN), xuất Excel (B16, xin duyệt package)
-- [ ] Thông báo cho tài xế theo bảng sự kiện 8.3, gọi qua `INotificationService` (B17)
+- [x] Thông báo cho tài xế theo bảng sự kiện 8.3, gọi qua `INotificationService` (B17)
 - [ ] Thông báo cho **khách** khi chính bước của Hoàng đổi trạng thái (8.3): nhận đơn `CustomerEvent.OrderAccepted`, đến điểm lấy `DriverArrived`, gửi ảnh lấy hàng `PickupPhotosToReview`, giao hàng `OrderDelivered`, JOB-ORDER-01 `OrderCompleted`, Admin duyệt/chi hoàn tiền `RefundDecided`, job tự hủy đơn `OrderCancelled`: gọi `NotifyCustomerAsync`, và `PublishOrderStatusAsync` sau mỗi lần đổi trạng thái đơn (B12)
 
 ## 6. Huy: Dispatcher
@@ -118,7 +119,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 | Google Maps | `IMapService` | Hiếu | Đã làm |
 | Cloudinary | `IFileStorage` | Hiếu | Đã làm |
 | PayOS | `IPaymentGateway` | Hoàng | Đã làm |
-| FCM | `IPushNotificationService` | Hoàng | Chưa |
+| FCM | `IPushNotificationService` | Hoàng | Đã làm |
 | SignalR | `IRealtimeNotifier` | Hiếu | Đã làm (`WebApi/Hubs`, `/hubs/tracking`) |
 
 Khóa để trong `appsettings.Development.json` hoặc user-secrets, không commit. Package mới phải hỏi nhóm trước (đã duyệt: `CloudinaryDotNet`, `Microsoft.Extensions.Http`).

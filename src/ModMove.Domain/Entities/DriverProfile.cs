@@ -92,6 +92,13 @@ public sealed class DriverProfile : BaseAuditableEntity, IAggregateRoot
         LastLocationAt = at;
     }
 
+    /// <summary>
+    /// DECISIONS 6.4 / GB-39: true while the last GPS point is less than 5 minutes old. A driver without a fresh point is
+    /// disconnected: hidden on the Dispatcher map and shown no new orders (an order already in progress is kept).
+    /// </summary>
+    public bool HasFreshLocation(DateTimeOffset now) =>
+        LastLocationAt is { } at && now - at < Constants.BusinessRules.GpsDisconnectAfter;
+
     public void LinkBankAccount(string bankName, string accountNumber, string accountHolder)
     {
         BankName = bankName;

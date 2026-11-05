@@ -25,4 +25,7 @@ public interface IShippingOrderRepository : IRepository<ShippingOrder>
 
     /// <summary>Orders created in [fromUtc, toUtc); numbers the next order code of the day (DECISIONS 9.5).</summary>
     Task<int> CountCreatedBetweenAsync(DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken = default);
+
+    /// <summary>All orders still in <see cref="Domain.Enums.OrderStatus.Pending"/>, for timeout background jobs (JOB-MATCH-01, JOB-PAY-01).</summary>
+    Task<IReadOnlyList<ShippingOrder>> GetPendingAsync(CancellationToken cancellationToken = default);
 }
