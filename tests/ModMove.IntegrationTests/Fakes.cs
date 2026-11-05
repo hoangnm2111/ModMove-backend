@@ -95,6 +95,9 @@ internal sealed class InMemoryOrders : IShippingOrderRepository
     public Task<IReadOnlyList<ShippingOrder>> GetPendingAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<ShippingOrder>>(Items.Where(o => o.OrderStatus == OrderStatus.Pending).ToList());
 
+    public Task<IReadOnlyList<ShippingOrder>> GetDeliveredOrdersAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<ShippingOrder>>(Items.Where(o => o.OrderStatus == OrderStatus.Delivered && o.DeliveredAt is not null).ToList());
+
     public Task<ShippingOrder?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(o => o.Id == id));
 
@@ -546,6 +549,11 @@ internal sealed class InMemoryPaymentTransactions : IPaymentTransactionRepositor
             .Where(p => p.OrderId == orderId && p.PaymentMethod == PaymentMethod.PayOS && p.TransactionStatus == PaymentTransactionStatus.Pending)
             .ToList());
 
+    public Task<IReadOnlyList<PaymentTransaction>> GetPendingPayOsTransactionsAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<PaymentTransaction>>(Items
+            .Where(p => p.PaymentMethod == PaymentMethod.PayOS && p.TransactionStatus == PaymentTransactionStatus.Pending)
+            .ToList());
+
     public Task<PaymentTransaction?> GetByPayOsOrderCodeAsync(long payosOrderCode, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(p => p.PayosOrderCode == payosOrderCode));
 
@@ -614,6 +622,7 @@ internal sealed class TestApp
     public InMemoryRepository<VehicleType> VehicleTypes { get; } = new();
     public InMemoryPlatformSettings Settings { get; } = new();
     public FakeSql Sql { get; } = new();
+    public IExcelExporter Excel { get; } = new ModMove.Infrastructure.ExternalServices.Excel.OpenXmlExcelExporter();
     public MutableTime Time { get; } = new(Start);
     public ISender Sender { get; }
 
@@ -662,6 +671,7 @@ internal sealed class TestApp
             .AddSingleton<IRepository<VehicleType>>(VehicleTypes)
             .AddSingleton<IPlatformSettings>(Settings)
             .AddSingleton<ISqlConnectionFactory>(Sql)
+            .AddSingleton<IExcelExporter>(Excel)
             .AddSingleton<ICurrentUserService>(new FakeCurrentUser(signedInUserId))
             .AddSingleton<TimeProvider>(Time)
             .BuildServiceProvider()

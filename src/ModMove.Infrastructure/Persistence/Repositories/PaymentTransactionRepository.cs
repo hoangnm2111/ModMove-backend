@@ -15,6 +15,12 @@ public sealed class PaymentTransactionRepository(ApplicationDbContext dbContext)
                 && p.TransactionStatus == PaymentTransactionStatus.Pending)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<PaymentTransaction>> GetPendingPayOsTransactionsAsync(CancellationToken cancellationToken = default) =>
+        await Set
+            .Where(p => p.PaymentMethod == PaymentMethod.PayOS
+                && p.TransactionStatus == PaymentTransactionStatus.Pending)
+            .ToListAsync(cancellationToken);
+
     public Task<PaymentTransaction?> GetByPayOsOrderCodeAsync(long payosOrderCode, CancellationToken cancellationToken = default) =>
         Set.FirstOrDefaultAsync(p => p.PayosOrderCode == payosOrderCode, cancellationToken);
 }
