@@ -25,7 +25,7 @@ public sealed class OrdersController : ApiControllerBase
     public Task<OrderDetailResponse> GetById(long id, CancellationToken cancellationToken) =>
         Sender.Send(new GetMyOrderDetailQuery(id), cancellationToken);
 
-    /// <summary>Stops, last driver position and ETA when the tracking screen opens (CUS-13); then follow /hubs/tracking. Not yours → 404. Each call costs a Google Maps request, so it is limited per user.</summary>
+    /// <summary>Stops, last driver position and ETA when the tracking screen opens (CUS-13); then follow /hubs/tracking. Not yours → 404. Each call costs a MapVina route request, so it is limited per user.</summary>
     [HttpGet("{id:long}/tracking")]
     [EnableRateLimiting(AuthRateLimit.UserPolicy)]
     public Task<OrderTrackingResponse> GetTracking(long id, CancellationToken cancellationToken) =>

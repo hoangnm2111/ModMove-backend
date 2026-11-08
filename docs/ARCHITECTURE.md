@@ -51,7 +51,7 @@ src/
 │   │   ├── Seed/                      # DatabaseInitializer: migrate + reference data (+ demo accounts in Development)
 │   │   └── SqlConnectionFactory.cs    # Kết nối đọc cho Dapper
 │   ├── Identity/                      # JWT, BCrypt
-│   ├── ExternalServices/              # Cloudinary, GoogleMaps, PayOS, Firebase, Email
+│   ├── ExternalServices/              # Cloudinary, MapVina, PayOS, Firebase, Email
 │   ├── BackgroundJobs/
 │   └── DependencyInjection.cs         # AddInfrastructure()
 │

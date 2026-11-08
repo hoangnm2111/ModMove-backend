@@ -29,7 +29,7 @@ public class OrderTrackingTests
             if (Hang)
                 await Task.Delay(Timeout.Infinite, cancellationToken);
             if (Fail)
-                throw new HttpRequestException("Google Maps is down");
+                throw new HttpRequestException("MapVina is down");
             Routes.Add((from, to));
             return new RouteInfo(5m, 14);
         }
@@ -206,14 +206,15 @@ public class OrderTrackingTests
     }
 
     [Fact]
-    public async Task Position_exactly_5_minutes_old_still_counts_6_4()
+    public async Task Position_exactly_5_minutes_old_is_stale_6_4()
     {
+        // Same boundary as matching and the Dispatcher map: from 5 minutes on, the driver is disconnected.
         var db = new Db { LocationAt = new DateTime(2026, 10, 20, 7, 55, 0) };
 
         var tracking = await db.Sender().Send(new GetOrderTrackingQuery(1));
 
-        Assert.False(tracking.Driver!.IsStale);
-        Assert.NotNull(tracking.Eta);
+        Assert.True(tracking.Driver!.IsStale);
+        Assert.Null(tracking.Eta);
     }
 
     [Fact]

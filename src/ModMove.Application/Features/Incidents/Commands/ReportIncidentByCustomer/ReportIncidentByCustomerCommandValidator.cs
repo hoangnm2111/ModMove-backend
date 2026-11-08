@@ -19,5 +19,10 @@ internal sealed class ReportIncidentByCustomerCommandValidator : AbstractValidat
             .WithMessage("Upload the photos through POST api/customer/uploads first.");
         RuleFor(x => x.Latitude).InclusiveBetween(-90, 90);
         RuleFor(x => x.Longitude).InclusiveBetween(-180, 180);
+        // A lone coordinate would be mixed with the pickup point when the Dispatcher looks for a replacement driver.
+        RuleFor(x => x)
+            .Must(x => x.Latitude.HasValue == x.Longitude.HasValue)
+            .WithName("Coordinates")
+            .WithMessage("Send both latitude and longitude, or neither.");
     }
 }

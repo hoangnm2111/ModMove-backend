@@ -34,7 +34,7 @@ dotnet ef migrations add <Name> -p src/ModMove.Infrastructure -s src/ModMove.Web
 - Luôn truyền `CancellationToken` xuống tới EF/Dapper. Không dùng `.Result`/`.Wait()`.
 - Dapper: luôn dùng tham số (`@Id`), không nối chuỗi SQL.
 - Tiền tệ dùng `decimal`, không dùng `double`/`float`.
-- Không commit secret. Connection string, key PayOS/Cloudinary/Firebase/Google Maps để trong `appsettings.Development.json` / `appsettings.Local.json` / user-secrets (đã gitignore), không để trong `appsettings.json`.
+- Không commit secret. Connection string, key PayOS/Cloudinary/Firebase/MapVina để trong `appsettings.Development.json` / `appsettings.Local.json` / user-secrets (đã gitignore), không để trong `appsettings.json`.
 - MediatR giữ ở 12.x (13+ cần license thương mại). Không thêm package mới khi chưa hỏi.
 
 ## Test

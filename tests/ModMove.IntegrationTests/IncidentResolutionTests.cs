@@ -117,6 +117,19 @@ public class IncidentResolutionTests
     }
 
     [Fact]
+    public async Task Reassign_refuses_a_driver_whose_gps_is_exactly_5_minutes_old_6_4()
+    {
+        var s = new DispatcherSetup();
+        var incident = s.Incident(s.InTransit(PaymentMethod.Cash));
+        var (_, atFiveMinutes, _) = s.ReplacementDriver("3", locationAt: DispatcherSetup.Now.AddMinutes(-5));
+
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(new ReassignIncidentDriverCommand(incident.Id, atFiveMinutes.Id, "Đổi tài xế")));
+
+        Assert.Equal("DRIVER_NOT_ELIGIBLE", error.Code);
+    }
+
+    [Fact]
     public async Task ReassignDriver_RejectsStaleGps_WrongVehicleType_OutsideRadius_BusyDriver_OrLowCodDeposit()
     {
         var s = new DispatcherSetup();
