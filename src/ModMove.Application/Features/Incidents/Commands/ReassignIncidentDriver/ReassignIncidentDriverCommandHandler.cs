@@ -3,6 +3,7 @@ using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
+using ModMove.Application.Features.Matching;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 using ModMove.Domain.Exceptions;
@@ -60,7 +61,7 @@ internal sealed class ReassignIncidentDriverCommandHandler(
 
         var radiusKm = (double)await settings.GetDecimalAsync(SettingKeys.MatchingRadiusKm, cancellationToken);
         var (refLat, refLon) = IncidentHandlingRules.ReferencePoint(incident, order.PickupLatitude, order.PickupLongitude);
-        if (IncidentHandlingRules.HaversineKm(refLat, refLon, dLat, dLon) > radiusKm)
+        if (GeoDistance.HaversineKm(refLat, refLon, dLat, dLon) > radiusKm)
             throw NotEligible("The replacement driver is outside the matching radius.");
 
         if (await orders.GetActiveOrderIdForDriverAsync(newProfile.Id, cancellationToken) is not null)

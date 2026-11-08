@@ -1,6 +1,6 @@
 # Plan: sửa lỗi bản đồ trong phần của Huy và Hoàng
 
-Trạng thái: **chờ Hiếu duyệt**. Huy và Hoàng đã đồng ý cho Hiếu sửa (2026-11-08). Nhánh: `feature/hieu`, mỗi lỗi một commit.
+Trạng thái: **đã duyệt (phương án A) và làm xong (2026-11-08)**. Huy và Hoàng đã đồng ý cho Hiếu sửa.
 
 Mỗi bước làm theo thứ tự: viết test, chạy thấy fail đúng lý do, sửa code, rồi chạy lại toàn bộ test.
 
