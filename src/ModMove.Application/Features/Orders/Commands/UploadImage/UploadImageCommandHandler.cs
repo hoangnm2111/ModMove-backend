@@ -2,6 +2,7 @@ using ModMove.Application.Common;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
+using ModMove.Domain.Enums;
 
 namespace ModMove.Application.Features.Orders.Commands.UploadImage;
 
@@ -14,7 +15,8 @@ internal sealed class UploadImageCommandHandler(
     {
         var user = await currentUser.LoadUserAsync(users, cancellationToken);
 
-        var url = await storage.UploadImageAsync(request.Content, request.FileName, $"modmove/customers/{user.Id}", cancellationToken);
+        var folder = user.Role == UserRole.Driver ? "drivers" : "customers";
+        var url = await storage.UploadImageAsync(request.Content, request.FileName, $"modmove/{folder}/{user.Id}", cancellationToken);
         return new UploadImageResponse(url);
     }
 }

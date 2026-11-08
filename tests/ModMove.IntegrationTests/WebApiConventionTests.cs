@@ -92,6 +92,7 @@ namespace ModMove.IntegrationTests
         [InlineData(typeof(WebApi.Controllers.Customer.FakeOrdersController), "Customer")]
         [InlineData(typeof(WebApi.Controllers.Driver.FakeJobsController), "Driver")]
         [InlineData(typeof(WebApi.Controllers.Driver.WalletController), "Driver")]
+        [InlineData(typeof(WebApi.Controllers.Driver.UploadsController), "Driver")]
         [InlineData(typeof(WebApi.Controllers.Dispatcher.FakeIncidentsController), "Dispatcher")]
         [InlineData(typeof(WebApi.Controllers.Admin.FakeUsersController), "Administrator")]
         [InlineData(typeof(WebApi.Controllers.Admin.RefundsController), "Administrator")]

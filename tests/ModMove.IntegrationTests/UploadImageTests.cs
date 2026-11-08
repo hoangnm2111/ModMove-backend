@@ -17,6 +17,17 @@ public class UploadImageTests
         new(new MemoryStream(bytes), "photo", contentType, length ?? bytes.Length);
 
     [Fact]
+    public async Task Driver_documents_use_the_driver_folder_before_approval()
+    {
+        var driver = User.Create("Driver", "0900000002", "driver@x.vn", "h:secret123", UserRole.Driver, emailVerified: true);
+        var app = TestApp.SignedInAs(driver);
+
+        await app.Sender.Send(Upload(Jpg, "image/jpeg"));
+
+        Assert.Equal("modmove/drivers/1", app.Files.Uploaded.Single().Folder);
+    }
+
+    [Fact]
     public async Task Jpg_is_uploaded_to_the_customer_folder()
     {
         var app = TestApp.SignedInAs(Customer());
