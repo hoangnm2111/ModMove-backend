@@ -8,5 +8,6 @@ namespace ModMove.Application.Common.Interfaces.Persistence;
 public interface IDriverWalletRepository : IRepository<DriverWallet>
 {
     Task<DriverWallet?> GetByDriverProfileIdAsync(long driverProfileId, CancellationToken cancellationToken = default);
+    Task<DriverWallet?> GetByDriverProfileIdWithTransactionsAsync(long driverProfileId, CancellationToken cancellationToken = default);
     Task<DriverWallet?> GetByTransactionIdWithTransactionsAsync(long transactionId, CancellationToken cancellationToken = default);
 }

@@ -159,12 +159,14 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     public void ConfirmArrival(long driverUserId, DateTimeOffset now) =>
         TransitionTo(OrderStatus.Arrived, ChangedByRole.Driver, driverUserId, null, now);
 
-    /// <summary>GB-11: at least 2 photos are needed before the order is PickedUp.</summary>
+    /// <summary>GB-11: at least 2 photos (and at most 5, GB-06) are needed before the order is PickedUp.</summary>
     public void ConfirmPickup(IEnumerable<string> photoUrls, long driverUserId, DateTimeOffset now)
     {
         var photos = photoUrls.ToList();
         if (photos.Count < BusinessRules.MinPickupPhotos)
             throw new DomainException($"At least {BusinessRules.MinPickupPhotos} pickup photos are required.");
+        if (photos.Count > BusinessRules.MaxCargoPhotos)
+            throw new DomainException($"At most {BusinessRules.MaxCargoPhotos} pickup photos are allowed.", "TOO_MANY_PHOTOS");
 
         // The customer rejected the evidence: the driver re-uploads without a status change,
         // at most 5 submissions in all (DECISIONS 6.3); after that the driver reports an incident.
@@ -215,6 +217,43 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     {
         if (customerId != CustomerId)
             throw new DomainException("This order belongs to another customer.", "ORDER_NOT_YOURS");
+    }
+
+    /// <summary>DECISIONS C10: refuses a driver other than the one currently assigned to the order (ORDER_NOT_YOURS).</summary>
+    public void EnsureDriver(long driverProfileId)
+    {
+        if (DriverProfileId != driverProfileId)
+            throw new DomainException("This order is not assigned to you.", "ORDER_NOT_YOURS");
+    }
+
+    /// <summary>
+    /// UC-DRV-17: the assigned driver confirms collecting cash for a Cash order (from Arrived to InTransit when Sender pays,
+    /// or while InTransit when Receiver pays). Marks the order Paid and returns the cash PaymentTransaction to persist.
+    /// </summary>
+    public PaymentTransaction CollectCash(long driverProfileId, DateTimeOffset now)
+    {
+        EnsureDriver(driverProfileId);
+        if (OrderStatus == OrderStatus.Cancelled)
+            throw new DomainException("This order was cancelled; cash cannot be collected.", "ORDER_CANCELLED");
+        if (PaymentMethod != PaymentMethod.Cash || PayerRole is not { } payer)
+            throw new DomainException("Only a cash order has cash collection.");
+        if (PaymentStatus == PaymentStatus.Paid)
+            throw new DomainException("Cash has already been collected for this order.", "ORDER_ALREADY_PAID");
+
+        var allowed = payer == Enums.PayerRole.Sender
+            ? OrderStatus is OrderStatus.Arrived or OrderStatus.PickedUp or OrderStatus.InTransit
+            : OrderStatus == OrderStatus.InTransit;
+        if (!allowed)
+        {
+            throw new DomainException(
+                payer == Enums.PayerRole.Sender
+                    ? "Sender cash payment can be collected once you arrive at the pickup point until delivery."
+                    : "Receiver cash payment can only be collected while in transit at the drop-off point.",
+                "CASH_COLLECTION_NOT_ALLOWED");
+        }
+
+        MarkPaid(now);
+        return PaymentTransaction.ForOrderInCash(Id, payer, TotalFee, now);
     }
 
     /// <summary>
@@ -277,6 +316,23 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
                 "INCIDENT_NOT_ALLOWED");
 
         return InTransitIncident.Report(Id, customerId, type, description, photoUrls, latitude, longitude);
+    }
+
+    /// <summary>
+    /// UC-DRV-18, DECISIONS 6.1, 7.1: a driver who accepted an order cannot self-cancel; from Accepted until before
+    /// Delivered they report an incident for a Dispatcher to resolve, reassign or cancel (GB-17).
+    /// </summary>
+    public InTransitIncident ReportIncidentByDriver(
+        long driverProfileId, long driverUserId, IncidentType type, string description,
+        IEnumerable<string>? photoUrls, decimal? latitude, decimal? longitude)
+    {
+        EnsureDriver(driverProfileId);
+        if (OrderStatus is not (OrderStatus.Accepted or OrderStatus.Arrived or OrderStatus.PickedUp or OrderStatus.InTransit))
+            throw new DomainException(
+                "An incident can only be reported on an active order from acceptance until delivery.",
+                "INCIDENT_NOT_ALLOWED");
+
+        return InTransitIncident.Report(Id, driverUserId, type, description, photoUrls, latitude, longitude);
     }
 
     /// <summary>DECISIONS B9: more than 0 and at most what the order cost; larger compensation is handled outside the system.</summary>
