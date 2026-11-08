@@ -4,6 +4,7 @@ using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
+using ModMove.Domain.Constants;
 using ModMove.Domain.Entities;
 
 namespace ModMove.Application.Features.Incidents.Queries.GetReplacementDrivers;
@@ -54,7 +55,7 @@ internal sealed class GetReplacementDriversQueryHandler(
           AND dp.online_status = 'Online'
           AND dp.last_latitude IS NOT NULL
           AND dp.last_longitude IS NOT NULL
-          AND dp.last_location_at >= @FreshSince
+          AND dp.last_location_at > @FreshSince
           AND (@CurrentDriverProfileId IS NULL OR dp.id <> @CurrentDriverProfileId)
           AND v.vehicle_status = 'Active'
           AND v.vehicle_type_id = @VehicleTypeId
@@ -87,7 +88,7 @@ internal sealed class GetReplacementDriversQueryHandler(
             requiredCommission = Math.Round(commissionRate * ctx.TotalFee, 0, MidpointRounding.AwayFromZero);
         }
 
-        var freshSince = (clock.GetUtcNow() - IncidentHandlingRules.GpsFreshWindow).UtcDateTime;
+        var freshSince = (clock.GetUtcNow() - BusinessRules.GpsDisconnectAfter).UtcDateTime;
         var candidates = await conn.QueryAsync<CandidateDriverRow>(
             new CommandDefinition(
                 CandidateDriversSql,

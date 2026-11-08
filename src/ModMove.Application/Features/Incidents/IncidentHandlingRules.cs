@@ -9,9 +9,6 @@ internal static class IncidentHandlingRules
 {
     private const double EarthRadiusKm = 6371.0;
 
-    /// <summary>DECISIONS 6.4: a driver without a GPS point in the last 5 minutes is treated as disconnected.</summary>
-    public static readonly TimeSpan GpsFreshWindow = TimeSpan.FromMinutes(5);
-
     /// <summary>
     /// Refuses with 409 when another Dispatcher already took over the incident (<see cref="IncidentResolutionStatus.InProgress"/>).
     /// An <see cref="IncidentResolutionStatus.Open"/> incident can be taken or decided directly.

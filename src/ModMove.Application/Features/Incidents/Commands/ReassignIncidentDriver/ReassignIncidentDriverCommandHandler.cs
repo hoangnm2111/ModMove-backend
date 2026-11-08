@@ -53,8 +53,7 @@ internal sealed class ReassignIncidentDriverCommandHandler(
         var now = clock.GetUtcNow();
         if (newProfile.LastLatitude is not { } dLat
             || newProfile.LastLongitude is not { } dLon
-            || newProfile.LastLocationAt is not { } locAt
-            || now - locAt > IncidentHandlingRules.GpsFreshWindow)
+            || !newProfile.HasFreshLocation(now))
         {
             throw NotEligible("The replacement driver has no recent GPS signal within the last 5 minutes.");
         }
