@@ -699,4 +699,98 @@ public class ShippingOrderTests
         Assert.Throws<DomainException>(() => cash.EnsureCanStartPayOsPayment(1, Now));
         Assert.Throws<DomainException>(() => paid.EnsureCanStartPayOsPayment(1, Now));
     }
+
+    [Fact]
+    public void EnsureDriver_refuses_unassigned_or_different_driver_C10()
+    {
+        var unassigned = Assert.Throws<DomainException>(() => NewOrder().EnsureDriver(driverProfileId: 5));
+        var wrongDriver = Assert.Throws<DomainException>(() => AcceptedOrder().EnsureDriver(driverProfileId: 99));
+
+        Assert.Equal(("ORDER_NOT_YOURS", "ORDER_NOT_YOURS"), (unassigned.Code, wrongDriver.Code));
+        AcceptedOrder().EnsureDriver(driverProfileId: 5);
+    }
+
+    [Fact]
+    public void ConfirmPickup_rejects_more_than_five_photos_GB06()
+    {
+        var order = AcceptedOrder();
+        order.ConfirmArrival(9, Now);
+
+        var error = Assert.Throws<DomainException>(() =>
+            order.ConfirmPickup(["1.jpg", "2.jpg", "3.jpg", "4.jpg", "5.jpg", "6.jpg"], 9, Now));
+
+        Assert.Equal("TOO_MANY_PHOTOS", error.Code);
+    }
+
+    [Fact]
+    public void Sender_cash_collection_is_allowed_from_Arrived_to_InTransit_and_marks_order_paid_DRV17()
+    {
+        var order = NewOrder(PaymentMethod.Cash, PayerRole.Sender);
+        order.Accept(5, 9, Now);
+
+        var tooEarly = Assert.Throws<DomainException>(() => order.CollectCash(5, Now));
+        Assert.Equal("CASH_COLLECTION_NOT_ALLOWED", tooEarly.Code);
+
+        order.ConfirmArrival(9, Now);
+        var tx = order.CollectCash(5, Now.AddMinutes(3));
+
+        Assert.Equal(PaymentStatus.Paid, order.PaymentStatus);
+        Assert.Equal(Now.AddMinutes(3), order.PaidAt);
+        Assert.Equal((PaymentMethod.Cash, (PayerRole?)PayerRole.Sender, 180_000m, PaymentTransactionStatus.Paid),
+            (tx.PaymentMethod, tx.PayerRole, tx.Amount, tx.TransactionStatus));
+
+        var duplicate = Assert.Throws<DomainException>(() => order.CollectCash(5, Now.AddMinutes(4)));
+        Assert.Equal("ORDER_ALREADY_PAID", duplicate.Code);
+    }
+
+    [Fact]
+    public void Receiver_cash_collection_is_allowed_only_while_InTransit_DRV17()
+    {
+        var order = NewOrder(PaymentMethod.Cash, PayerRole.Receiver);
+        order.Accept(5, 9, Now);
+        order.ConfirmArrival(9, Now);
+        order.ConfirmPickup(["1.jpg", "2.jpg"], 9, Now);
+
+        var atPickup = Assert.Throws<DomainException>(() => order.CollectCash(5, Now));
+        Assert.Equal("CASH_COLLECTION_NOT_ALLOWED", atPickup.Code);
+
+        order.ApprovePickupEvidence(1, Now);
+        var tx = order.CollectCash(5, Now.AddMinutes(10));
+
+        Assert.Equal(PaymentStatus.Paid, order.PaymentStatus);
+        Assert.Equal((PayerRole.Receiver, 180_000m), (tx.PayerRole, tx.Amount));
+    }
+
+    [Theory]
+    [InlineData(OrderStatus.Pending, false)]
+    [InlineData(OrderStatus.Accepted, true)]
+    [InlineData(OrderStatus.Arrived, true)]
+    [InlineData(OrderStatus.PickedUp, true)]
+    [InlineData(OrderStatus.InTransit, true)]
+    [InlineData(OrderStatus.Delivered, false)]
+    [InlineData(OrderStatus.Completed, false)]
+    [InlineData(OrderStatus.Cancelled, false)]
+    public void Driver_incident_is_allowed_from_Accepted_to_InTransit_6_1(OrderStatus status, bool allowed)
+    {
+        var order = OrderIn(status);
+        if (status is OrderStatus.Pending or OrderStatus.Cancelled)
+        {
+            var notYours = Assert.Throws<DomainException>(() =>
+                order.ReportIncidentByDriver(5, 9, IncidentType.VehicleBreakdown, "Xe hỏng", null, 10.7m, 106.7m));
+            Assert.Equal("ORDER_NOT_YOURS", notYours.Code);
+            return;
+        }
+
+        var wrongDriver = Assert.Throws<DomainException>(() =>
+            order.ReportIncidentByDriver(99, 99, IncidentType.VehicleBreakdown, "Xe hỏng", null, null, null));
+        Assert.Equal("ORDER_NOT_YOURS", wrongDriver.Code);
+
+        var error = Record.Exception(() =>
+            order.ReportIncidentByDriver(5, 9, IncidentType.VehicleBreakdown, "Xe hỏng", ["1.jpg"], 10.7m, 106.7m));
+
+        if (allowed)
+            Assert.Null(error);
+        else
+            Assert.Equal("INCIDENT_NOT_ALLOWED", Assert.IsType<DomainException>(error).Code);
+    }
 }

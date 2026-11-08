@@ -1,10 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using ModMove.Application.Features.Matching.Commands.AcceptOrder;
+using ModMove.Application.Features.Matching.Queries.GetNearbyOrderDetail;
 using ModMove.Application.Features.Matching.Queries.GetNearbyOrders;
 
 namespace ModMove.WebApi.Controllers.Driver;
 
-/// <summary>Driver only (RoleConvention): api/driver/matching. Dispatch Job Alert screen (UC-DRV-08..10).</summary>
+/// <summary>Driver only (RoleConvention): api/driver/matching. Dispatch Job Alert &amp; Job Details screens (UC-DRV-08..10).</summary>
 public sealed class MatchingController : ApiControllerBase
 {
     /// <summary>
@@ -14,6 +15,14 @@ public sealed class MatchingController : ApiControllerBase
     [HttpGet("orders")]
     public Task<IReadOnlyList<NearbyOrderDto>> GetNearbyOrders(CancellationToken cancellationToken) =>
         Sender.Send(new GetNearbyOrdersQuery(), cancellationToken);
+
+    /// <summary>
+    /// UC-DRV-09: full detail of a candidate <c>Pending</c> order (fare breakdown, cargo, countdown and eligibility).
+    /// Returns 409 CONFLICT if already taken by another driver, or 422 ORDER_CANCELLED / ORDER_NOT_AVAILABLE if closed.
+    /// </summary>
+    [HttpGet("orders/{id:long}")]
+    public Task<NearbyOrderDetailResponse> GetOrderDetail(long id, CancellationToken cancellationToken) =>
+        Sender.Send(new GetNearbyOrderDetailQuery(id), cancellationToken);
 
     /// <summary>
     /// UC-DRV-10, GB-08: the first eligible driver to accept takes the order; a second driver gets 409 CONFLICT.
