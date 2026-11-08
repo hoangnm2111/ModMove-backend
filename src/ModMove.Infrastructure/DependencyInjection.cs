@@ -9,7 +9,7 @@ using ModMove.Infrastructure.ExternalServices.Email;
 using ModMove.Infrastructure.ExternalServices.Excel;
 using ModMove.Infrastructure.ExternalServices.Firebase;
 using ModMove.Infrastructure.BackgroundJobs;
-using ModMove.Infrastructure.ExternalServices.GoogleMaps;
+using ModMove.Infrastructure.ExternalServices.MapVina;
 using ModMove.Infrastructure.ExternalServices.PayOS;
 using ModMove.Infrastructure.Identity;
 using ModMove.Infrastructure.Persistence;
@@ -94,13 +94,13 @@ public static class DependencyInjection
             services.AddSingleton<IEmailSender, SmtpEmailSender>();
         }
 
-        // Google Maps (DECISIONS 3.4) for fare estimate and order creation. Without a key the app still starts
+        // MapVina (DECISIONS 3.4) for fare estimate, order creation and tracking ETA. Without a key the app still starts
         // (a stand-in fails only when called), so teammates without the key can run everything else.
-        if (!string.IsNullOrWhiteSpace(configuration["GoogleMaps:ApiKey"]))
+        if (!string.IsNullOrWhiteSpace(configuration["MapVina:ApiKey"]))
         {
-            services.AddSingleton(new GoogleMapsOptions { ApiKey = configuration["GoogleMaps:ApiKey"]! });
-            // The Geocoding URL carries the key: the default HttpClient logs print request URIs, so they are removed.
-            services.AddHttpClient<IMapService, GoogleMapService>().RemoveAllLoggers();
+            services.AddSingleton(new MapVinaOptions { ApiKey = configuration["MapVina:ApiKey"]! });
+            // Every MapVina URL carries the key: the default HttpClient logs print request URIs, so they are removed.
+            services.AddHttpClient<IMapService, MapVinaMapService>().RemoveAllLoggers();
         }
         else
         {

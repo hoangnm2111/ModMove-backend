@@ -2,7 +2,7 @@ using Dapper;
 using ModMove.Application.Common;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
-using ModMove.Application.Features.Incidents;
+using ModMove.Domain.Constants;
 
 namespace ModMove.Application.Features.Monitoring.Queries.ListOnlineDrivers;
 
@@ -43,14 +43,14 @@ internal sealed class ListOnlineDriversQueryHandler(
           AND v.vehicle_status = 'Active'
           AND dp.last_latitude IS NOT NULL
           AND dp.last_longitude IS NOT NULL
-          AND dp.last_location_at >= @FreshSince
+          AND dp.last_location_at > @FreshSince
         ORDER BY dp.id ASC;
         """;
 
     public async Task<IReadOnlyList<OnlineDriverMapItemResponse>> Handle(
         ListOnlineDriversQuery request, CancellationToken cancellationToken)
     {
-        var freshSince = (clock.GetUtcNow() - IncidentHandlingRules.GpsFreshWindow).UtcDateTime;
+        var freshSince = (clock.GetUtcNow() - BusinessRules.GpsDisconnectAfter).UtcDateTime;
 
         using var connection = connectionFactory.CreateConnection();
         var rows = await connection.QueryAsync<Row>(

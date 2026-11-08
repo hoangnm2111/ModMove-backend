@@ -26,7 +26,7 @@ public class FareEstimateTests
         new(1, pickup, "Cầu Giấy, Hà Nội", weightKg, length, width, height, loading, coupon);
 
     [Fact]
-    public async Task Estimate_uses_google_km_and_B1()
+    public async Task Estimate_uses_map_km_and_B1()
     {
         var result = await App().Sender.Send(Estimate());
 
