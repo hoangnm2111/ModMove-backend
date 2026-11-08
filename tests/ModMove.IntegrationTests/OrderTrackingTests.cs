@@ -29,7 +29,7 @@ public class OrderTrackingTests
             if (Hang)
                 await Task.Delay(Timeout.Infinite, cancellationToken);
             if (Fail)
-                throw new HttpRequestException("Google Maps is down");
+                throw new HttpRequestException("MapVina is down");
             Routes.Add((from, to));
             return new RouteInfo(5m, 14);
         }
