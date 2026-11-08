@@ -22,6 +22,10 @@ public sealed class DriverWallet : BaseAuditableEntity, IAggregateRoot
 
     public WalletStatus WalletStatus { get; private set; } = WalletStatus.Active;
 
+    /// <summary>DECISIONS 5.1: maximum amount currently withdrawable after covering any negative deposit balance.</summary>
+    public decimal MaxWithdrawableAmount =>
+        WalletStatus == WalletStatus.Active ? Math.Max(0m, EarningsBalance - Math.Max(0m, -DepositBalance)) : 0m;
+
     /// <summary>Optimistic lock on balance changes.</summary>
     public int RowVersion { get; private set; }
 
@@ -84,6 +88,9 @@ public sealed class DriverWallet : BaseAuditableEntity, IAggregateRoot
     {
         EnsureActive();
         EnsurePositive(amount);
+        if (_transactions.Any(t => t.TransactionType == WalletTransactionType.WithdrawEarnings && t.TransactionStatus == WalletTransactionStatus.Pending))
+            throw new DomainException("A withdrawal request is already pending review.", "WITHDRAWAL_ALREADY_PENDING");
+
         var debt = Math.Max(0, -DepositBalance);
         if (EarningsBalance - debt < amount)
             throw new DomainException("The earnings balance, after the commission owed on the deposit, is not enough for this withdrawal.");

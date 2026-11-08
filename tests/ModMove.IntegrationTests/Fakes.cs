@@ -334,6 +334,12 @@ internal sealed class InMemoryDriverWallets : IDriverWalletRepository
     public Task<DriverWallet?> GetByDriverProfileIdAsync(long driverProfileId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(w => w.DriverProfileId == driverProfileId));
 
+    public Task<DriverWallet?> GetByDriverProfileIdWithTransactionsAsync(long driverProfileId, CancellationToken cancellationToken = default)
+    {
+        SyncTransactions();
+        return Task.FromResult(Items.FirstOrDefault(w => w.DriverProfileId == driverProfileId));
+    }
+
     public Task<DriverWallet?> GetByTransactionIdWithTransactionsAsync(long transactionId, CancellationToken cancellationToken = default)
     {
         SyncTransactions();
@@ -351,7 +357,7 @@ internal sealed class InMemoryDriverWallets : IDriverWalletRepository
     public void Update(DriverWallet aggregate) => SyncTransactions();
     public void Remove(DriverWallet aggregate) => Items.Remove(aggregate);
 
-    private void SyncTransactions()
+    internal void SyncTransactions()
     {
         var nextTxId = Items.SelectMany(w => w.Transactions).Select(t => t.Id).DefaultIfEmpty(0).Max() + 1;
         foreach (var wallet in Items)
@@ -391,6 +397,8 @@ internal sealed class CountingUnitOfWork : IUnitOfWork
 {
     public int Saves { get; private set; }
 
+    internal Action? SyncGeneratedIds { get; set; }
+
     /// <summary>Runs right after a save, e.g. to act like the client disconnecting at that moment.</summary>
     public Action? AfterSave { get; set; }
 
@@ -401,6 +409,7 @@ internal sealed class CountingUnitOfWork : IUnitOfWork
     {
         if (ThrowConflictOnSave)
             throw new ModMove.Application.Common.Exceptions.ConflictException("A record with the same unique value already exists.");
+        SyncGeneratedIds?.Invoke();
         Saves++;
         AfterSave?.Invoke();
         return Task.FromResult(1);
@@ -652,6 +661,7 @@ internal sealed class TestApp
     private TestApp(long? signedInUserId, InMemoryUsers users)
     {
         Users = users;
+        UnitOfWork.SyncGeneratedIds = DriverWallets.SyncTransactions;
         Sender = new ServiceCollection()
             .AddLogging()
             .AddApplication()
