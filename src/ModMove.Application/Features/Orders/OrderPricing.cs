@@ -16,7 +16,7 @@ public sealed record PricedTrip(VehicleType VehicleType, GeoPoint Pickup, GeoPoi
 
 /// <summary>
 /// One price for both the fare estimate and order creation, so the customer pays what was quoted (DECISIONS 4.4):
-/// vehicle and fit (GB-10, 4.2) → Google Maps km (3.4) → B1 fare → coupon (GB-21).
+/// vehicle and fit (GB-10, 4.2) → MapVina km (3.4) → B1 fare → coupon (GB-21).
 /// </summary>
 internal sealed class OrderPricing(
     IMapService maps,

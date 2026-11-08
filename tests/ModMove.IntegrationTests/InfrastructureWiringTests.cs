@@ -77,7 +77,7 @@ public class InfrastructureWiringTests
         var logs = new CapturingLogs();
         var services = new ServiceCollection()
             .AddLogging(b => b.SetMinimumLevel(LogLevel.Trace).AddProvider(logs))
-            .AddInfrastructure(Config(("GoogleMaps:ApiKey", "secret-maps-key")));
+            .AddInfrastructure(Config(("MapVina:ApiKey", "secret-maps-key")));
         services.AddHttpClient(nameof(IMapService)).ConfigurePrimaryHttpMessageHandler(() => new GeocodeOk());
         using var provider = services.BuildServiceProvider();
 
