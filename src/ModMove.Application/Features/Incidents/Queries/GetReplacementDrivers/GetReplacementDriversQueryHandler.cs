@@ -94,8 +94,8 @@ internal sealed class GetReplacementDriversQueryHandler(
                 new { FreshSince = freshSince, ctx.CurrentDriverProfileId, ctx.VehicleTypeId },
                 cancellationToken: cancellationToken));
 
-        var refLat = ctx.IncidentLatitude ?? ctx.PickupLatitude;
-        var refLon = ctx.IncidentLongitude ?? ctx.PickupLongitude;
+        var (refLat, refLon) = IncidentHandlingRules.ReferencePoint(
+            ctx.IncidentLatitude, ctx.IncidentLongitude, ctx.PickupLatitude, ctx.PickupLongitude);
 
         var results = new List<(double RawDistanceKm, ReplacementDriverResponse Dto)>();
         foreach (var c in candidates)

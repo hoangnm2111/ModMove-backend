@@ -29,7 +29,12 @@ internal static class IncidentHandlingRules
     /// <summary>Incident GPS point when available; falls back to the order's pickup point when reported without coordinates.</summary>
     public static (decimal Latitude, decimal Longitude) ReferencePoint(
         InTransitIncident incident, decimal pickupLatitude, decimal pickupLongitude) =>
-        incident is { Latitude: { } lat, Longitude: { } lon }
+        ReferencePoint(incident.Latitude, incident.Longitude, pickupLatitude, pickupLongitude);
+
+    /// <summary>Same rule for a row read with Dapper: a point with only one coordinate is not used.</summary>
+    public static (decimal Latitude, decimal Longitude) ReferencePoint(
+        decimal? incidentLatitude, decimal? incidentLongitude, decimal pickupLatitude, decimal pickupLongitude) =>
+        incidentLatitude is { } lat && incidentLongitude is { } lon
             ? (lat, lon)
             : (pickupLatitude, pickupLongitude);
 
