@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
@@ -28,7 +29,15 @@ internal sealed class ResendOtpCommandHandler(
         if (!await AuthRules.TryIssueOtpAsync(otps, email, request.Purpose, passwordHasher.Hash(code), clock.GetUtcNow(), cancellationToken))
             return; // GB-25 limit reached: send nothing, answer like an unknown email (no 422 that would reveal the account)
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
-        await AuthRules.SendOtpAsync(emailSender, email, code, request.Purpose, logger, cancellationToken);
+        try
+        {
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+        }
+        catch (ConflictException)
+        {
+            return; // A parallel request changed this code (a resend or a wrong guess), so the user asks again; a 409 would reveal the account.
+        }
+
+        await AuthRules.SendOtpAsync(emailSender, user.Email, code, request.Purpose, logger, cancellationToken);
     }
 }

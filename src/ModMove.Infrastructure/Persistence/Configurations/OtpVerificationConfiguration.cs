@@ -16,6 +16,9 @@ internal sealed class OtpVerificationConfiguration : IEntityTypeConfiguration<Ot
         builder.Property(o => o.VerifiedAt).IsConcurrencyToken();
         builder.Property(o => o.FailedAttempts).IsConcurrencyToken();
 
+        // A code replaced meanwhile cannot verify, and parallel resends of a live code cannot lose a count (GB-25): the loser gets 409.
+        builder.Property(o => o.CodeHash).IsConcurrencyToken();
+
         builder.HasIndex(o => o.Email);
     }
 }
