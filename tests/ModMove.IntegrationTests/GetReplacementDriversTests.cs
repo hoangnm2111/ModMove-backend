@@ -99,6 +99,25 @@ public class GetReplacementDriversTests
     }
 
     [Fact]
+    public async Task Incident_with_one_coordinate_falls_back_to_the_pickup_point()
+    {
+        var sql = new FakeSql();
+
+        var ctx = IncidentContextTable();
+        // Older incident saved with a latitude only: the pickup point in Ha Noi must be used, not (incident lat, pickup lng).
+        ctx.Rows.Add(10L, 10.7769m, DBNull.Value, 100L, 1L, 1L, 21.0285m, 105.8542m, 500_000m, "PayOS");
+        sql.Results.Enqueue(ctx);
+
+        var candidates = CandidateDriversTable();
+        candidates.Rows.Add(2L, 20L, "Tài Ở Điểm Lấy", "0900000002", "29A-00002", 1L, "Xe tải 500kg", 21.0290m, 105.8545m, Now.UtcDateTime, "Active", 0m);
+        sql.Results.Enqueue(candidates);
+
+        var result = await SenderWith(sql).Send(new GetReplacementDriversQuery(10));
+
+        Assert.Equal(2L, Assert.Single(result).DriverProfileId);
+    }
+
+    [Fact]
     public async Task NotFound_WhenIncidentDoesNotExist()
     {
         var sql = new FakeSql();
