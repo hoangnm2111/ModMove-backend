@@ -39,7 +39,7 @@ internal sealed class UpdateDriverLocationCommandHandler(
         var update = new DriverLocationUpdate(profile.Id, orderId, request.Latitude, request.Longitude, now);
         if (orderId is { } followed)
             await realtime.SendToOrderAsync(followed, RealtimeEvents.LocationUpdated, update, cancellationToken);
-        // The Dispatcher map shows every Online driver (B12); 6.4 hides one whose last GPS is over 5 minutes old.
+        // The Dispatcher map shows every Online driver (B12); 6.4 hides one whose last GPS is 5 minutes old or more.
         if (profile.OnlineStatus == OnlineStatus.Online)
             await realtime.SendToDispatchersAsync(RealtimeEvents.LocationUpdated, update, cancellationToken);
     }

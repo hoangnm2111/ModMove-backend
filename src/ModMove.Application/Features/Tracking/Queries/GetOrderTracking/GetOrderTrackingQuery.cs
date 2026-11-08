@@ -13,7 +13,7 @@ public sealed record GetOrderTrackingQuery(long OrderId) : IQuery<OrderTrackingR
 public sealed record OrderTrackingResponse(
     long OrderId, string OrderStatus, GeoPoint Pickup, GeoPoint Dropoff, DriverPositionResponse? Driver, TrackingEtaResponse? Eta);
 
-/// <summary><see cref="IsStale"/>: no GPS for over 5 minutes, the driver counts as disconnected (6.4).</summary>
+/// <summary><see cref="IsStale"/>: the last GPS point is 5 minutes old or more, the driver counts as disconnected (6.4).</summary>
 public sealed record DriverPositionResponse(decimal Latitude, decimal Longitude, DateTimeOffset At, bool IsStale);
 
 /// <summary>
