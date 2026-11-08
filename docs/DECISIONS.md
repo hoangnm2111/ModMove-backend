@@ -13,7 +13,7 @@
 |---|---|
 | B1 | **Giá đơn** = `max(minimum_fare, base_fare + price_per_km × km)` + phí bốc xếp (`LOADING_FEE`, nếu chọn) − coupon = `total_fee`. Giá nằm ở `vehicle_types` và `platform_settings`, không có entity `FareRule` |
 | B2 | Không có giờ cao điểm, không có phụ phí cồng kềnh |
-| 4.4 | Giá chốt lúc đặt đơn theo khoảng cách Google Maps, không tính lại theo quãng đường thực tế. Tạo đơn gửi kèm `expectedTotalFee`; giá server khác số này thì trả 422 `FARE_CHANGED`, không tạo đơn và không tính lượt coupon (2026-11-02) |
+| 4.4 | Giá chốt lúc đặt đơn theo khoảng cách MapVina, không tính lại theo quãng đường thực tế. Tạo đơn gửi kèm `expectedTotalFee`; giá server khác số này thì trả 422 `FARE_CHANGED`, không tạo đơn và không tính lượt coupon (2026-11-02) |
 | 4.6 | Không giới hạn phạm vi phục vụ hay số km |
 | M1, M2, B4 | **Tài xế chịu coupon.** Khi đơn hoàn tất: `commission_amount = commission_rate × total_fee` (đã trừ coupon, làm tròn đến đồng); tài xế nhận `total_fee − commission_amount`. Cùng công thức cho đơn PayOS và tiền mặt. Đổi tỷ lệ không ảnh hưởng đơn cũ |
 | GB-15 | Đơn tiền mặt: hoa hồng trừ vào ví cọc của tài xế. **Ví tài xế không bao giờ chặn khách:** đơn đã giao thì vẫn hoàn tất, ví cọc thiếu thì được âm, ví bị khóa vẫn được tất toán (2026-11-02) |
@@ -101,7 +101,7 @@
 |---|---|
 | C1 | Aggregate cần `Include` hay truy vấn riêng có `I<Name>Repository` (mẫu: `IUserRepository`); người sở hữu module tự thêm |
 | C2 | Không test với DB thật. Test domain, validator và handler với fake (`tests/ModMove.IntegrationTests/Fakes.cs`) |
-| C3, 3.4 | Khóa sandbox: Hoàng tạo PayOS + FCM; Hiếu tạo Google Maps (Hiếu đứng tên tài khoản thanh toán; dùng Routes API nếu project mới không bật được Distance Matrix) + Cloudinary + Gmail. Gửi qua kênh riêng, không lên repo |
+| C3, 3.4 | Khóa sandbox: Hoàng tạo PayOS + FCM; Hiếu tạo key MapVina (Search v2 + Directions v2, `mode=driving`; đổi từ Google Maps ngày 2026-11-08; gói Free 200 lượt geocode và 200 lượt tìm đường mỗi ngày, dùng chung key) + Cloudinary + Gmail. Gửi qua kênh riêng, không lên repo |
 | C5 | `?page=1&pageSize=20` → `PagedResult<T>`; thời gian ISO 8601 UTC; tiền là số VND; enum là chuỗi |
 | C7, 9.3 | Chạy và test đủ các luồng ở **local**; chưa đưa lên production. Migration tự chạy ở Development |
 | C8 | Admin sửa được (`platform_settings`): `COMMISSION_RATE`, `LOADING_FEE`, `MIN_COD_DEPOSIT`, `MATCHING_RADIUS_KM`. Cố định trong `BusinessRules.cs`: mốc thời gian, giới hạn OTP/đăng nhập/ảnh, nạp cọc tối thiểu, cửa sổ đánh giá. Không để một giá trị ở cả hai chỗ. `COMMISSION_RATE` chỉ được sửa khi hệ thống bảo trì hoặc không có đơn nào đang chạy (từ `Accepted` tới trước `Delivered`), để hoa hồng của đơn đang chạy bằng đúng số đã kiểm tra lúc nhận đơn (GB-16). Đơn `Delivered` không khóa vì khiếu nại có thể giữ đơn lâu (7.3); đơn này tính theo tỷ lệ tại lúc hoàn tất, ví cọc thiếu thì được âm (GB-15) (2026-11-02) |

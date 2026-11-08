@@ -60,7 +60,7 @@ public interface IPaymentGateway
     bool VerifyWebhookSignature(string rawBody, string signature);
 }
 
-/// <summary>Google Maps: geocoding and route distance, Distance Matrix or Routes API (DECISIONS 3.4); distance feeds the fare.</summary>
+/// <summary>MapVina: geocoding (Search v2) and route distance (Directions v2), DECISIONS 3.4; distance feeds the fare.</summary>
 public interface IMapService
 {
     Task<GeoPoint> GeocodeAsync(string address, CancellationToken cancellationToken);

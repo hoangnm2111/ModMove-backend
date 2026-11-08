@@ -18,7 +18,7 @@ internal sealed class GetOrderTrackingQueryHandler(
     TimeProvider clock,
     ILogger<GetOrderTrackingQueryHandler> logger) : IQueryHandler<GetOrderTrackingQuery, OrderTrackingResponse>
 {
-    private static readonly TimeSpan EtaTimeout = TimeSpan.FromSeconds(3); // the screen must not wait on Google Maps
+    private static readonly TimeSpan EtaTimeout = TimeSpan.FromSeconds(3); // the screen must not wait on MapVina
 
     private const string Sql = """
         SELECT o.order_status AS OrderStatus,

@@ -18,6 +18,6 @@ public sealed record DriverPositionResponse(decimal Latitude, decimal Longitude,
 
 /// <summary>
 /// <see cref="Target"/>: Pickup, Handover (the old vehicle, after a mid-trip reassignment, 7.2) or Dropoff. Null on the response
-/// when the position is stale, the handover location is unknown, or Google Maps failed or took over 3 seconds.
+/// when the position is stale, the handover location is unknown, or MapVina failed or took over 3 seconds.
 /// </summary>
 public sealed record TrackingEtaResponse(string Target, int DurationMinutes);
