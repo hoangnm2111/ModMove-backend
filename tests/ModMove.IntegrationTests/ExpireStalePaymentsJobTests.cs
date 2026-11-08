@@ -126,6 +126,24 @@ public class ExpireStalePaymentsJobTests
     }
 
     [Fact]
+    public async Task Cancelling_unpaid_PayOS_order_at_30_minutes_also_cancels_young_PayOS_code_created_at_minute_29()
+    {
+        var (app, customer) = CreateSetup();
+        var unpaidExpired = AddOrder(app, customer.Id, "MM20261020009", PaymentMethod.PayOS, createdAt: Now.AddMinutes(-30));
+        // Customer requested a new QR code at minute 29 (1 minute ago), so its 10-minute lifetime has 9 minutes left.
+        var youngTx = PaymentTransaction.ForOrderViaPayOs(
+            unpaidExpired.Id, unpaidExpired.TotalFee, 2999L, "https://pay.payos.vn/web/2999", Now.AddMinutes(-1));
+        app.Payments.Add(youngTx);
+
+        var count = await app.Sender.Send(new ExpireStalePaymentsCommand());
+
+        Assert.Equal(1, count); // 1 cancelled order
+        Assert.Equal(OrderStatus.Cancelled, unpaidExpired.OrderStatus);
+        Assert.Equal(PaymentTransactionStatus.Cancelled, youngTx.TransactionStatus);
+        Assert.Equal([2999L], app.Gateway.Cancelled);
+    }
+
+    [Fact]
     public async Task Leaves_fresh_sessions_paid_PayOS_orders_cash_orders_and_accepted_orders_untouched_3_1()
     {
         var (app, customer) = CreateSetup();

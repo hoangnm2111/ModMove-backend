@@ -204,19 +204,66 @@ public class ProcessPayOsWebhookTests
     }
 
     [Fact]
-    public async Task Webhook_arriving_after_order_was_cancelled_throws_ORDER_CANCELLED()
+    public async Task Webhook_arriving_after_order_was_cancelled_records_payment_and_creates_full_cancellation_refund()
     {
         var s = Build();
         var order = AddOrder(s);
         await s.App.Sender.Send(new CreateOrderPaymentCommand(order.Id, PaymentPlatform.Web));
         var transaction = Assert.Single(s.App.Payments.Items);
-        order.CancelByCustomer(s.Customer.Id, "Đổi ý", Now.AddMinutes(1));
+        order.CancelByCustomer(s.Customer.Id, "Đổi ý", Now.AddMinutes(1), "CHANGED_PLAN");
 
-        var error = await Assert.ThrowsAsync<DomainException>(() =>
-            s.App.Sender.Send(new ProcessPayOsWebhookCommand(WebhookJson(transaction.PayosOrderCode!.Value, 180_000m))));
+        var paidTime = Now.AddMinutes(2);
+        s.App.Time.Now = paidTime;
+        await s.App.Sender.Send(new ProcessPayOsWebhookCommand(WebhookJson(transaction.PayosOrderCode!.Value, 180_000m)));
 
-        Assert.Equal("ORDER_CANCELLED", error.Code);
-        Assert.Equal(PaymentStatus.Unpaid, order.PaymentStatus);
+        Assert.Equal(PaymentTransactionStatus.Paid, transaction.TransactionStatus);
+        Assert.Equal(paidTime, transaction.PaidAt);
+        Assert.Equal(OrderStatus.Cancelled, order.OrderStatus);
+        var refund = Assert.Single(s.App.Refunds.Items);
+        Assert.Equal((order.Id, RefundSourceType.Cancellation, RefundStatus.Requested), (refund.OrderId, refund.SourceType, refund.RefundStatus));
+        Assert.Equal(180_000m, refund.RequestedAmount);
+        Assert.Equal(180_000m, refund.ProposedAmount);
+        Assert.Equal("CHANGED_PLAN", refund.ReasonCode);
+    }
+
+    [Fact]
+    public async Task Webhook_for_locally_expired_or_replaced_session_still_marks_transaction_and_open_order_paid()
+    {
+        var s = Build();
+        var order = AddOrder(s);
+        await s.App.Sender.Send(new CreateOrderPaymentCommand(order.Id, PaymentPlatform.Web));
+        var firstTx = s.App.Payments.Items[0];
+
+        // Customer asks for a second code at minute 3 (cancelling firstTx locally), or JOB-PAY-01 expired firstTx,
+        // but the customer's bank app had already scanned and transferred money to firstTx!
+        s.App.Time.Now = Now.AddMinutes(3);
+        await s.App.Sender.Send(new CreateOrderPaymentCommand(order.Id, PaymentPlatform.Web));
+        var secondTx = s.App.Payments.Items[1];
+        Assert.Equal(PaymentTransactionStatus.Cancelled, firstTx.TransactionStatus);
+        Assert.Equal(PaymentTransactionStatus.Pending, secondTx.TransactionStatus);
+
+        var paidTime = Now.AddMinutes(4);
+        s.App.Time.Now = paidTime;
+        await s.App.Sender.Send(new ProcessPayOsWebhookCommand(WebhookJson(firstTx.PayosOrderCode!.Value, 180_000m)));
+
+        Assert.Equal(PaymentTransactionStatus.Paid, firstTx.TransactionStatus);
+        Assert.Equal(paidTime, firstTx.PaidAt);
+        Assert.Equal(PaymentStatus.Paid, order.PaymentStatus);
+        Assert.Equal(paidTime, order.PaidAt);
+        // The second pending session is cancelled both in DB and at PayOS:
+        Assert.Equal(PaymentTransactionStatus.Cancelled, secondTx.TransactionStatus);
+        Assert.Contains(secondTx.PayosOrderCode!.Value, s.App.Gateway.Cancelled);
+    }
+
+    [Fact]
+    public async Task PayOS_confirm_webhook_probe_with_order_code_123_is_accepted_as_a_no_op()
+    {
+        var s = Build();
+
+        await s.App.Sender.Send(new ProcessPayOsWebhookCommand(WebhookJson(123L, 3_000m)));
+
+        Assert.Empty(s.App.Payments.Items);
+        Assert.Equal(0, s.App.UnitOfWork.Saves);
     }
 
     [Fact]

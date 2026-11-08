@@ -67,9 +67,9 @@ public class CreateOrderPaymentTests
         await s.App.Sender.Send(Pay(order, PaymentPlatform.App));
 
         var asked = Assert.Single(s.App.Gateway.Created);
-        Assert.Equal((180_000m, "ModMove MM20261020001", PaymentPlatform.App, Now.AddMinutes(10)), (asked.Amount, asked.Description, asked.Platform, asked.ExpiresAt));
+        Assert.Equal((180_000m, $"MM{order.Id}", PaymentPlatform.App, Now.AddMinutes(10)), (asked.Amount, asked.Description, asked.Platform, asked.ExpiresAt));
         Assert.Equal(s.App.Payments.Items[0].PayosOrderCode, asked.Code);
-        Assert.InRange(asked.Description.Length, 1, 25); // PayOS limit
+        Assert.InRange(asked.Description.Length, 1, 9); // PayOS non-linked bank limit
     }
 
     [Fact]
