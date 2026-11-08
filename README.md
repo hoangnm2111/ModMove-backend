@@ -54,7 +54,8 @@ Code mẫu để copy: Command `src/ModMove.Application/Features/Auth/Commands/L
 2. Copy `src/ModMove.WebApi/appsettings.Development.example.json` to `appsettings.Development.json` (git-ignored) and fill in your MySQL password and a random `Jwt:SigningKey` of at least 32 characters (the sample leaves it empty on purpose: the app refuses to start until you set your own). Optional: fill `Email:*` with Gmail SMTP (use an App Password); if `Email:Host` is empty, Development writes emails to the console log instead of sending them, with OTP codes as `[DEV] Register OTP <code> To: <email>`. Never commit secrets.
 3. `dotnet run --project src/ModMove.WebApi`. In Development the app applies the EF Core migrations, seeds reference data (vehicle types, settings, coupons, master data) and creates four demo accounts: `admin@`, `dispatcher@`, `customer@`, `driver@modmove.local` (password `ModMove@123`).
 4. Open Swagger at `http://localhost:5133/swagger`, call `POST /api/public/auth/login` and use the returned token as `Authorization: Bearer <token>`.
-5. Before pushing: `dotnet format ModMove.slnx`, `dotnet build ModMove.slnx` (no warnings), `dotnet test ModMove.slnx`.
+5. **PayOS Webhook (local development):** PayOS can only deliver webhooks to a public HTTPS URL (never `localhost`). Run a tunnel (`ngrok http 5133` or `devtunnel host -p 5133 --allow-anonymous`) and register `https://<public-domain>/api/webhooks/payos` on [my.payos.vn](https://my.payos.vn) or via `IPaymentGateway.ConfirmWebhookAsync`. PayOS's `confirm-webhook` probe (`orderCode = 123`) is verified and answered with `200 OK` automatically.
+6. Before pushing: `dotnet format ModMove.slnx`, `dotnet build ModMove.slnx` (no warnings), `dotnet test ModMove.slnx`.
 
 New migration (always `git pull develop` first, two people creating one at once conflict):
 `dotnet ef migrations add <Name> -p src/ModMove.Infrastructure -s src/ModMove.WebApi -o Persistence/Migrations`

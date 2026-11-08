@@ -55,7 +55,7 @@ public class PayOsPaymentGatewayTests
     {
         var handler = new StubHandler(HttpStatusCode.OK, OkBody);
 
-        var link = await Gateway(handler).CreatePaymentLinkAsync(1_760_000_000_123_456, 180_000m, "ModMove MM1", PaymentPlatform.Web, Expires, CancellationToken.None);
+        var link = await Gateway(handler).CreatePaymentLinkAsync(1_760_000_000_123_456, 180_000m, "MM1", PaymentPlatform.Web, Expires, CancellationToken.None);
 
         Assert.Equal(new PaymentLink("https://pay.payos.vn/web/abc", "0002010102"), link);
         var (request, body) = Assert.Single(handler.Calls);
@@ -67,13 +67,28 @@ public class PayOsPaymentGatewayTests
         var root = json.RootElement;
         Assert.Equal(1_760_000_000_123_456, root.GetProperty("orderCode").GetInt64());
         Assert.Equal(180_000, root.GetProperty("amount").GetInt64());
-        Assert.Equal("ModMove MM1", root.GetProperty("description").GetString());
+        Assert.Equal("MM1", root.GetProperty("description").GetString());
         Assert.Equal("https://web.test/return", root.GetProperty("returnUrl").GetString());
         Assert.Equal("https://web.test/cancel", root.GetProperty("cancelUrl").GetString());
         Assert.Equal(Expires.ToUnixTimeSeconds(), root.GetProperty("expiredAt").GetInt64());
         Assert.Equal(
-            Hmac("amount=180000&cancelUrl=https://web.test/cancel&description=ModMove MM1&orderCode=1760000000123456&returnUrl=https://web.test/return"),
+            Hmac("amount=180000&cancelUrl=https://web.test/cancel&description=MM1&orderCode=1760000000123456&returnUrl=https://web.test/return"),
             root.GetProperty("signature").GetString());
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("1234567890")] // 10 chars > 9-char PayOS limit for non-linked banks
+    [InlineData("ModMove MM20261020001")]
+    public async Task A_description_outside_1_to_9_characters_is_refused_before_calling_PayOS(string badDescription)
+    {
+        var handler = new StubHandler(HttpStatusCode.OK, OkBody);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            Gateway(handler).CreatePaymentLinkAsync(1, 50_000m, badDescription, PaymentPlatform.Web, Expires, CancellationToken.None));
+
+        Assert.Empty(handler.Calls);
     }
 
     [Fact]
@@ -162,6 +177,49 @@ public class PayOsPaymentGatewayTests
         Assert.DoesNotContain(logs, l => l.Contains("api-key-1"));
     }
 
+    private sealed class TimeoutHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromException<HttpResponseMessage>(new TaskCanceledException("HttpClient.Timeout elapsed."));
+    }
+
+    [Fact]
+    public async Task A_timed_out_cancel_is_only_logged_and_does_not_fail_new_link_creation()
+    {
+        var logs = new List<string>();
+        var gateway = new PayOsPaymentGateway(new HttpClient(new TimeoutHandler()), Options, new ListLogger(logs));
+
+        await gateway.CancelPaymentLinkAsync(99, CancellationToken.None); // does not throw
+
+        Assert.Contains(logs, l => l.Contains("99"));
+    }
+
+    [Fact]
+    public async Task ConfirmWebhook_posts_webhook_url_with_credentials_and_verifies_success_code()
+    {
+        var handler = new StubHandler(HttpStatusCode.OK, """{"code":"00","desc":"success","data":"https://example.ngrok.app/api/webhooks/payos"}""");
+
+        await Gateway(handler).ConfirmWebhookAsync("https://example.ngrok.app/api/webhooks/payos", CancellationToken.None);
+
+        var (request, body) = Assert.Single(handler.Calls);
+        Assert.Equal("https://api-merchant.payos.vn/confirm-webhook", request.RequestUri!.ToString());
+        Assert.Equal("client-1", request.Headers.GetValues("x-client-id").Single());
+        Assert.Equal("api-key-1", request.Headers.GetValues("x-api-key").Single());
+        using var json = JsonDocument.Parse(body);
+        Assert.Equal("https://example.ngrok.app/api/webhooks/payos", json.RootElement.GetProperty("webhookUrl").GetString());
+    }
+
+    [Fact]
+    public async Task ConfirmWebhook_throws_when_PayOS_refuses_the_url()
+    {
+        var handler = new StubHandler(HttpStatusCode.OK, """{"code":"20","desc":"Webhook url invalid"}""");
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            Gateway(handler).ConfirmWebhookAsync("https://bad.url/webhook", CancellationToken.None));
+
+        Assert.Contains("Webhook url invalid", error.Message);
+    }
+
     private sealed class ListLogger(List<string> lines) : ILogger<PayOsPaymentGateway>
     {
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
@@ -185,6 +243,17 @@ public class PayOsPaymentGatewayTests
 
         Assert.True(gateway.VerifyWebhookSignature(Webhook(), Hmac(DataPayload)));
         Assert.True(gateway.VerifyWebhookSignature(Webhook(), Hmac(DataPayload).ToUpperInvariant())); // hex case does not matter
+    }
+
+    [Fact]
+    public void A_webhook_where_PayOS_sends_string_literal_null_or_undefined_verifies_as_empty()
+    {
+        var gateway = Gateway(new StubHandler(HttpStatusCode.OK, ""));
+        var dataWithLiteralNull = Data.Replace("\"counterAccountName\":null", "\"counterAccountName\":\"null\"");
+        var dataWithLiteralUndefined = Data.Replace("\"counterAccountName\":null", "\"counterAccountName\":\"undefined\"");
+
+        Assert.True(gateway.VerifyWebhookSignature(Webhook(dataWithLiteralNull), Hmac(DataPayload)));
+        Assert.True(gateway.VerifyWebhookSignature(Webhook(dataWithLiteralUndefined), Hmac(DataPayload)));
     }
 
     [Fact]

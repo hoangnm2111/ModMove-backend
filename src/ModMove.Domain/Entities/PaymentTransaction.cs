@@ -59,10 +59,15 @@ public sealed class PaymentTransaction : BaseAuditableEntity, IAggregateRoot
             ExpiresAt = now + BusinessRules.PayOsSessionLifetime,
         };
 
-    /// <summary>Idempotent: a repeated webhook returns false and changes nothing.</summary>
+    /// <summary>
+    /// Marks the transaction as paid when PayOS confirms the bank transfer succeeded.
+    /// Idempotent: a repeated webhook for an already-Paid transaction returns false and changes nothing.
+    /// Late transfers arriving after the session was locally marked Expired or Cancelled are still recorded
+    /// as Paid so no real money transfer is ever silently dropped.
+    /// </summary>
     public bool MarkPaid(DateTimeOffset now)
     {
-        if (TransactionStatus != PaymentTransactionStatus.Pending)
+        if (TransactionStatus == PaymentTransactionStatus.Paid)
             return false;
 
         TransactionStatus = PaymentTransactionStatus.Paid;

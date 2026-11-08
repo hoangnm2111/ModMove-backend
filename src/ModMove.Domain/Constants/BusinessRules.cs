@@ -26,6 +26,8 @@ public static class BusinessRules
 
     public static readonly TimeSpan PayOsSessionLifetime = TimeSpan.FromMinutes(10); // GB-13
     public static readonly TimeSpan PayOsPaymentDeadline = TimeSpan.FromMinutes(30); // DECISIONS 3.1: an order still Unpaid this long after booking is cancelled (JOB-PAY-01)
+    public const int PayOsMaxDescriptionLength = 9;                                  // PayOS non-linked bank transfer description limit
+    public const long PayOsProbeOrderCode = 123L;                                    // PayOS confirm-webhook connectivity probe orderCode
     public static readonly TimeSpan MatchingTimeout = TimeSpan.FromMinutes(10);      // GB-24
     public static readonly TimeSpan AutoCompleteAfterDelivery = TimeSpan.FromHours(24); // GB-23
     public static readonly TimeSpan ComplaintWindow = TimeSpan.FromHours(24);        // GB-18

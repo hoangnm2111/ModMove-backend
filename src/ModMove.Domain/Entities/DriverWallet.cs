@@ -37,12 +37,18 @@ public sealed class DriverWallet : BaseAuditableEntity, IAggregateRoot
     public bool CanReceiveCod(decimal minDeposit, decimal orderCommission) =>
         WalletStatus == WalletStatus.Active && DepositBalance >= minDeposit && DepositBalance >= orderCommission;
 
-    /// <summary>DECISIONS 5.2: at least 50,000 VND per top-up. Withdrawals have no minimum (5.1).</summary>
-    public WalletTransaction TopUpDeposit(decimal amount)
+    /// <summary>DECISIONS 5.2: at least 50,000 VND per top-up and the wallet must be Active.</summary>
+    public void EnsureCanTopUpDeposit(decimal amount)
     {
         EnsureActive();
         if (amount < BusinessRules.MinDepositTopUp)
             throw new DomainException($"A deposit top-up must be at least {BusinessRules.MinDepositTopUp:N0} VND.", "TOP_UP_TOO_SMALL");
+    }
+
+    /// <summary>DECISIONS 5.2: at least 50,000 VND per top-up. Withdrawals have no minimum (5.1).</summary>
+    public WalletTransaction TopUpDeposit(decimal amount)
+    {
+        EnsureCanTopUpDeposit(amount);
         DepositBalance += amount;
         return Record(WalletTransactionType.TopUpDeposit, null, amount, DepositBalance, WalletTransactionStatus.Completed);
     }

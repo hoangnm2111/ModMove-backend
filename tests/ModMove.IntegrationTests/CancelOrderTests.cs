@@ -83,6 +83,21 @@ public class CancelOrderTests
     }
 
     [Fact]
+    public async Task Cancelling_unpaid_PayOS_order_cancels_its_pending_PayOS_link_in_db_and_at_PayOS()
+    {
+        var s = Build();
+        var order = AddOrder(s, s.Customer.Id, PaymentMethod.PayOS);
+        var pendingTx = PaymentTransaction.ForOrderViaPayOs(order.Id, order.TotalFee, 1760000000111222L, "https://pay.payos.vn/web/1", Now);
+        s.App.Payments.Add(pendingTx);
+
+        await s.App.Sender.Send(Cancel(order));
+
+        Assert.Equal(OrderStatus.Cancelled, order.OrderStatus);
+        Assert.Equal(PaymentTransactionStatus.Cancelled, pendingTx.TransactionStatus);
+        Assert.Equal([1760000000111222L], s.App.Gateway.Cancelled);
+    }
+
+    [Fact]
     public async Task The_assigned_driver_is_told_when_an_accepted_order_is_cancelled_B17()
     {
         var s = Build();
