@@ -16,6 +16,11 @@ public sealed class PayOsOptions
 
     public string Endpoint { get; init; } = "https://api-merchant.payos.vn";
 
+    /// <summary>
+    /// The public HTTPS webhook URL registered with PayOS (e.g. via ngrok/devtunnel for local development).
+    /// </summary>
+    public string? WebhookUrl { get; init; }
+
     public string ReturnUrlWeb { get; init; } = "";
     public string ReturnUrlApp { get; init; } = "";
     public string CancelUrlWeb { get; init; } = "";

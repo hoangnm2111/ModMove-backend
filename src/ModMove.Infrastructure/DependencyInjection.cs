@@ -138,6 +138,7 @@ public static class DependencyInjection
                 ApiKey = configuration["PayOS:ApiKey"] ?? "",
                 ChecksumKey = configuration["PayOS:ChecksumKey"] ?? "",
                 Endpoint = configuration["PayOS:Endpoint"] is { Length: > 0 } endpoint ? endpoint.TrimEnd('/') : new PayOsOptions().Endpoint,
+                WebhookUrl = configuration["PayOS:WebhookUrl"],
                 ReturnUrlWeb = configuration["PayOS:ReturnUrls:Web"] ?? "",
                 ReturnUrlApp = configuration["PayOS:ReturnUrls:App"] ?? "",
                 CancelUrlWeb = configuration["PayOS:CancelUrls:Web"] ?? "",
@@ -146,7 +147,8 @@ public static class DependencyInjection
             if (string.IsNullOrWhiteSpace(payOs.ApiKey) || string.IsNullOrWhiteSpace(payOs.ChecksumKey))
                 throw new InvalidOperationException("PayOS:ClientId is set, so PayOS:ApiKey and PayOS:ChecksumKey must be set too.");
             services.AddSingleton(payOs);
-            services.AddHttpClient<IPaymentGateway, PayOsPaymentGateway>();
+            services.AddHttpClient<IPaymentGateway, PayOsPaymentGateway>(client =>
+                client.Timeout = PayOsPaymentGateway.DefaultTimeout);
         }
 
         // Firebase Cloud Messaging (DECISIONS C3, B17, 8.3, 9.2): push notifications to the mobile app.
