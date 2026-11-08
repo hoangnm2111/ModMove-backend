@@ -81,7 +81,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 
 **Phase 2**
 - [x] Thanh toán đơn hàng PayOS (CUS-27): tạo lại mã khi hết 10 phút (3.1), `CreateOrderPayment` nhận `platform` (`Web` | `App`) và chọn `returnUrl` từ cấu hình `PayOS:ReturnUrls:*`, client không gửi URL (3.1), webhook `POST api/webhooks/payos` (sai chữ ký → từ chối, gọi trùng → idempotent, đối soát số tiền), `ShippingOrder.MarkPaid(now)` và cộng ví cọc khi webhook báo thành công
-- [ ] Tạo link nạp cọc ví tài xế qua PayOS (DRV-21 ≥ 50.000đ)
+- [x] Tạo link nạp cọc ví tài xế qua PayOS (DRV-21 ≥ 50.000đ)
 - [x] Matching (DRV-08..10, B5): đơn PayOS chỉ hiện khi đã trả; GB-08/09; đơn tiền mặt cần ví cọc ≥ `MIN_COD_DEPOSIT` và ≥ hoa hồng của đơn (GB-16: `DriverWallet.CanReceiveCod(minDeposit, order.CommissionFor(rate))`, dùng cả khi đổi tài xế); ẩn tài xế mất GPS quá 5 phút (6.4)
 - [ ] Trips (DRV-11..16, 18, 19): không có hủy từ tài xế (6.1); không có người nhận thì vẫn giao và gửi POD (2.7)
 - [ ] Ví (DRV-17, 20..23): thu COD, rút tiền không tối thiểu (5.1), thu nhập = `DriverEarning`; số rút tối đa hiển thị = `earningsBalance + min(depositBalance, 0)`, `DriverWallet.RequestWithdrawal` tự trừ nợ ví cọc trước (5.1)
