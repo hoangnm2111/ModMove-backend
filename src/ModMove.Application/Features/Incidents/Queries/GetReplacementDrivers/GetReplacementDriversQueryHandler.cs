@@ -4,6 +4,8 @@ using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
+using ModMove.Application.Features.Matching;
+using ModMove.Domain.Constants;
 using ModMove.Domain.Entities;
 
 namespace ModMove.Application.Features.Incidents.Queries.GetReplacementDrivers;
@@ -54,7 +56,7 @@ internal sealed class GetReplacementDriversQueryHandler(
           AND dp.online_status = 'Online'
           AND dp.last_latitude IS NOT NULL
           AND dp.last_longitude IS NOT NULL
-          AND dp.last_location_at >= @FreshSince
+          AND dp.last_location_at > @FreshSince
           AND (@CurrentDriverProfileId IS NULL OR dp.id <> @CurrentDriverProfileId)
           AND v.vehicle_status = 'Active'
           AND v.vehicle_type_id = @VehicleTypeId
@@ -87,15 +89,15 @@ internal sealed class GetReplacementDriversQueryHandler(
             requiredCommission = Math.Round(commissionRate * ctx.TotalFee, 0, MidpointRounding.AwayFromZero);
         }
 
-        var freshSince = (clock.GetUtcNow() - IncidentHandlingRules.GpsFreshWindow).UtcDateTime;
+        var freshSince = (clock.GetUtcNow() - BusinessRules.GpsDisconnectAfter).UtcDateTime;
         var candidates = await conn.QueryAsync<CandidateDriverRow>(
             new CommandDefinition(
                 CandidateDriversSql,
                 new { FreshSince = freshSince, ctx.CurrentDriverProfileId, ctx.VehicleTypeId },
                 cancellationToken: cancellationToken));
 
-        var refLat = ctx.IncidentLatitude ?? ctx.PickupLatitude;
-        var refLon = ctx.IncidentLongitude ?? ctx.PickupLongitude;
+        var (refLat, refLon) = IncidentHandlingRules.ReferencePoint(
+            ctx.IncidentLatitude, ctx.IncidentLongitude, ctx.PickupLatitude, ctx.PickupLongitude);
 
         var results = new List<(double RawDistanceKm, ReplacementDriverResponse Dto)>();
         foreach (var c in candidates)
@@ -107,7 +109,7 @@ internal sealed class GetReplacementDriversQueryHandler(
                     continue;
             }
 
-            var distKm = IncidentHandlingRules.HaversineKm(refLat, refLon, c.LastLatitude, c.LastLongitude);
+            var distKm = GeoDistance.HaversineKm(refLat, refLon, c.LastLatitude, c.LastLongitude);
             if (distKm > radiusKm)
                 continue;
 

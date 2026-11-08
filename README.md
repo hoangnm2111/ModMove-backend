@@ -11,7 +11,7 @@ The backend is structured according to **Clean Architecture** and **Domain-Drive
 
 - `src/ModMove.Domain`: Core business entities and aggregates with their business rules, enumerations and fixed limits (`BusinessRules`).
 - `src/ModMove.Application`: Use cases, CQRS commands/queries (MediatR), DTOs, FluentValidation validators, repository and external service interfaces.
-- `src/ModMove.Infrastructure`: MySQL database persistence (Entity Framework Core), Cloudinary media adapter, Google Maps adapter, PayOS gateway client, FCM adapter, and BCrypt password hasher.
+- `src/ModMove.Infrastructure`: MySQL database persistence (Entity Framework Core), Cloudinary media adapter, MapVina maps adapter, PayOS gateway client, FCM adapter, and BCrypt password hasher.
 - `src/ModMove.WebApi`: ASP.NET Core Web API controllers, JWT authentication middleware, SignalR/WebSocket hubs for live GPS streaming, and global error handling middleware.
 - `tests/ModMove.UnitTests`: Unit tests for domain models and business rules.
 - `tests/ModMove.IntegrationTests`: Use-case tests through the real MediatR pipeline with in-memory fakes (no database).
@@ -28,7 +28,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the folder layout, CQRS con
 - **Real-Time Streaming:** ASP.NET Core SignalR / WebSocket (GPS coordinates 5-10s interval)
 - **Authentication:** JWT Bearer tokens + Refresh token rotation + Role-Based Access Control (RBAC)
 - **External Integrations:**
-  - Google Maps Geocoding + Distance Matrix (or Routes API)
+  - MapVina Search v2 (geocoding) + Directions v2 (route distance)
   - PayOS Payment Gateway (VietQR + HMAC-SHA256 webhook)
   - Firebase Cloud Messaging (FCM) push notifications
   - Cloudinary Media API (Cargo photos & Proof of Delivery evidence)

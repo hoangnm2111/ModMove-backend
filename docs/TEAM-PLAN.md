@@ -46,7 +46,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [x] Tài khoản: xem/sửa hồ sơ, FCM token, xóa tài khoản (`Inactive`, chặn khi còn đơn mở)
 - [x] Public: loại xe, chính sách, giới thiệu dịch vụ, gửi yêu cầu hỗ trợ
 - [x] Gửi email Gmail SMTP (Development không có SMTP thì ghi OTP ra log)
-- [x] Google Maps (`IMapService`: Geocoding + Distance Matrix hoặc Routes API, DECISIONS 3.4) và `FareCalculator` (B1)
+- [x] MapVina (`IMapService`: Search v2 + Directions v2, DECISIONS 3.4; trước đây Google Maps) và `FareCalculator` (B1)
 - [x] `POST api/public/fareestimate`: loại xe, tải trọng và lọt thùng theo món lớn nhất (GB-10, 4.2: dùng `VehicleType.CanCarry`), phí bốc xếp, coupon (GB-21) với mã lỗi riêng `COUPON_NOT_FOUND`, `COUPON_INACTIVE`, `COUPON_EXPIRED`, `COUPON_LIMIT_REACHED`, `COUPON_MIN_ORDER_NOT_MET`
 - [x] Cloudinary (`IFileStorage`) + `POST api/customer/uploads` (JPG/PNG ≤ 5 MB, GB-06); ảnh hàng chỉ nhận URL thuộc domain Cloudinary của nhóm
 - [x] Tạo đơn (GST-17): cam kết không hàng cấm (4.3), 1–5 ảnh, mã đơn `MMyyyyMMddNNN` giờ VN, coupon `used_count++` (B11), **chỉ tiền mặt** ở Phase 1; **không có sửa đơn** (4.1)
@@ -82,9 +82,9 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 **Phase 2**
 - [x] Thanh toán đơn hàng PayOS (CUS-27): tạo lại mã khi hết 10 phút (3.1), `CreateOrderPayment` nhận `platform` (`Web` | `App`) và chọn `returnUrl` từ cấu hình `PayOS:ReturnUrls:*`, client không gửi URL (3.1), webhook `POST api/webhooks/payos` (sai chữ ký → từ chối, gọi trùng → idempotent, đối soát số tiền), `ShippingOrder.MarkPaid(now)` và cộng ví cọc khi webhook báo thành công
 - [x] Tạo link nạp cọc ví tài xế qua PayOS (DRV-21 ≥ 50.000đ)
-- [x] Matching (DRV-08..10, B5): đơn PayOS chỉ hiện khi đã trả; GB-08/09; đơn tiền mặt cần ví cọc ≥ `MIN_COD_DEPOSIT` và ≥ hoa hồng của đơn (GB-16: `DriverWallet.CanReceiveCod(minDeposit, order.CommissionFor(rate))`, dùng cả khi đổi tài xế); ẩn tài xế mất GPS quá 5 phút (6.4)
-- [x] Trips (DRV-11..16, 18, 19): không có hủy từ tài xế (6.1); không có người nhận thì vẫn giao và gửi POD (2.7)
-- [x] Ví (DRV-17, 20..23): thu COD, rút tiền không tối thiểu (5.1), thu nhập = `DriverEarning`; số rút tối đa hiển thị = `earningsBalance + min(depositBalance, 0)`, `DriverWallet.RequestWithdrawal` tự trừ nợ ví cọc trước (5.1)
+- [x] Matching (DRV-08..10, B5): đơn PayOS chỉ hiện khi đã trả; GB-08/09; đơn tiền mặt cần ví cọc ≥ `MIN_COD_DEPOSIT` và ≥ hoa hồng của đơn (GB-16: `DriverWallet.CanReceiveCod(minDeposit, order.CommissionFor(rate))`, dùng cả khi đổi tài xế); ẩn tài xế mất GPS từ 5 phút trở lên (6.4)
+- [ ] Trips (DRV-11..16, 18, 19): không có hủy từ tài xế (6.1); không có người nhận thì vẫn giao và gửi POD (2.7)
+- [ ] Ví (DRV-17, 20..23): thu COD, rút tiền không tối thiểu (5.1), thu nhập = `DriverEarning`; số rút tối đa hiển thị = `earningsBalance + min(depositBalance, 0)`, `DriverWallet.RequestWithdrawal` tự trừ nợ ví cọc trước (5.1)
 - [x] Admin duyệt hoàn tiền (cả hoàn tiền do hủy không qua Dispatcher, 3.3) và chi trả tay (`RefundsController`: `GET`, `approve`, `reject`, `payout`); truyền lý do cho khách vào tham số `note` của `Refund.Approve`/`RejectRefund` (CUS-23); trước khi duyệt gọi `order.EnsureRefundFits(0, await refunds.GetClaimedTotalForOrderAsync(order.Id))` để tổng hoàn của đơn không vượt `total_fee` (B9); gửi `CustomerEvent.RefundDecided` (8.3)
 - [x] Admin duyệt rút tiền tài xế (ADM-24)
 
@@ -116,7 +116,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 | Dịch vụ | Port | Ai làm | Trạng thái |
 |---|---|---|---|
 | Gmail SMTP | `IEmailSender` | Hiếu | Đã làm |
-| Google Maps | `IMapService` | Hiếu | Đã làm |
+| MapVina | `IMapService` | Hiếu | Đã làm |
 | Cloudinary | `IFileStorage` | Hiếu | Đã làm |
 | PayOS | `IPaymentGateway` | Hoàng | Đã làm |
 | FCM | `IPushNotificationService` | Hoàng | Đã làm |

@@ -6,8 +6,8 @@ using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
-using ModMove.Application.Features.Incidents;
 using ModMove.Application.Features.Orders.Queries;
+using ModMove.Domain.Constants;
 
 namespace ModMove.Application.Features.Tracking.Queries.GetOrderTracking;
 
@@ -18,7 +18,7 @@ internal sealed class GetOrderTrackingQueryHandler(
     TimeProvider clock,
     ILogger<GetOrderTrackingQueryHandler> logger) : IQueryHandler<GetOrderTrackingQuery, OrderTrackingResponse>
 {
-    private static readonly TimeSpan EtaTimeout = TimeSpan.FromSeconds(3); // the screen must not wait on Google Maps
+    private static readonly TimeSpan EtaTimeout = TimeSpan.FromSeconds(3); // the screen must not wait on MapVina
 
     private const string Sql = """
         SELECT o.order_status AS OrderStatus,
@@ -82,7 +82,7 @@ internal sealed class GetOrderTrackingQueryHandler(
             return default;
 
         var at = CustomerAccess.Utc(seenAt);
-        var isStale = clock.GetUtcNow() - at > IncidentHandlingRules.GpsFreshWindow;
+        var isStale = clock.GetUtcNow() - at >= BusinessRules.GpsDisconnectAfter; // 6.4: from 5 minutes on, disconnected
         var driver = new DriverPositionResponse(latitude, longitude, at, isStale);
         if (isStale || stop is null)
             return (driver, null);

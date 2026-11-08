@@ -107,6 +107,19 @@ public class ReportIncidentByCustomerTests
             order.Id, IncidentType.Other, description, null, (decimal)lat, (decimal)lng)));
     }
 
+    [Theory]
+    [InlineData(10.7769, null)]
+    [InlineData(null, 106.7009)]
+    public async Task Coordinates_come_as_a_pair_or_not_at_all(double? lat, double? lng)
+    {
+        // A lone latitude would be paired with the pickup longitude when the Dispatcher looks for a replacement driver.
+        var s = new TripSetup();
+        var order = s.PickedUp();
+
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new ReportIncidentByCustomerCommand(
+            order.Id, IncidentType.Other, "Xe hỏng giữa đường", null, (decimal?)lat, (decimal?)lng)));
+    }
+
     [Fact]
     public async Task Unknown_order_is_not_found() =>
         await Assert.ThrowsAsync<NotFoundException>(() => new TripSetup().App.Sender.Send(

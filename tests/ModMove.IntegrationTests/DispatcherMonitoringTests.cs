@@ -298,6 +298,7 @@ public class DispatcherMonitoringTests
         Assert.Equal(100L, drivers[0].ActiveOrderId);
         Assert.Null(drivers[1].ActiveOrderId);
         Assert.Equal(Now.AddMinutes(-5).UtcDateTime, sql.LastParameters["FreshSince"]);
+        Assert.Contains("last_location_at > @FreshSince", sql.LastSql); // exactly 5 minutes old is disconnected (6.4)
     }
 
     [Fact]
