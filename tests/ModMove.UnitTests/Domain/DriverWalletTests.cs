@@ -264,6 +264,22 @@ public class DriverWalletTests
         Assert.True(tx.ExpireIfDue(Now.AddMinutes(10)));
         Assert.Equal(PaymentTransactionStatus.Expired, tx.TransactionStatus);
         Assert.False(tx.ExpireIfDue(Now.AddMinutes(11))); // already Expired
-        Assert.False(tx.MarkPaid(Now.AddMinutes(11))); // Expired cannot become Paid
+
+        // If the bank transfer actually succeeded at PayOS just before expiry, the late webhook still records Paid.
+        Assert.True(tx.MarkPaid(Now.AddMinutes(11)));
+        Assert.Equal(PaymentTransactionStatus.Paid, tx.TransactionStatus);
+        Assert.False(tx.MarkPaid(Now.AddMinutes(12))); // idempotent once Paid
+    }
+
+    [Fact]
+    public void Payment_transaction_locally_cancelled_still_records_paid_if_customer_paid_old_qr()
+    {
+        var tx = PaymentTransaction.ForOrderViaPayOs(10, 180_000, 123456, "https://pay.payos.vn/web/1", Now);
+        tx.Cancel();
+        Assert.Equal(PaymentTransactionStatus.Cancelled, tx.TransactionStatus);
+
+        Assert.True(tx.MarkPaid(Now.AddMinutes(2)));
+        Assert.Equal(PaymentTransactionStatus.Paid, tx.TransactionStatus);
+        Assert.Equal(Now.AddMinutes(2), tx.PaidAt);
     }
 }

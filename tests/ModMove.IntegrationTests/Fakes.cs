@@ -514,6 +514,7 @@ internal sealed class FakePaymentGateway : IPaymentGateway
 {
     public List<(long Code, decimal Amount, string Description, PaymentPlatform Platform, DateTimeOffset ExpiresAt)> Created { get; } = [];
     public List<long> Cancelled { get; } = [];
+    public List<string> ConfirmedWebhooks { get; } = [];
 
     /// <summary>Set to true to act like PayOS being down.</summary>
     public bool Fail { get; set; }
@@ -536,6 +537,14 @@ internal sealed class FakePaymentGateway : IPaymentGateway
         return Task.CompletedTask;
     }
 
+    public Task ConfirmWebhookAsync(string webhookUrl, CancellationToken cancellationToken = default)
+    {
+        if (Fail)
+            throw new InvalidOperationException("PayOS is down");
+        ConfirmedWebhooks.Add(webhookUrl);
+        return Task.CompletedTask;
+    }
+
     public bool VerifyWebhookSignature(string rawBody, string signature) =>
         !string.IsNullOrWhiteSpace(rawBody) && signature == ValidSignature;
 }
@@ -547,6 +556,11 @@ internal sealed class InMemoryPaymentTransactions : IPaymentTransactionRepositor
     public Task<IReadOnlyList<PaymentTransaction>> GetPendingPayOsForOrderAsync(long orderId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<PaymentTransaction>>(Items
             .Where(p => p.OrderId == orderId && p.PaymentMethod == PaymentMethod.PayOS && p.TransactionStatus == PaymentTransactionStatus.Pending)
+            .ToList());
+
+    public Task<IReadOnlyList<PaymentTransaction>> GetPendingPayOsForWalletAsync(long walletId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<PaymentTransaction>>(Items
+            .Where(p => p.WalletId == walletId && p.PaymentMethod == PaymentMethod.PayOS && p.TransactionStatus == PaymentTransactionStatus.Pending)
             .ToList());
 
     public Task<IReadOnlyList<PaymentTransaction>> GetPendingPayOsTransactionsAsync(CancellationToken cancellationToken = default) =>
