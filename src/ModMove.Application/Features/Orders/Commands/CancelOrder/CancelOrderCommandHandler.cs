@@ -18,7 +18,9 @@ internal sealed class CancelOrderCommandHandler(
     IMasterDataRepository masterData,
     INotificationService notifications,
     IUnitOfWork unitOfWork,
-    TimeProvider clock) : ICommandHandler<CancelOrderCommand>
+    TimeProvider clock,
+    IPaymentTransactionRepository? payments = null,
+    IPaymentGateway? gateway = null) : ICommandHandler<CancelOrderCommand>
 {
     public async Task Handle(CancelOrderCommand request, CancellationToken cancellationToken)
     {
@@ -29,10 +31,21 @@ internal sealed class CancelOrderCommandHandler(
         var choice = await masterData.RequireActiveAsync(
             PublicContentCategories.CancellationReason, request.ReasonCode, nameof(request.ReasonCode), cancellationToken);
         var reason = choice.ReasonText(request.Reason);
+        var now = clock.GetUtcNow();
         // ORDER_NOT_YOURS / ORDER_NOT_CANCELLABLE come from the entity. A coupon use is not given back (B11).
-        var refundAmount = order.CancelByCustomer(customer.Id, reason, clock.GetUtcNow(), choice.Code);
+        var refundAmount = order.CancelByCustomer(customer.Id, reason, now, choice.Code);
         if (refundAmount > 0)
             refunds.Add(Refund.Request(order.Id, null, RefundSourceType.Cancellation, reason, null, refundAmount, choice.Code));
+
+        if (payments is not null)
+        {
+            foreach (var pending in await payments.GetPendingPayOsForOrderAsync(order.Id, cancellationToken))
+            {
+                pending.Cancel();
+                if (gateway is not null && pending.PayosOrderCode is { } code && pending.ExpiresAt > now)
+                    await gateway.CancelPaymentLinkAsync(code, cancellationToken);
+            }
+        }
 
         // Accept, MarkPaid and Cancel all bump RowVersion: of two racing saves, the later one is a 409.
         await unitOfWork.SaveChangesAsync(cancellationToken);

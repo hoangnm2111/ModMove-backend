@@ -57,6 +57,12 @@ public interface IPaymentGateway
     /// </summary>
     Task CancelPaymentLinkAsync(long payosOrderCode, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Registers the public HTTPS webhook URL with PayOS (<c>POST /confirm-webhook</c>). PayOS immediately sends a
+    /// signed connectivity probe (<c>orderCode = 123</c>) to <paramref name="webhookUrl"/> before returning <c>code = "00"</c>.
+    /// </summary>
+    Task ConfirmWebhookAsync(string webhookUrl, CancellationToken cancellationToken = default);
+
     bool VerifyWebhookSignature(string rawBody, string signature);
 }
 

@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using ModMove.Application.Common.Interfaces;
+using ModMove.Domain.Constants;
 
 namespace ModMove.Infrastructure.ExternalServices.PayOS;
 
@@ -13,6 +14,8 @@ namespace ModMove.Infrastructure.ExternalServices.PayOS;
 /// </summary>
 public sealed class PayOsPaymentGateway(HttpClient http, PayOsOptions options, ILogger<PayOsPaymentGateway> logger) : IPaymentGateway
 {
+    public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(10);
+
     private const string SuccessCode = "00";
 
     public async Task<PaymentLink> CreatePaymentLinkAsync(
@@ -21,6 +24,9 @@ public sealed class PayOsPaymentGateway(HttpClient http, PayOsOptions options, I
     {
         if (amount <= 0 || amount != decimal.Truncate(amount))
             throw new InvalidOperationException($"PayOS needs a whole VND amount above zero, got {amount}.");
+
+        if (string.IsNullOrWhiteSpace(description) || description.Length > BusinessRules.PayOsMaxDescriptionLength)
+            throw new InvalidOperationException($"PayOS description must be 1..{BusinessRules.PayOsMaxDescriptionLength} characters for non-linked banks, got '{description}'.");
 
         var vnd = (long)amount;
         var returnUrl = options.ReturnUrl(platform);
@@ -90,9 +96,45 @@ public sealed class PayOsPaymentGateway(HttpClient http, PayOsOptions options, I
             if (!response.IsSuccessStatusCode)
                 logger.LogWarning("PayOS did not cancel the old code {OrderCode}: HTTP {Status}", payosOrderCode, (int)response.StatusCode);
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (ex is HttpRequestException || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
         {
             logger.LogWarning(ex, "PayOS could not be reached to cancel the old code {OrderCode}", payosOrderCode);
+        }
+    }
+
+    public async Task ConfirmWebhookAsync(string webhookUrl, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(webhookUrl))
+            throw new InvalidOperationException("PayOS needs a non-empty webhook URL.");
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{options.Endpoint}/confirm-webhook")
+        {
+            Content = JsonContent.Create(new { webhookUrl }),
+        };
+        AddCredentials(request);
+
+        using var response = await http.SendAsync(request, cancellationToken);
+        var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+        JsonDocument json;
+        try
+        {
+            json = JsonDocument.Parse(body);
+        }
+        catch (JsonException)
+        {
+            response.EnsureSuccessStatusCode();
+            throw new InvalidOperationException("PayOS answered confirm-webhook with something that is not JSON.");
+        }
+
+        using (json)
+        {
+            var code = json.RootElement.TryGetProperty("code", out var c) ? c.GetString() : null;
+            if (code != SuccessCode)
+            {
+                var desc = json.RootElement.TryGetProperty("desc", out var d) ? d.GetString() : null;
+                throw new InvalidOperationException($"PayOS refused the webhook URL: code {code ?? "?"}, {desc ?? "no description"}.");
+            }
         }
     }
 
@@ -124,11 +166,11 @@ public sealed class PayOsPaymentGateway(HttpClient http, PayOsOptions options, I
         }
     }
 
-    // How PayOS's own SDK turns a field into text: null becomes empty, everything else as written.
+    // How PayOS's own SDK turns a field into text: null, "null", and "undefined" become empty, everything else as written.
     private static string ValueOf(JsonElement value) => value.ValueKind switch
     {
         JsonValueKind.Null or JsonValueKind.Undefined => "",
-        JsonValueKind.String => value.GetString() ?? "",
+        JsonValueKind.String => value.GetString() is null or "null" or "undefined" ? "" : value.GetString()!,
         JsonValueKind.True => "true",
         JsonValueKind.False => "false",
         _ => value.GetRawText(),
