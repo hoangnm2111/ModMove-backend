@@ -4,6 +4,7 @@ using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
+using ModMove.Application.Features.Matching;
 using ModMove.Domain.Constants;
 using ModMove.Domain.Entities;
 
@@ -108,7 +109,7 @@ internal sealed class GetReplacementDriversQueryHandler(
                     continue;
             }
 
-            var distKm = IncidentHandlingRules.HaversineKm(refLat, refLon, c.LastLatitude, c.LastLongitude);
+            var distKm = GeoDistance.HaversineKm(refLat, refLon, c.LastLatitude, c.LastLongitude);
             if (distKm > radiusKm)
                 continue;
 
