@@ -282,4 +282,32 @@ public class DriverWalletTests
         Assert.Equal(PaymentTransactionStatus.Paid, tx.TransactionStatus);
         Assert.Equal(Now.AddMinutes(2), tx.PaidAt);
     }
+
+    [Fact]
+    public void Only_one_pending_withdrawal_is_allowed_at_a_time_GB32()
+    {
+        var wallet = DriverWallet.Create(1);
+        wallet.CreditTripEarning(10, 200_000, 20_000); // 180,000 earnings
+
+        var first = wallet.RequestWithdrawal(50_000);
+
+        var secondWhilePending = Assert.Throws<DomainException>(() => wallet.RequestWithdrawal(30_000));
+        Assert.Equal("WITHDRAWAL_ALREADY_PENDING", secondWhilePending.Code);
+        Assert.Equal(130_000m, wallet.EarningsBalance);
+
+        wallet.CompleteWithdrawal(first, adminId: 2, "FT001", Now);
+        var afterProcessed = wallet.RequestWithdrawal(30_000);
+        Assert.Equal(WalletTransactionStatus.Pending, afterProcessed.TransactionStatus);
+        Assert.Equal(100_000m, wallet.EarningsBalance);
+    }
+
+    [Fact]
+    public void Max_withdrawable_amount_subtracts_negative_deposit_debt_and_is_zero_when_frozen_5_1()
+    {
+        var wallet = WalletOwingCommission(); // earnings 90,000, deposit -10,000
+        Assert.Equal(80_000m, wallet.MaxWithdrawableAmount);
+
+        typeof(DriverWallet).GetProperty("WalletStatus")!.SetValue(wallet, WalletStatus.Frozen);
+        Assert.Equal(0m, wallet.MaxWithdrawableAmount);
+    }
 }

@@ -10,6 +10,10 @@ public sealed class DriverWalletRepository(ApplicationDbContext dbContext)
     public Task<DriverWallet?> GetByDriverProfileIdAsync(long driverProfileId, CancellationToken cancellationToken = default) =>
         Set.FirstOrDefaultAsync(w => w.DriverProfileId == driverProfileId, cancellationToken);
 
+    public Task<DriverWallet?> GetByDriverProfileIdWithTransactionsAsync(long driverProfileId, CancellationToken cancellationToken = default) =>
+        Set.Include(w => w.Transactions)
+            .FirstOrDefaultAsync(w => w.DriverProfileId == driverProfileId, cancellationToken);
+
     public Task<DriverWallet?> GetByTransactionIdWithTransactionsAsync(long transactionId, CancellationToken cancellationToken = default) =>
         Set.Include(w => w.Transactions)
             .FirstOrDefaultAsync(w => w.Transactions.Any(t => t.Id == transactionId), cancellationToken);
