@@ -215,9 +215,8 @@ public class AutoCompleteDeliveredOrdersJobTests
         var scopes = new ServiceCollection().AddSingleton<ISender>(sender).BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
         var job = new AutoCompleteDeliveredOrdersJob(scopes, TimeProvider.System, NullLogger<AutoCompleteDeliveredOrdersJob>.Instance);
 
-        await job.StartAsync(CancellationToken.None);
-        var command = await sender.FirstCommand.WaitAsync(TimeSpan.FromSeconds(5));
-        await job.StopAsync(CancellationToken.None);
+        await HostedJobRunner.RunUntilAsync(job, sender.FirstCommand);
+        var command = await sender.FirstCommand;
 
         Assert.IsType<AutoCompleteDeliveredOrdersCommand>(command);
     }

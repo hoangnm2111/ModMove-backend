@@ -206,9 +206,8 @@ public class ExpireStalePaymentsJobTests
         var scopes = new ServiceCollection().AddSingleton<ISender>(sender).BuildServiceProvider().GetRequiredService<IServiceScopeFactory>();
         var job = new ExpireStalePaymentsJob(scopes, TimeProvider.System, NullLogger<ExpireStalePaymentsJob>.Instance);
 
-        await job.StartAsync(CancellationToken.None);
-        var command = await sender.FirstCommand.WaitAsync(TimeSpan.FromSeconds(5));
-        await job.StopAsync(CancellationToken.None);
+        await HostedJobRunner.RunUntilAsync(job, sender.FirstCommand);
+        var command = await sender.FirstCommand;
 
         Assert.IsType<ExpireStalePaymentsCommand>(command);
     }
