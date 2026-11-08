@@ -30,7 +30,7 @@ internal sealed class CreateOrderPaymentCommandHandler(
         var payosOrderCode = NewPayOsOrderCode(now);
         var expiresAt = now + BusinessRules.PayOsSessionLifetime; // GB-13
         var link = await gateway.CreatePaymentLinkAsync(
-            payosOrderCode, order.TotalFee, $"ModMove {order.OrderCode}", request.Platform, expiresAt, cancellationToken);
+            payosOrderCode, order.TotalFee, OrderDescription(order.Id), request.Platform, expiresAt, cancellationToken);
 
         // DECISIONS 3.1: the new code replaces the old one. Cancel after the new link exists, so a PayOS outage
         // never leaves the customer with no valid code at all.
@@ -50,9 +50,21 @@ internal sealed class CreateOrderPaymentCommandHandler(
     }
 
     /// <summary>
+    /// PayOS limits descriptions to 9 characters when the customer's bank is not directly linked.
+    /// <c>MM{orderId}</c> stays within 9 characters and uniquely identifies the order for reconciliation.
+    /// </summary>
+    internal static string OrderDescription(long orderId)
+    {
+        var text = $"MM{orderId}";
+        return text.Length <= BusinessRules.PayOsMaxDescriptionLength
+            ? text
+            : $"MM{orderId % 10_000_000}";
+    }
+
+    /// <summary>
     /// PayOS wants a unique integer up to 2^53-1. Milliseconds since 1970 times 1,000 plus a random 0-999 is about 1.8e15,
     /// inside that range, and it does not run out or need a sequence.
     /// </summary>
-    private static long NewPayOsOrderCode(DateTimeOffset now) =>
+    internal static long NewPayOsOrderCode(DateTimeOffset now) =>
         now.ToUnixTimeMilliseconds() * 1000 + Random.Shared.Next(1000);
 }

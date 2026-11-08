@@ -23,6 +23,7 @@ public class PersistenceModelTests
     [InlineData(typeof(DriverWallet), nameof(DriverWallet.RowVersion))]   // balance changes never lost
     [InlineData(typeof(Coupon), nameof(Coupon.UsedCount))]                // B11, GB-21: two orders cannot share the last use
     [InlineData(typeof(Refund), nameof(Refund.RowVersion))]               // a withdrawal and an Admin decision cannot both win
+    [InlineData(typeof(PaymentTransaction), nameof(PaymentTransaction.TransactionStatus))] // JOB-PAY-01 cannot overwrite Paid
     [InlineData(typeof(User), nameof(User.EmailVerified))]                // A-02: registering again cannot overwrite an account verified meanwhile
     [InlineData(typeof(OtpVerification), nameof(OtpVerification.CodeHash))]       // A-02, GB-25: a replaced code cannot verify, a resend cannot lose a count
     [InlineData(typeof(OtpVerification), nameof(OtpVerification.VerifiedAt))]     // a code is used once

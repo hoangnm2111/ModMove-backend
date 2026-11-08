@@ -5,6 +5,7 @@ using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
 using ModMove.Application.Common.Notifications;
+using ModMove.Domain.Constants;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 using ModMove.Domain.Exceptions;
@@ -20,7 +21,8 @@ internal sealed class ProcessPayOsWebhookCommandHandler(
     TimeProvider clock,
     IDriverProfileRepository? driverProfiles = null,
     IPlatformSettings? settings = null,
-    INotificationService? notifications = null) : ICommandHandler<ProcessPayOsWebhookCommand>
+    INotificationService? notifications = null,
+    IRefundRepository? refunds = null) : ICommandHandler<ProcessPayOsWebhookCommand>
 {
     private const string SuccessCode = "00";
 
@@ -32,8 +34,15 @@ internal sealed class ProcessPayOsWebhookCommandHandler(
 
         var (payosOrderCode, amount, isSuccess) = ParsePayload(request.RawBody);
 
-        var transaction = await payments.GetByPayOsOrderCodeAsync(payosOrderCode, cancellationToken)
-            ?? throw new NotFoundException(nameof(PaymentTransaction), payosOrderCode);
+        var transaction = await payments.GetByPayOsOrderCodeAsync(payosOrderCode, cancellationToken);
+        if (transaction is null)
+        {
+            // When registering the webhook URL via confirm-webhook, PayOS sends a signed probe with orderCode = 123.
+            if (payosOrderCode == BusinessRules.PayOsProbeOrderCode)
+                return;
+
+            throw new NotFoundException(nameof(PaymentTransaction), payosOrderCode);
+        }
 
         if (amount != transaction.Amount)
             throw new DomainException(
@@ -51,7 +60,8 @@ internal sealed class ProcessPayOsWebhookCommandHandler(
             return;
         }
 
-        // Idempotent: a duplicate webhook for an already-Paid session (or a Cancelled/Expired one) is a no-op.
+        // Idempotent: a duplicate webhook for an already-Paid session is a no-op.
+        // Late transfers arriving after a session was locally marked Expired or Cancelled still transition to Paid.
         var now = clock.GetUtcNow();
         if (!transaction.MarkPaid(now))
             return;
@@ -62,14 +72,48 @@ internal sealed class ProcessPayOsWebhookCommandHandler(
             var order = await orders.GetByIdAsync(orderId, cancellationToken)
                 ?? throw new NotFoundException(nameof(ShippingOrder), orderId);
 
-            // Throws ORDER_CANCELLED if the order was cancelled before the payment arrived.
-            order.MarkPaid(now);
-            paidOrder = order;
-
             foreach (var other in await payments.GetPendingPayOsForOrderAsync(order.Id, cancellationToken))
             {
-                if (other.Id != transaction.Id)
-                    other.Cancel();
+                if (other.Id == transaction.Id)
+                    continue;
+
+                other.Cancel();
+                if (other.PayosOrderCode is { } otherCode && other.ExpiresAt > now)
+                    await gateway.CancelPaymentLinkAsync(otherCode, cancellationToken);
+            }
+
+            if (order.OrderStatus == OrderStatus.Cancelled)
+            {
+                // Customer or JOB-PAY-01 cancelled the order before the bank transfer arrived:
+                // record the payment and queue a 100% cancellation refund for Admin approval instead of failing with 422.
+                var reason = !string.IsNullOrWhiteSpace(order.CancellationReason)
+                    ? $"Thanh toán đến sau khi đơn đã hủy: {order.CancellationReason}"
+                    : "Thanh toán đến sau khi đơn đã hủy.";
+                refunds?.Add(Refund.Request(
+                    order.Id,
+                    incidentId: null,
+                    RefundSourceType.Cancellation,
+                    reason,
+                    evidenceUrls: null,
+                    transaction.Amount,
+                    order.CancellationReasonCode));
+            }
+            else if (order.PaymentStatus == PaymentStatus.Paid)
+            {
+                // Customer paid twice across two different QR sessions for the same order: queue a 100% refund for the extra payment.
+                refunds?.Add(Refund.Request(
+                    order.Id,
+                    incidentId: null,
+                    RefundSourceType.Cancellation,
+                    "Khách chuyển khoản trùng lần 2 cho cùng đơn hàng.",
+                    evidenceUrls: null,
+                    transaction.Amount,
+                    order.CancellationReasonCode));
+            }
+            else
+            {
+                order.MarkPaid(now);
+                paidOrder = order;
             }
         }
         else if (transaction.WalletId is { } walletId)
@@ -78,6 +122,16 @@ internal sealed class ProcessPayOsWebhookCommandHandler(
                 ?? throw new NotFoundException(nameof(DriverWallet), walletId);
 
             wallet.TopUpDeposit(transaction.Amount);
+
+            foreach (var other in await payments.GetPendingPayOsForWalletAsync(wallet.Id, cancellationToken))
+            {
+                if (other.Id == transaction.Id)
+                    continue;
+
+                other.Cancel();
+                if (other.PayosOrderCode is { } otherCode && other.ExpiresAt > now)
+                    await gateway.CancelPaymentLinkAsync(otherCode, cancellationToken);
+            }
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);

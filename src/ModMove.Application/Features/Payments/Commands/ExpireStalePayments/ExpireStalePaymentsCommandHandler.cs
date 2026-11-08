@@ -12,7 +12,8 @@ internal sealed class ExpireStalePaymentsCommandHandler(
     IShippingOrderRepository orders,
     INotificationService notifications,
     IUnitOfWork unitOfWork,
-    TimeProvider clock) : ICommandHandler<ExpireStalePaymentsCommand, int>
+    TimeProvider clock,
+    IPaymentGateway? gateway = null) : ICommandHandler<ExpireStalePaymentsCommand, int>
 {
     public const string TimeoutReason = "Đơn hàng bị hủy do quá thời hạn thanh toán (30 phút).";
 
@@ -41,6 +42,19 @@ internal sealed class ExpireStalePaymentsCommandHandler(
             order.Cancel(TimeoutReason, ChangedByRole.System, userId: null, now);
             orders.Update(order);
             cancelledOrders.Add(order);
+
+            // Cancel any PayOS session created shortly before the 30-minute deadline (e.g. at minute 29)
+            // so the QR code does not remain live at PayOS after the order itself has been cancelled.
+            foreach (var pendingTx in pendingTransactions)
+            {
+                if (pendingTx.OrderId != order.Id || pendingTx.TransactionStatus != PaymentTransactionStatus.Pending)
+                    continue;
+
+                pendingTx.Cancel();
+                payments.Update(pendingTx);
+                if (gateway is not null && pendingTx.PayosOrderCode is { } code && pendingTx.ExpiresAt > now)
+                    await gateway.CancelPaymentLinkAsync(code, cancellationToken);
+            }
         }
 
         var totalChanged = expiredCount + cancelledOrders.Count;

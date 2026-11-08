@@ -18,6 +18,9 @@ public sealed class NotConfiguredPaymentGateway : IPaymentGateway
 
     public Task CancelPaymentLinkAsync(long payosOrderCode, CancellationToken cancellationToken) => Task.CompletedTask;
 
+    public Task ConfirmWebhookAsync(string webhookUrl, CancellationToken cancellationToken = default) =>
+        throw new InvalidOperationException(Message);
+
     public bool VerifyWebhookSignature(string rawBody, string signature) => false;
 }
 
