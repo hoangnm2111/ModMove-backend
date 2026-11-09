@@ -40,11 +40,17 @@ public class InfrastructureWiringTests
 
     private sealed class GeocodeOk : HttpMessageHandler
     {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        private int _requests;
+        public int Requests => _requests;
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Interlocked.Increment(ref _requests);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent("""{"status":"OK","results":[{"geometry":{"location":{"lat":1,"lng":2}}}]}""", Encoding.UTF8, "application/json"),
             });
+        }
     }
 
     [Fact]
@@ -84,6 +90,26 @@ public class InfrastructureWiringTests
         await provider.GetRequiredService<IMapService>().GeocodeAsync("Hà Nội", CancellationToken.None);
 
         Assert.DoesNotContain(logs.Lines, line => line.Contains("secret-maps-key"));
+    }
+
+    [Fact]
+    public async Task Maps_results_are_cached_across_requests()
+    {
+        var stub = new GeocodeOk();
+        var services = new ServiceCollection().AddLogging().AddInfrastructure(Config(("MapVina:ApiKey", "secret-maps-key")));
+        services.AddHttpClient(nameof(IMapService)).ConfigurePrimaryHttpMessageHandler(() => stub);
+        using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateOnBuild = true, ValidateScopes = true });
+
+        // Two HTTP requests = two scopes, like a fare estimate followed by the order.
+        foreach (var _ in Enumerable.Range(0, 2))
+        {
+            using var scope = provider.CreateScope();
+            var maps = scope.ServiceProvider.GetRequiredService<IMapService>();
+            Assert.IsType<ModMove.Infrastructure.ExternalServices.MapVina.CachedMapService>(maps);
+            await maps.GeocodeAsync("Hà Nội", CancellationToken.None);
+        }
+
+        Assert.Equal(1, stub.Requests);
     }
 
     [Fact]
