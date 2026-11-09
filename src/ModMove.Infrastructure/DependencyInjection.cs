@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ModMove.Application.Common.Interfaces;
@@ -96,11 +97,17 @@ public static class DependencyInjection
 
         // MapVina (DECISIONS 3.4) for fare estimate, order creation and tracking ETA. Without a key the app still starts
         // (a stand-in fails only when called), so teammates without the key can run everything else.
+        // Answers are cached in memory (CachedMapService) to save the Free plan quota.
         if (!string.IsNullOrWhiteSpace(configuration["MapVina:ApiKey"]))
         {
-            services.AddSingleton(new MapVinaOptions { ApiKey = configuration["MapVina:ApiKey"]! });
+            var mapVina = new MapVinaOptions { ApiKey = configuration["MapVina:ApiKey"]! };
+            services.AddSingleton(mapVina);
+            services.AddMemoryCache();
             // Every MapVina URL carries the key: the default HttpClient logs print request URIs, so they are removed.
-            services.AddHttpClient<IMapService, MapVinaMapService>().RemoveAllLoggers();
+            services.AddHttpClient(nameof(IMapService)).RemoveAllLoggers();
+            services.AddTransient<IMapService>(sp => new CachedMapService(
+                new MapVinaMapService(sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(IMapService)), mapVina),
+                sp.GetRequiredService<IMemoryCache>()));
         }
         else
         {
