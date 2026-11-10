@@ -60,6 +60,14 @@ Code mẫu để copy: Command `src/ModMove.Application/Features/Auth/Commands/L
 New migration (always `git pull develop` first, two people creating one at once conflict):
 `dotnet ef migrations add <Name> -p src/ModMove.Infrastructure -s src/ModMove.WebApi -o Persistence/Migrations`
 
+### Run everything with Docker (no .NET, MySQL or Node needed)
+For testing the whole system, not for coding (every code change needs `--build` again; `dotnet test` still needs the .NET SDK).
+1. Install Docker Desktop. Clone `ModMove-backend` and `ModMove-web` side by side in the same parent folder.
+2. Copy `deploy/local.env.example` to `deploy/local.env` (git-ignored); set `MYSQL_PASSWORD` and `Jwt__SigningKey`, other keys are optional.
+3. From `ModMove-backend`: `docker compose --env-file deploy/local.env -f deploy/docker-compose.local.yml up --build`
+4. Open `http://localhost:8080` (web, demo sign-in buttons) and `http://localhost:8080/swagger`. Same demo accounts as above; OTP codes: `docker compose --env-file deploy/local.env -f deploy/docker-compose.local.yml logs api`. MySQL for DB tools: `127.0.0.1:3307`, user `root`.
+5. Stop: same command with `down` instead of `up --build`; `down -v` also deletes the database.
+
 Production (VPS, Docker Compose, branch `production`): see [deploy/README.md](deploy/README.md).
 
 ---

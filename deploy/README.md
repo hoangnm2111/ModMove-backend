@@ -24,6 +24,7 @@ migrations and seeds reference data on start (`Database__MigrateOnStartup`); dem
 | `deploy.sh` | `/opt/modmove/` | Backup, pull, restart; copied by CD |
 | `.env.example` | `/opt/modmove/.env` | Domain, MySQL passwords, image tags. Created by hand, `chmod 600` |
 | `api.env.example` | `/opt/modmove/api.env` | API secrets. Created by hand, `chmod 600` |
+| `docker-compose.local.yml`, `Caddyfile.local`, `local.env.example` | not used | Whole system on a developer machine, Development mode (main README) |
 
 ## First setup (once)
 
