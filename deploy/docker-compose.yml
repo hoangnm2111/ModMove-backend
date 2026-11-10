@@ -1,0 +1,67 @@
+# Production stack on one VPS: Caddy (HTTPS) in front of the web app and the API, MySQL behind them.
+# Copied to /opt/modmove by the CD workflows; values come from .env (this stack) and api.env (API secrets).
+name: modmove
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    environment:
+      MYSQL_DATABASE: modmove
+      MYSQL_USER: modmove
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h 127.0.0.1 -uroot --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    # No published port: only the API reaches MySQL, on the internal network.
+
+  api:
+    image: ghcr.io/hoangnm2111/modmove-backend:${API_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    env_file: api.env
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # EF Core logs every SQL command at Information; keep only its warnings and errors.
+      Logging__LogLevel__Microsoft.EntityFrameworkCore: Warning
+      # Trusts X-Forwarded-For/Proto from any sender: safe only because the API port is not published (Caddy only).
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      AllowedHosts: ${DOMAIN:?set DOMAIN in .env}
+      Database__MigrateOnStartup: "true"
+      ConnectionStrings__DefaultConnection: "Server=mysql;Port=3306;Database=modmove;User=modmove;Password=${MYSQL_PASSWORD}"
+      PayOS__ReturnUrls__Web: https://${DOMAIN}/orders
+      PayOS__CancelUrls__Web: https://${DOMAIN}/orders
+      # Same origin as the web app, so no other origin needs CORS.
+      Cors__AllowedOrigins__0: https://${DOMAIN}
+
+  web:
+    image: ghcr.io/hoangnm2111/modmove-web:${WEB_TAG:-latest}
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.10
+    restart: unless-stopped
+    depends_on: [api, web]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  mysql-data:
+  caddy-data:
+  caddy-config:

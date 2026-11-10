@@ -1,0 +1,15 @@
+# docker-compose.local.yml: plain HTTP on localhost:8080, the API and the web app on one origin.
+:80 {
+	encode gzip
+
+	@api path /api/* /hubs/* /health /swagger*
+	handle @api {
+		reverse_proxy api:8080
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

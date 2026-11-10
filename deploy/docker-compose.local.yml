@@ -1,0 +1,67 @@
+# Whole system on a developer machine, built from the code on disk, in Development mode
+# (demo accounts, Swagger, OTP in the API log). Not for the server: that is docker-compose.yml.
+#
+# Needs ModMove-backend and ModMove-web cloned side by side in the same parent folder.
+#   docker compose --env-file deploy/local.env -f deploy/docker-compose.local.yml up --build
+# Web and API: http://localhost:8080 (Swagger at /swagger). MySQL for DB tools: 127.0.0.1:3307.
+name: modmove-local
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    environment:
+      MYSQL_DATABASE: modmove
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in deploy/local.env}
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h 127.0.0.1 -uroot --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+
+  api:
+    build:
+      context: ..
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    env_file: local.env
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      ConnectionStrings__DefaultConnection: "Server=mysql;Port=3306;Database=modmove;User=root;Password=${MYSQL_PASSWORD}"
+      Logging__LogLevel__Microsoft.EntityFrameworkCore: Warning
+
+  web:
+    # Built here, not with ModMove-web's own Dockerfile, so any web branch works. Only the files the build
+    # needs are copied: no node_modules or .env from the host. The API is on the same origin (/api).
+    build:
+      context: ../../ModMove-web
+      dockerfile_inline: |
+        FROM node:20-alpine AS build
+        WORKDIR /app
+        COPY package.json package-lock.json ./
+        RUN npm ci
+        COPY index.html vite.config.ts tsconfig.json postcss.config.js tailwind.config.js ./
+        COPY public ./public
+        COPY src ./src
+        ENV VITE_API_BASE_URL=/api VITE_DEMO_MODE=true
+        RUN npm run build
+        FROM caddy:2.10
+        COPY --from=build /app/dist /srv
+    restart: unless-stopped
+    depends_on: [api]
+    # This machine only: Development mode has Swagger and demo accounts with a known password.
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./Caddyfile.local:/etc/caddy/Caddyfile:ro
+
+volumes:
+  mysql-data:
