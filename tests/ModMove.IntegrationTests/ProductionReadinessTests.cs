@@ -42,21 +42,34 @@ public class ProductionReadinessTests
     public void Initial_administrator_is_optional() =>
         Assert.Null(InitialAdministrator.FromConfiguration(Config()));
 
+    [Fact]
+    public void Initial_administrator_password_without_the_rest_stops_the_app() =>
+        Assert.Throws<InvalidOperationException>(() => InitialAdministrator.FromConfiguration(Config(("Seed:Admin:Password", "Strong-pass-123"))));
+
+    /// <summary>deploy/README tells the operator to delete the password after the first start; the app must still start.</summary>
+    [Fact]
+    public void Initial_administrator_is_skipped_once_its_password_is_removed() =>
+        Assert.Null(InitialAdministrator.FromConfiguration(Config(
+            ("Seed:Admin:Email", "admin@modmove.vn"), ("Seed:Admin:PhoneNumber", "0900000009"), ("Seed:Admin:Password", ""))));
+
     [Theory]
-    [InlineData("0900000009", "short1")]
-    [InlineData("0900000009", "onlyletters")]
-    [InlineData("0900000009", "12345678")]
-    [InlineData("", "Strong-pass-123")]
-    [InlineData("12345", "Strong-pass-123")]
-    public void Initial_administrator_needs_a_valid_phone_and_a_strong_password(string phone, string password) =>
+    [InlineData("admin@modmove.vn", "0900000009", "short1")]
+    [InlineData("admin@modmove.vn", "0900000009", "onlyletters")]
+    [InlineData("admin@modmove.vn", "0900000009", "12345678")]
+    [InlineData("admin@modmove.vn", "", "Strong-pass-123")]
+    [InlineData("admin@modmove.vn", "12345", "Strong-pass-123")]
+    [InlineData("", "0900000009", "Strong-pass-123")]
+    [InlineData("not-an-email", "0900000009", "Strong-pass-123")]
+    [InlineData("quản.trị@modmove.vn", "0900000009", "Strong-pass-123")]
+    public void Initial_administrator_needs_a_valid_email_phone_and_strong_password(string email, string phone, string password) =>
         Assert.Throws<InvalidOperationException>(() => InitialAdministrator.FromConfiguration(Config(
-            ("Seed:Admin:Email", "admin@modmove.vn"), ("Seed:Admin:PhoneNumber", phone), ("Seed:Admin:Password", password))));
+            ("Seed:Admin:Email", email), ("Seed:Admin:PhoneNumber", phone), ("Seed:Admin:Password", password))));
 
     [Fact]
     public void Initial_administrator_reads_its_fields_and_never_prints_the_password()
     {
         var admin = InitialAdministrator.FromConfiguration(Config(
-            ("Seed:Admin:Email", " admin@modmove.vn "), ("Seed:Admin:PhoneNumber", "0900000009"), ("Seed:Admin:Password", "Strong-pass-123")))!;
+            ("Seed:Admin:Email", " Admin@ModMove.vn "), ("Seed:Admin:PhoneNumber", "0900000009"), ("Seed:Admin:Password", "Strong-pass-123")))!;
 
         Assert.Equal("admin@modmove.vn", admin.Email);
         Assert.Equal("0900000009", admin.PhoneNumber);

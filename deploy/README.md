@@ -32,13 +32,18 @@ migrations and seeds reference data on start (`Database__MigrateOnStartup`); dem
 2. VPS: install Docker Engine with the Compose plugin; create a deploy user in the `docker` group with an SSH key;
    `sudo mkdir -p /opt/modmove && sudo chown <user> /opt/modmove`.
 3. Create `/opt/modmove/.env` and `/opt/modmove/api.env` from the examples, with new production values.
-4. GitHub, in **both** repos (Settings → Secrets and variables → Actions):
+4. Image pulls: the two GHCR packages (`modmove-backend`, `modmove-web`) are private. Create a classic GitHub
+   personal access token with only `read:packages`, from an account that can read both repos, and log in once
+   as the deploy user: `docker login ghcr.io -u <github-user>` (paste the token). The VPS keeps this login; CD
+   never logs in there, so a manual roll back works too. Renew it before the token expires.
+5. GitHub, in **both** repos (Settings → Secrets and variables → Actions):
    secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` (private key of the deploy user), `VPS_KNOWN_HOSTS`
    (output of `ssh-keyscan <VPS_HOST>`), variable `DOMAIN`.
-5. Push `production` in ModMove-web first (the web image must exist), then in this repo. Watch the Actions run;
+6. Push `production` in ModMove-web first (the web image must exist), then in this repo. Watch the Actions run;
    its last step calls `https://<DOMAIN>/health`.
-6. Sign in as the Seed Administrator, change the password, then delete `Seed__Admin__Password` from `api.env`.
-7. PayOS: set the webhook of the production channel to `https://<DOMAIN>/api/webhooks/payos`.
+7. Sign in as the Seed Administrator, change the password, then delete `Seed__Admin__Password` from `api.env`
+   (without a password the seed is skipped; `Email` and `PhoneNumber` may stay).
+8. PayOS: set the webhook of the production channel to `https://<DOMAIN>/api/webhooks/payos`.
 
 ## Day to day
 
@@ -47,7 +52,9 @@ migrations and seeds reference data on start (`Database__MigrateOnStartup`); dem
 - Roll back: set `API_TAG=sha-<7 chars>` (or `WEB_TAG`) in `.env`, then `./deploy.sh`. Back to `latest` after the fix.
   A migration is not rolled back: restore the backup taken before it if the schema must go back.
 - Restore a backup: `gunzip -c backups/<file>.sql.gz | docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot modmove'`.
-- Backups: `deploy.sh` keeps the 14 newest in `/opt/modmove/backups`. Copy them off the VPS too (one disk is not a backup).
+- Backups: `deploy.sh` keeps the 14 newest in `/opt/modmove/backups` (owner-only files). Copy them off the VPS too
+  (one disk is not a backup).
+- Only the `production` branch deploys: a manual run of the workflow from another branch does nothing.
 
 ## Limits
 

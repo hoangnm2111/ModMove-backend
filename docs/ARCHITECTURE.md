@@ -48,7 +48,7 @@ src/
 │   │   ├── Interceptors/              # Tự gán CreatedAt/By, UpdatedAt/By
 │   │   ├── Repositories/              # Repository<T> (+ repo riêng khi cần)
 │   │   ├── Migrations/                # Code first: dotnet ef migrations add ...
-│   │   ├── Seed/                      # DatabaseInitializer: migrate + reference data (+ demo accounts in Development)
+│   │   ├── Seed/                      # DatabaseInitializer: migrate + reference data (+ demo accounts in Development, first Admin from Seed:Admin in Production)
 │   │   └── SqlConnectionFactory.cs    # Kết nối đọc cho Dapper
 │   ├── Identity/                      # JWT, BCrypt
 │   ├── ExternalServices/              # Cloudinary, MapVina, PayOS, Firebase, Email
