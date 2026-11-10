@@ -12,6 +12,7 @@ using ModMove.Infrastructure;
 using ModMove.Infrastructure.Persistence.Seed;
 using ModMove.WebApi.Controllers;
 using ModMove.WebApi.Controllers.Public;
+using ModMove.WebApi.HealthChecks;
 using ModMove.WebApi.Hubs;
 using ModMove.WebApi.Middlewares;
 using ModMove.WebApi.Services;
@@ -19,6 +20,9 @@ using ModMove.WebApi.Services;
 const string ClientCorsPolicy = "Clients";
 
 var builder = WebApplication.CreateBuilder(args);
+
+if (builder.Environment.IsProduction())
+    ProductionConfiguration.EnsureComplete(builder.Configuration);
 
 // Composition root: the only place that knows every layer.
 builder.Services
@@ -96,7 +100,7 @@ builder.Services.AddSwaggerGen(options =>
 });
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IRealtimeNotifier, SignalRRealtimeNotifier>();
-builder.Services.AddHealthChecks();
+builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
 
 // Clients (WebApp, mobile) are separate deployables that talk to us only over HTTP/WebSocket.
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
@@ -116,10 +120,12 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-if (app.Environment.IsDevelopment())
+// Code first: apply migrations and seed reference data on startup. Development adds demo accounts; Production opts in
+// with Database:MigrateOnStartup (one API instance, see deploy/) and creates the first Administrator from Seed:Admin.
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
 {
-    // Code first: apply migrations and seed reference data (+ demo accounts) on startup.
-    await DatabaseInitializer.MigrateAndSeedAsync(app.Services, includeDemoData: true);
+    await DatabaseInitializer.MigrateAndSeedAsync(
+        app.Services, includeDemoData: app.Environment.IsDevelopment(), InitialAdministrator.FromConfiguration(app.Configuration));
 }
 
 app.UseHttpsRedirection();
