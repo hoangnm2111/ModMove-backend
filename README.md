@@ -60,6 +60,8 @@ Code mẫu để copy: Command `src/ModMove.Application/Features/Auth/Commands/L
 New migration (always `git pull develop` first, two people creating one at once conflict):
 `dotnet ef migrations add <Name> -p src/ModMove.Infrastructure -s src/ModMove.WebApi -o Persistence/Migrations`
 
+Production (VPS, Docker Compose, branch `production`): see [deploy/README.md](deploy/README.md).
+
 ---
 
 ## 🌿 GitFlow & Contribution Rules

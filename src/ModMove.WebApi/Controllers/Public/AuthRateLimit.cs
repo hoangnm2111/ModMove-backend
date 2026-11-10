@@ -20,7 +20,8 @@ public static class AuthRateLimit
     public static string UserPartitionKey(HttpContext http) =>
         $"{http.User.FindFirstValue(ClaimTypes.NameIdentifier)}:{http.GetEndpoint()?.DisplayName}";
 
-    // shortcut: keys on the connection IP; behind a reverse proxy, enable forwarded headers first or all clients share one bucket.
+    // Keys on the connection IP. Behind the reverse proxy (deploy/), ASPNETCORE_FORWARDEDHEADERS_ENABLED makes it the
+    // client's IP; that trusts any X-Forwarded-For, so the API port must stay reachable only from the proxy.
     public static IServiceCollection AddAuthRateLimit(this IServiceCollection services) =>
         services.AddRateLimiter(options =>
         {

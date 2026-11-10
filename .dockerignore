@@ -1,0 +1,14 @@
+# Never copy local secrets into the image: Development/Local settings, user files, Firebase keys.
+**/appsettings.*.json
+**/firebase-service-account*.json
+**/*.env
+**/bin/
+**/obj/
+.git/
+.github/
+.vs/
+.vscode/
+.idea/
+docs/
+tests/
+deploy/

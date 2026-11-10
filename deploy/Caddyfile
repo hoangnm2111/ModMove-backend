@@ -1,0 +1,14 @@
+# One domain for everything: Caddy gets and renews the HTTPS certificate itself.
+# No access log on purpose: the SignalR URL carries the JWT (?access_token=, DECISIONS B12).
+{$DOMAIN} {
+	encode zstd gzip
+
+	@api path /api/* /hubs/* /health
+	handle @api {
+		reverse_proxy api:8080
+	}
+
+	handle {
+		reverse_proxy web:80
+	}
+}
