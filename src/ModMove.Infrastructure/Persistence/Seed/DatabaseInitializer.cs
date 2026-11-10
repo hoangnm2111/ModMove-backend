@@ -8,10 +8,12 @@ namespace ModMove.Infrastructure.Persistence.Seed;
 public static class DatabaseInitializer
 {
     /// <summary>
-    /// Applies pending migrations, then seeds reference data (always) and demo accounts
-    /// (only when <paramref name="includeDemoData"/>, i.e. Development).
+    /// Applies pending migrations, then seeds reference data (always), the first Administrator (when
+    /// <paramref name="administrator"/> is set, i.e. Production) and demo accounts (only when
+    /// <paramref name="includeDemoData"/>, i.e. Development).
     /// </summary>
-    public static async Task MigrateAndSeedAsync(IServiceProvider services, bool includeDemoData, CancellationToken ct = default)
+    public static async Task MigrateAndSeedAsync(
+        IServiceProvider services, bool includeDemoData, InitialAdministrator? administrator = null, CancellationToken ct = default)
     {
         using var scope = services.CreateScope();
         var sp = scope.ServiceProvider;
@@ -21,6 +23,10 @@ public static class DatabaseInitializer
 
         await db.Database.MigrateAsync(ct);
         await ReferenceDataSeeder.SeedAsync(db, now, ct);
+
+        if (administrator is not null
+            && await AdministratorSeeder.SeedAsync(db, sp.GetRequiredService<IPasswordHasher>(), administrator, ct))
+            logger.LogInformation("Initial Administrator account created; Seed:Admin:Password can now be removed.");
 
         if (!includeDemoData)
             return;

@@ -1,27 +1,65 @@
-name: Backend Docker Build & CD Check
+name: Backend CD (production)
 
+# A push to `production` tests the code, pushes the API image to GHCR and deploys it to the VPS.
+# Needs repository secrets VPS_HOST, VPS_USER, VPS_SSH_KEY, VPS_KNOWN_HOSTS and the variable DOMAIN (deploy/README.md).
 on:
   push:
-    branches: [ main ]
+    branches: [ production ]
   workflow_dispatch: {}
 
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/hoangnm2111/modmove-backend
+
 jobs:
-  docker-build:
-    name: Validate Docker Container Build
+  deploy:
+    name: Test, build image, deploy
     runs-on: ubuntu-latest
+    env:
+      # Until the VPS secrets exist, the run stops after pushing the image.
+      VPS_HOST: ${{ secrets.VPS_HOST }}
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
 
-      - name: Build Docker Image
+      - name: Test
+        run: dotnet test ModMove.slnx --configuration Release
+
+      - name: Build and push image
         run: |
-          if [ -f Dockerfile ]; then
-            docker build -t modmove-backend:latest .
-            echo "Docker build succeeded!"
-          else
-            echo "Dockerfile not committed yet. CD runner ready."
-          fi
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker build -t "$IMAGE:latest" -t "$IMAGE:sha-${GITHUB_SHA::7}" .
+          docker push --all-tags "$IMAGE"
+
+      - name: Set up SSH
+        if: env.VPS_HOST != ''
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.VPS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+
+      - name: Deploy
+        if: env.VPS_HOST != ''
+        env:
+          TARGET: ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}
+        run: |
+          scp deploy/docker-compose.yml deploy/Caddyfile deploy/deploy.sh "$TARGET:/opt/modmove/"
+          echo "${{ secrets.GITHUB_TOKEN }}" | ssh "$TARGET" "docker login ghcr.io -u '${{ github.actor }}' --password-stdin"
+          ssh "$TARGET" "chmod +x /opt/modmove/deploy.sh && /opt/modmove/deploy.sh"
+
+      - name: Health check
+        if: env.VPS_HOST != ''
+        run: curl -fsS --retry 12 --retry-delay 10 --retry-all-errors "https://${{ vars.DOMAIN }}/health"
