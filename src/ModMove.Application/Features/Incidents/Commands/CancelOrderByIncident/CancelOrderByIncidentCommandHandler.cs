@@ -3,6 +3,7 @@ using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
+using ModMove.Application.Common.Notifications;
 using ModMove.Application.Features.Orders;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
@@ -102,6 +103,10 @@ internal sealed class CancelOrderByIncidentCommandHandler(
             : $"Đơn đã bị hủy. {note}";
         await IncidentNotifications.NotifyOrderCancelledAsync(
             notifications, order, driverUserId, incident, customerDetail, note, cancellationToken);
+
+        // R-01: a new refund was created; the money has nowhere to go until the customer gives a bank account.
+        if (request.Refund && remaining > 0m)
+            await notifications.NotifyCustomerAsync(order, CustomerEvent.RefundBankInfoRequired, cancellationToken);
     }
 }
 

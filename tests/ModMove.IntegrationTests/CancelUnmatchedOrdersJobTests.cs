@@ -121,6 +121,25 @@ public class CancelUnmatchedOrdersJobTests
     }
 
     [Fact]
+    public async Task Customer_is_asked_for_a_bank_account_when_a_paid_order_times_out_R01()
+    {
+        var (app, customer) = CreateSetup();
+        var paidExpired = AddOrder(
+            app, customer.Id, "MM20261020002", PaymentMethod.PayOS,
+            createdAt: Now.AddMinutes(-22), paidAt: Now.AddMinutes(-10));
+
+        await app.Sender.Send(new CancelUnmatchedOrdersCommand());
+
+        var toCustomer = app.Realtime.Sent
+            .Where(x => x is { Target: "user", EventName: RealtimeEvents.NotificationReceived } && x.Id == customer.Id.ToString())
+            .Select(x => (Notification)x.Payload)
+            .ToList();
+        Assert.Contains(toCustomer, n => n.Type == "ORDER_CANCELLED");
+        var ask = Assert.Single(toCustomer, n => n.Type == "REFUND_BANK_INFO_REQUIRED");
+        Assert.Equal(paidExpired.Id.ToString(), ask.Data!["orderId"]);
+    }
+
+    [Fact]
     public async Task Leaves_fresh_orders_unpaid_payos_orders_and_accepted_orders_untouched_3_2()
     {
         var (app, customer) = CreateSetup();

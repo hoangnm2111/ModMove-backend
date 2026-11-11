@@ -231,6 +231,47 @@ public class ProcessPayOsWebhookTests
     }
 
     [Fact]
+    public async Task Customer_is_asked_for_a_bank_account_when_the_payment_arrives_after_the_order_was_cancelled_R01()
+    {
+        var s = Build();
+        var order = AddOrder(s);
+        await s.App.Sender.Send(new CreateOrderPaymentCommand(order.Id, PaymentPlatform.Web));
+        var transaction = Assert.Single(s.App.Payments.Items);
+        order.CancelByCustomer(s.Customer.Id, "Đổi ý", Now.AddMinutes(1), "CHANGED_PLAN");
+        s.App.Time.Now = Now.AddMinutes(2);
+
+        await s.App.Sender.Send(new ProcessPayOsWebhookCommand(WebhookJson(transaction.PayosOrderCode!.Value, 180_000m)));
+
+        var ask = Assert.Single(CustomerNotifications(s), n => n.Type == "REFUND_BANK_INFO_REQUIRED");
+        Assert.Equal(order.Id.ToString(), ask.Data!["orderId"]);
+    }
+
+    [Fact]
+    public async Task Customer_is_asked_for_a_bank_account_when_the_same_order_is_paid_twice_R01()
+    {
+        var s = Build();
+        var order = AddOrder(s);
+        await s.App.Sender.Send(new CreateOrderPaymentCommand(order.Id, PaymentPlatform.Web));
+        var first = Assert.Single(s.App.Payments.Items);
+        var second = PaymentTransaction.ForOrderViaPayOs(order.Id, order.TotalFee, 1760000000999222L, "https://pay.payos.vn/web/2", Now);
+        s.App.Payments.Add(second);
+        s.App.Time.Now = Now.AddMinutes(2);
+        await s.App.Sender.Send(new ProcessPayOsWebhookCommand(WebhookJson(first.PayosOrderCode!.Value, 180_000m)));
+        Assert.DoesNotContain(CustomerNotifications(s), n => n.Type == "REFUND_BANK_INFO_REQUIRED"); // the first payment is not a refund
+
+        await s.App.Sender.Send(new ProcessPayOsWebhookCommand(WebhookJson(second.PayosOrderCode!.Value, 180_000m)));
+
+        Assert.Single(s.App.Refunds.Items);
+        Assert.Single(CustomerNotifications(s), n => n.Type == "REFUND_BANK_INFO_REQUIRED");
+    }
+
+    private static List<Notification> CustomerNotifications(Setup s) =>
+        s.App.Realtime.Sent
+            .Where(x => x is { Target: "user", EventName: RealtimeEvents.NotificationReceived } && x.Id == s.Customer.Id.ToString())
+            .Select(x => (Notification)x.Payload)
+            .ToList();
+
+    [Fact]
     public async Task Webhook_for_locally_expired_or_replaced_session_still_marks_transaction_and_open_order_paid()
     {
         var s = Build();

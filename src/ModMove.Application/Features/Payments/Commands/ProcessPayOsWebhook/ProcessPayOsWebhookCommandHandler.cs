@@ -67,6 +67,7 @@ internal sealed class ProcessPayOsWebhookCommandHandler(
             return;
 
         ShippingOrder? paidOrder = null;
+        ShippingOrder? refundOrder = null;
         if (transaction.OrderId is { } orderId)
         {
             var order = await orders.GetByIdAsync(orderId, cancellationToken)
@@ -97,6 +98,7 @@ internal sealed class ProcessPayOsWebhookCommandHandler(
                     evidenceUrls: null,
                     transaction.Amount,
                     order.CancellationReasonCode));
+                refundOrder = order;
             }
             else if (order.PaymentStatus == PaymentStatus.Paid)
             {
@@ -109,6 +111,7 @@ internal sealed class ProcessPayOsWebhookCommandHandler(
                     evidenceUrls: null,
                     transaction.Amount,
                     order.CancellationReasonCode));
+                refundOrder = order;
             }
             else
             {
@@ -138,6 +141,10 @@ internal sealed class ProcessPayOsWebhookCommandHandler(
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // R-01: a late or double payment is owed back; the money has nowhere to go until the customer gives a bank account.
+        if (refundOrder is not null && refunds is not null && notifications is not null)
+            await notifications.NotifyCustomerAsync(refundOrder, CustomerEvent.RefundBankInfoRequired, cancellationToken);
 
         // DECISIONS 6.4, 8.3: PayOS orders enter the matching pool only once PaidAt is set.
         // Notify eligible nearby online drivers immediately via FCM + SignalR.
