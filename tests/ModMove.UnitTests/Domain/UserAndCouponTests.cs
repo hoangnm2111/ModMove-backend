@@ -236,19 +236,28 @@ public class UserAndCouponTests
         Assert.Equal(180_000m, refund.ProposedAmount);
     }
 
-    [Theory]
-    [InlineData(false, AccountStatus.Active, UserRole.Customer, true)]
-    [InlineData(true, AccountStatus.Active, UserRole.Customer, false)]
-    [InlineData(false, AccountStatus.Inactive, UserRole.Customer, false)]
-    [InlineData(false, AccountStatus.Locked, UserRole.Customer, false)]
-    [InlineData(false, AccountStatus.Active, UserRole.Driver, false)]
-    public void Only_an_unverified_active_account_of_the_same_role_can_register_again_A02(
-        bool verified, AccountStatus status, UserRole role, bool expected)
+    [Fact]
+    public void Completing_a_registration_creates_a_verified_account_and_forgets_the_held_details_A02()
     {
-        var user = User.Create("An", "0912345678", "an@example.com", "hash", UserRole.Customer, verified);
-        user.ChangeStatus(status);
+        var otp = OtpVerification.Issue("an@example.com", OtpPurpose.Register, "h", Now);
+        otp.HoldRegistration("An", "0912345678", "pw-hash", UserRole.Driver);
 
-        Assert.Equal(expected, user.CanRegisterAgainAs(role));
+        var user = otp.CompleteRegistration(Now);
+
+        Assert.Equal(("An", "0912345678", "an@example.com", "pw-hash", UserRole.Driver), (user.FullName, user.PhoneNumber, user.Email, user.PasswordHash, user.Role));
+        Assert.True(user.EmailVerified);
+        Assert.False(otp.IsUsable(Now));
+        Assert.Null(otp.PasswordHash);
+        Assert.Null(otp.PhoneNumber);
+    }
+
+    [Fact]
+    public void A_code_without_held_details_cannot_complete_a_registration()
+    {
+        var otp = OtpVerification.Issue("an@example.com", OtpPurpose.Register, "h", Now);
+
+        Assert.Throws<InvalidOperationException>(() => otp.CompleteRegistration(Now));
+        Assert.True(otp.IsUsable(Now));
     }
 
     private static Refund OpenComplaint() => Refund.Request(1, null, RefundSourceType.Complaint, "Hàng vỡ", null, 100_000);

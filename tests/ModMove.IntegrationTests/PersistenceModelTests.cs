@@ -36,6 +36,15 @@ public class PersistenceModelTests
     }
 
     [Fact]
+    public void One_otp_row_per_email_and_purpose_so_two_first_sends_cannot_both_win_GB25()
+    {
+        using var db = NewContext();
+
+        var index = Assert.Single(db.Model.FindEntityType(typeof(OtpVerification))!.GetIndexes(), i => i.IsUnique);
+        Assert.Equal([nameof(OtpVerification.Email), nameof(OtpVerification.Purpose)], index.Properties.Select(p => p.Name));
+    }
+
+    [Fact]
     public void Commission_rate_is_locked_from_accepted_until_delivered_C8()
     {
         var inProgress = (OrderStatus[])typeof(ShippingOrderRepository)

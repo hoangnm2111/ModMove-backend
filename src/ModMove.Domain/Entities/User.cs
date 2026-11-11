@@ -52,17 +52,6 @@ public sealed class User : BaseAuditableEntity, IAggregateRoot
 
     public void VerifyEmail() => EmailVerified = true;
 
-    /// <summary>DECISIONS A-02: an unverified, active account of the same role is registered over instead of being a conflict.</summary>
-    public bool CanRegisterAgainAs(UserRole role) =>
-        !EmailVerified && AccountStatus == AccountStatus.Active && Role == role;
-
-    public void RegisterAgain(string fullName, string phoneNumber, string passwordHash)
-    {
-        FullName = fullName;
-        PhoneNumber = phoneNumber;
-        PasswordHash = passwordHash;
-    }
-
     public void ChangeStatus(AccountStatus status) => AccountStatus = status;
 
     public void ChangePassword(string passwordHash) => PasswordHash = passwordHash;

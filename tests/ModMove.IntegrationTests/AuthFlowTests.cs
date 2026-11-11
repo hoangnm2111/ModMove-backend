@@ -30,20 +30,24 @@ public class AuthFlowTests
     [Theory]
     [InlineData(UserRole.Customer)]
     [InlineData(UserRole.Driver)]
-    public async Task Register_creates_an_unverified_account_with_the_role_the_endpoint_chose_B6(UserRole role)
+    public async Task Account_is_saved_only_once_the_email_is_verified_with_the_role_the_endpoint_chose_B6(UserRole role)
     {
         var app = await RegisteredAsync(role);
 
-        var user = Assert.Single(app.Users.Items);
-        Assert.Equal(role, user.Role);
-        Assert.Equal("an@example.com", user.Email); // emails are stored lower-case
-        Assert.False(user.EmailVerified);
+        Assert.Empty(app.Users.Items);
         Assert.Equal("an@example.com", Assert.Single(app.Email.Sent).To);
         Assert.Matches("^[0-9]{6}$", app.Email.LastCode());
+
+        await app.Sender.Send(new VerifyEmailCommand(Valid.Email, app.Email.LastCode(), Valid.Password));
+
+        var user = Assert.Single(app.Users.Items);
+        Assert.Equal((role, "an@example.com", "An Nguyen", "0912345678"), (user.Role, user.Email, user.FullName, user.PhoneNumber)); // emails are stored lower-case
+        Assert.True(user.EmailVerified);
+        Assert.Null(Assert.Single(app.Otps.Items).PasswordHash); // the held details are not kept once the account exists
     }
 
     [Fact]
-    public async Task Mail_failure_keeps_the_new_account_and_the_code_can_be_sent_again()
+    public async Task Mail_failure_keeps_the_registration_and_the_code_can_be_sent_again()
     {
         var app = new TestApp();
         app.Email.Fail = true;
@@ -51,12 +55,24 @@ public class AuthFlowTests
         var result = await app.Sender.Send(RegisterCommand.From(Valid, UserRole.Customer));
 
         Assert.Equal("an@example.com", result.Email);
-        Assert.Single(app.Users.Items);
+        Assert.Empty(app.Users.Items);
         Assert.Empty(app.Email.Sent);
 
         app.Email.Fail = false;
         await app.Sender.Send(new ResendOtpCommand(Valid.Email, OtpPurpose.Register));
-        Assert.Matches("^[0-9]{6}$", app.Email.LastCode());
+        await app.Sender.Send(new VerifyEmailCommand(Valid.Email, app.Email.LastCode(), Valid.Password));
+        Assert.Single(app.Users.Items);
+    }
+
+    [Fact]
+    public async Task Resend_for_an_email_that_never_registered_sends_nothing()
+    {
+        var app = new TestApp();
+
+        await app.Sender.Send(new ResendOtpCommand(Valid.Email, OtpPurpose.Register));
+
+        Assert.Empty(app.Email.Sent);
+        Assert.Empty(app.Otps.Items);
     }
 
     [Fact]
@@ -107,10 +123,9 @@ public class AuthFlowTests
     [InlineData("other@example.com", "0912345678")] // same phone
     public async Task Email_and_phone_of_a_verified_account_stay_taken_GB01(string email, string phone)
     {
-        var app = await RegisteredAsync();
+        var app = await VerifiedAsync();
         var user = app.Users.Items[0];
         var password = user.PasswordHash;
-        user.VerifyEmail();
 
         await Assert.ThrowsAsync<ConflictException>(() =>
             app.Sender.Send(RegisterCommand.From(Valid with { Email = email, PhoneNumber = phone, Password = "newsecret123" }, UserRole.Customer)));
@@ -118,6 +133,13 @@ public class AuthFlowTests
         Assert.Equal(password, user.PasswordHash);
         Assert.Equal("0912345678", user.PhoneNumber);
         Assert.Single(app.Email.Sent);
+    }
+
+    private static async Task<TestApp> VerifiedAsync()
+    {
+        var app = await RegisteredAsync();
+        await app.Sender.Send(new VerifyEmailCommand(Valid.Email, app.Email.LastCode(), Valid.Password));
+        return app;
     }
 
     [Fact]
@@ -131,8 +153,8 @@ public class AuthFlowTests
             app.Sender.Send(new VerifyEmailCommand(Valid.Email, app.Email.LastCode(), Valid.Password))); // the owner uses the mail
 
         Assert.Equal("VERIFY_PASSWORD_MISMATCH", error.Code);
-        Assert.False(app.Users.Items[0].EmailVerified);
-        await Assert.ThrowsAsync<ForbiddenAccessException>(() => app.Sender.Send(new LoginCommand(Valid.Email, "stranger123")));
+        Assert.Empty(app.Users.Items);
+        await Assert.ThrowsAsync<UnauthorizedException>(() => app.Sender.Send(new LoginCommand(Valid.Email, "stranger123")));
     }
 
     [Fact]
@@ -165,22 +187,25 @@ public class AuthFlowTests
             app.Sender.Send(new VerifyEmailCommand(Valid.Email, app.Email.LastCode(), Valid.Password)));
 
         Assert.Equal("VERIFY_PASSWORD_MISMATCH", error.Code);
-        Assert.False(app.Users.Items[0].EmailVerified);
+        Assert.Empty(app.Users.Items);
     }
 
     [Fact]
-    public async Task Forgot_password_lets_the_owner_take_the_account_back_at_the_send_limit_A02()
+    public async Task Owner_registers_again_once_the_15_minutes_after_a_stranger_used_up_the_sends_are_over_A02()
     {
         var app = new TestApp();
         var stranger = Valid with { Password = "stranger123" };
         for (var i = 0; i < 3; i++)
             await app.Sender.Send(RegisterCommand.From(stranger, UserRole.Customer));
 
-        await app.Sender.Send(new ForgotPasswordCommand(Valid.Email));
-        await app.Sender.Send(new ResetPasswordCommand(Valid.Email, app.Email.LastCode(), "ownerpass123"));
+        await app.Sender.Send(new ForgotPasswordCommand(Valid.Email)); // no account yet, so nothing to reset
+        Assert.Equal(3, app.Email.Sent.Count);
 
-        Assert.True(app.Users.Items[0].EmailVerified);
-        await app.Sender.Send(new LoginCommand(Valid.Email, "ownerpass123"));
+        app.Time.Now = TestApp.Start.AddMinutes(15);
+        await app.Sender.Send(RegisterCommand.From(Valid, UserRole.Customer));
+        await app.Sender.Send(new VerifyEmailCommand(Valid.Email, app.Email.LastCode(), Valid.Password));
+
+        await app.Sender.Send(new LoginCommand(Valid.Email, Valid.Password));
         await Assert.ThrowsAsync<UnauthorizedException>(() => app.Sender.Send(new LoginCommand(Valid.Email, "stranger123")));
     }
 
@@ -194,7 +219,7 @@ public class AuthFlowTests
             await Assert.ThrowsAsync<DomainException>(() => app.Sender.Send(new VerifyEmailCommand(Valid.Email, code, "wrongpass123")));
 
         await app.Sender.Send(new VerifyEmailCommand(Valid.Email, code, Valid.Password));
-        Assert.True(app.Users.Items[0].EmailVerified);
+        Assert.True(Assert.Single(app.Users.Items).EmailVerified);
     }
 
     [Fact]
@@ -206,7 +231,7 @@ public class AuthFlowTests
         var error = await Assert.ThrowsAsync<DomainException>(() => app.Sender.Send(new VerifyEmailCommand(Valid.Email, wrong, Valid.Password)));
 
         Assert.Equal("OTP_INVALID", error.Code);
-        Assert.False(app.Users.Items[0].EmailVerified);
+        Assert.Empty(app.Users.Items);
     }
 
     [Fact]
@@ -265,7 +290,7 @@ public class AuthFlowTests
 
         await Assert.ThrowsAsync<ValidationException>(() => app.Sender.Send(new VerifyEmailCommand(Valid.Email, app.Email.LastCode(), password!)));
 
-        Assert.False(app.Users.Items[0].EmailVerified);
+        Assert.Empty(app.Users.Items);
     }
 
     [Fact]
@@ -305,7 +330,7 @@ public class AuthFlowTests
         await app.Sender.Send(RegisterCommand.From(Valid, UserRole.Customer));
 
         await app.Sender.Send(new VerifyEmailCommand(Valid.Email, app.Email.LastCode(), Valid.Password));
-        Assert.True(app.Users.Items[0].EmailVerified);
+        Assert.True(Assert.Single(app.Users.Items).EmailVerified);
     }
 
     [Fact]
@@ -317,15 +342,17 @@ public class AuthFlowTests
         var again = await app.Sender.Send(RegisterCommand.From(
             Valid with { FullName = "An Tran", PhoneNumber = "0999999999", Password = "newsecret123" }, UserRole.Customer));
 
-        var user = Assert.Single(app.Users.Items);
-        Assert.Equal((user.Id, "an@example.com"), (again.UserId, again.Email));
-        Assert.Equal(("An Tran", "0999999999"), (user.FullName, user.PhoneNumber));
+        Assert.Equal("an@example.com", again.Email);
+        Assert.Empty(app.Users.Items);
         Assert.Equal(2, app.Email.Sent.Count);
         Assert.Single(app.Otps.Items);
 
         if (firstCode != app.Email.LastCode())
             await Assert.ThrowsAsync<DomainException>(() => app.Sender.Send(new VerifyEmailCommand(Valid.Email, firstCode, "newsecret123")));
         await app.Sender.Send(new VerifyEmailCommand(Valid.Email, app.Email.LastCode(), "newsecret123"));
+
+        var user = Assert.Single(app.Users.Items);
+        Assert.Equal(("An Tran", "0999999999"), (user.FullName, user.PhoneNumber));
         await app.Sender.Send(new LoginCommand(Valid.Email, "newsecret123"));
         await Assert.ThrowsAsync<UnauthorizedException>(() => app.Sender.Send(new LoginCommand(Valid.Email, Valid.Password)));
     }
@@ -338,22 +365,23 @@ public class AuthFlowTests
         await app.Sender.Send(RegisterCommand.From(Valid, UserRole.Customer)); // email 3
 
         var result = await app.Sender.Send(RegisterCommand.From(
-            Valid with { FullName = "An Tran", PhoneNumber = "0999999999", Password = "newsecret123" }, UserRole.Customer));
+            Valid with { FullName = "An Tran", PhoneNumber = "0999999999", Password = "newsecret123" }, UserRole.Driver));
 
         Assert.Equal("an@example.com", result.Email);
         Assert.Equal(3, app.Email.Sent.Count);
-        Assert.Equal(("An Nguyen", "0912345678"), (app.Users.Items[0].FullName, app.Users.Items[0].PhoneNumber));
 
         await app.Sender.Send(new VerifyEmailCommand(Valid.Email, app.Email.LastCode(), Valid.Password));
-        await app.Sender.Send(new LoginCommand(Valid.Email, Valid.Password));
+        var user = Assert.Single(app.Users.Items);
+        Assert.Equal(("An Nguyen", "0912345678", UserRole.Customer), (user.FullName, user.PhoneNumber, user.Role));
     }
 
     [Theory]
+    [InlineData(AccountStatus.Active)]
     [InlineData(AccountStatus.Inactive)]
     [InlineData(AccountStatus.Locked)]
-    public async Task Closed_or_locked_account_cannot_register_again(AccountStatus status)
+    public async Task Email_of_a_saved_account_stays_taken_whatever_its_status_GB01(AccountStatus status)
     {
-        var app = await RegisteredAsync();
+        var app = await VerifiedAsync();
         var user = app.Users.Items[0];
         var password = user.PasswordHash;
         user.ChangeStatus(status);
@@ -365,39 +393,42 @@ public class AuthFlowTests
     }
 
     [Fact]
-    public async Task Registering_again_with_another_role_stays_taken_B6()
+    public async Task Registering_again_through_the_other_endpoint_takes_its_role_B6()
     {
         var app = await RegisteredAsync();
 
-        await Assert.ThrowsAsync<ConflictException>(() => app.Sender.Send(RegisterCommand.From(Valid with { Password = "newsecret123" }, UserRole.Driver)));
-
-        Assert.Equal(UserRole.Customer, app.Users.Items[0].Role);
+        await app.Sender.Send(RegisterCommand.From(Valid, UserRole.Driver));
         await app.Sender.Send(new VerifyEmailCommand(Valid.Email, app.Email.LastCode(), Valid.Password));
-        Assert.Single(app.Email.Sent);
+
+        Assert.Equal(UserRole.Driver, Assert.Single(app.Users.Items).Role);
     }
 
     [Fact]
-    public async Task Registering_again_cannot_take_the_phone_of_another_account_GB01()
+    public async Task Registering_again_cannot_take_the_phone_of_a_saved_account_GB01()
     {
         var app = await RegisteredAsync();
-        var user = app.Users.Items[0];
-        var password = user.PasswordHash;
-        await app.Sender.Send(RegisterCommand.From(Valid with { Email = "other@example.com", PhoneNumber = "0999999999" }, UserRole.Customer));
+        var other = Valid with { Email = "other@example.com", PhoneNumber = "0999999999" };
+        await app.Sender.Send(RegisterCommand.From(other, UserRole.Customer));
+        await app.Sender.Send(new VerifyEmailCommand(other.Email, app.Email.LastCode(), other.Password));
 
         await Assert.ThrowsAsync<ConflictException>(() =>
             app.Sender.Send(RegisterCommand.From(Valid with { PhoneNumber = "0999999999", Password = "newsecret123" }, UserRole.Customer)));
 
-        Assert.Equal(("0912345678", password), (user.PhoneNumber, user.PasswordHash));
         Assert.Equal(2, app.Email.Sent.Count);
     }
 
     [Fact]
-    public async Task New_email_cannot_take_the_phone_of_an_unverified_account_GB01()
+    public async Task Phone_goes_to_whoever_verifies_first_GB01()
     {
         var app = await RegisteredAsync();
+        var anCode = app.Email.LastCode();
+        var other = Valid with { Email = "other@example.com" }; // same phone, nobody owns it yet
+        await app.Sender.Send(RegisterCommand.From(other, UserRole.Customer));
+        await app.Sender.Send(new VerifyEmailCommand(other.Email, app.Email.LastCode(), other.Password));
 
-        await Assert.ThrowsAsync<ConflictException>(() =>
-            app.Sender.Send(RegisterCommand.From(Valid with { Email = "other@example.com" }, UserRole.Customer)));
+        await Assert.ThrowsAsync<ConflictException>(() => app.Sender.Send(new VerifyEmailCommand(Valid.Email, anCode, Valid.Password)));
+
+        Assert.Equal("other@example.com", Assert.Single(app.Users.Items).Email);
     }
 
     [Fact]
@@ -405,23 +436,19 @@ public class AuthFlowTests
     {
         var app = await RegisteredAsync();
 
-        await Assert.ThrowsAsync<ForbiddenAccessException>(() => app.Sender.Send(new LoginCommand(Valid.Email, Valid.Password)));
-
         await app.Sender.Send(new VerifyEmailCommand(Valid.Email, app.Email.LastCode(), Valid.Password));
 
-        Assert.True(app.Users.Items[0].EmailVerified);
+        Assert.True(Assert.Single(app.Users.Items).EmailVerified);
         var login = await app.Sender.Send(new LoginCommand(Valid.Email, Valid.Password));
         Assert.Equal(UserRole.Customer, login.Role);
     }
 
     [Fact]
-    public async Task Login_before_verification_says_EMAIL_NOT_VERIFIED_only_with_the_right_password()
+    public async Task Login_before_verification_answers_like_an_unknown_email_D1()
     {
         var app = await RegisteredAsync();
 
-        var notVerified = await Assert.ThrowsAsync<ForbiddenAccessException>(() => app.Sender.Send(new LoginCommand(Valid.Email, Valid.Password)));
-        Assert.Equal("EMAIL_NOT_VERIFIED", notVerified.Code);
-        await Assert.ThrowsAsync<UnauthorizedException>(() => app.Sender.Send(new LoginCommand(Valid.Email, "wrong1234")));
+        await Assert.ThrowsAsync<UnauthorizedException>(() => app.Sender.Send(new LoginCommand(Valid.Email, Valid.Password)));
     }
 
     [Fact]
@@ -436,7 +463,7 @@ public class AuthFlowTests
 
         app.Time.Now = TestApp.Start.AddMinutes(5); // codes live 5 minutes
         await Assert.ThrowsAsync<DomainException>(() => app.Sender.Send(new VerifyEmailCommand(Valid.Email, code, Valid.Password)));
-        Assert.False(app.Users.Items[0].EmailVerified);
+        Assert.Empty(app.Users.Items);
     }
 
     [Fact]
@@ -477,7 +504,7 @@ public class AuthFlowTests
         if (first != second)
             await Assert.ThrowsAsync<DomainException>(() => app.Sender.Send(new VerifyEmailCommand(Valid.Email, first, Valid.Password)));
         await app.Sender.Send(new VerifyEmailCommand(Valid.Email, second, Valid.Password));
-        Assert.True(app.Users.Items[0].EmailVerified);
+        Assert.True(Assert.Single(app.Users.Items).EmailVerified);
     }
 
     [Fact]
@@ -632,6 +659,55 @@ public class AuthFlowTests
 
         Assert.Equal(unknown.Code, verified.Code);
         Assert.Equal("OTP_INVALID", unknown.Code);
+    }
+
+    [Fact]
+    public async Task Parallel_first_registration_loses_with_409_and_sends_nothing_GB25()
+    {
+        var app = new TestApp();
+        app.UnitOfWork.ThrowConflictOnSave = true; // another request saved the first code for this email (unique email + purpose)
+
+        await Assert.ThrowsAsync<ConflictException>(() => app.Sender.Send(RegisterCommand.From(Valid, UserRole.Customer)));
+
+        Assert.Empty(app.Email.Sent);
+    }
+
+    [Fact]
+    public async Task Right_code_with_no_registration_held_is_a_wrong_code_A02()
+    {
+        var app = new TestApp();
+        app.Otps.Add(OtpVerification.Issue("an@example.com", OtpPurpose.Register, "h:123456", TestApp.Start)); // a code from before accounts waited for verification
+
+        var error = await Assert.ThrowsAsync<DomainException>(() => app.Sender.Send(new VerifyEmailCommand(Valid.Email, "123456", Valid.Password)));
+
+        Assert.Equal("OTP_INVALID", error.Code);
+        Assert.Empty(app.Users.Items);
+    }
+
+    [Fact]
+    public async Task Verifying_an_email_that_has_an_account_by_then_is_a_conflict_GB01()
+    {
+        var app = await RegisteredAsync();
+        app.Users.Add(User.Create("Other", "0988888888", "an@example.com", "h:x", UserRole.Customer, emailVerified: true)); // saved meanwhile
+
+        await Assert.ThrowsAsync<ConflictException>(() =>
+            app.Sender.Send(new VerifyEmailCommand(Valid.Email, app.Email.LastCode(), Valid.Password)));
+
+        Assert.Equal("Other", Assert.Single(app.Users.Items).FullName);
+    }
+
+    [Fact]
+    public async Task A_new_code_after_a_used_one_reuses_the_same_row_GB25()
+    {
+        var app = new TestApp(null, User.Create("A", "0900000001", "a@x.vn", "h:old12345", UserRole.Customer, emailVerified: true));
+        await app.Sender.Send(new ForgotPasswordCommand("a@x.vn"));
+        await app.Sender.Send(new ResetPasswordCommand("a@x.vn", app.Email.LastCode(), "new12345"));
+
+        await app.Sender.Send(new ForgotPasswordCommand("a@x.vn"));
+        await app.Sender.Send(new ResetPasswordCommand("a@x.vn", app.Email.LastCode(), "again123"));
+
+        Assert.Single(app.Otps.Items);
+        await app.Sender.Send(new LoginCommand("a@x.vn", "again123"));
     }
 
     [Fact]

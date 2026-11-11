@@ -13,6 +13,8 @@ internal static class AuthRules
 {
     public const int MinPasswordLength = 8;
 
+    public const string AlreadyRegistered = "This email or phone number is already registered.";
+
     public static IRuleBuilderOptions<T, string> ValidPassword<T>(this IRuleBuilder<T, string> rule) =>
         rule.NotEmpty()
             .MinimumLength(MinPasswordLength)
@@ -36,16 +38,20 @@ internal static class AuthRules
     /// <summary>Six random digits from a cryptographic source.</summary>
     public static string NewOtpCode() => RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
 
-    /// <summary>Starts a code or replaces the current one; false at the GB-25 limit, when nothing changes and nothing may be sent.</summary>
-    public static async Task<bool> TryIssueOtpAsync(
+    /// <summary>
+    /// Starts a code or replaces the current one, used or not; null at the GB-25 limit, when nothing changes and nothing may be sent.
+    /// One row per email and purpose (unique index): two first sends in parallel cannot both win, the loser gets 409.
+    /// </summary>
+    public static async Task<OtpVerification?> TryIssueOtpAsync(
         IOtpRepository otps, string email, OtpPurpose purpose, string codeHash, DateTimeOffset now, CancellationToken ct)
     {
         var latest = await otps.GetLatestAsync(email, purpose, ct);
-        if (latest is not null && latest.VerifiedAt is null)
-            return latest.TryResend(codeHash, now);
+        if (latest is not null)
+            return latest.TryResend(codeHash, now) ? latest : null;
 
-        otps.Add(OtpVerification.Issue(email, purpose, codeHash, now));
-        return true;
+        var otp = OtpVerification.Issue(email, purpose, codeHash, now);
+        otps.Add(otp);
+        return otp;
     }
 
     /// <summary>
