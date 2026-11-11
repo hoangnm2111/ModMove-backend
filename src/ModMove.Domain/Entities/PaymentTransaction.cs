@@ -26,6 +26,37 @@ public sealed class PaymentTransaction : BaseAuditableEntity, IAggregateRoot
     public DateTimeOffset? ExpiresAt { get; private set; }
     public DateTimeOffset? PaidAt { get; private set; }
 
+    // R-01: the account the customer paid from, as PayOS reports it in the webhook (counterAccount*). Only a hint for
+    // the refund account; the customer still confirms it. Null when PayOS sends nothing usable.
+    public string? PayerBankBin { get; private set; }
+    public string? PayerAccountNumber { get; private set; }
+    public string? PayerAccountName { get; private set; }
+
+    /// <summary>R-01: a payer account the customer can be offered back as the refund account.</summary>
+    public bool HasPayerAccount => PayerBankBin is not null && PayerAccountNumber is not null;
+
+    /// <summary>
+    /// R-01: keeps what PayOS reported about the payer. Empty, blank and the text "null" or "undefined" (PayOS sends them
+    /// for a missing value) become null, so nothing meaningless is stored. Values are cut to the column sizes.
+    /// </summary>
+    public void RecordPayer(string? bankBin, string? accountNumber, string? accountName)
+    {
+        PayerBankBin = Clean(bankBin, 20);
+        PayerAccountNumber = Clean(accountNumber, 19);
+        PayerAccountName = Clean(accountName, 100);
+    }
+
+    private static string? Clean(string? value, int maxLength)
+    {
+        var text = value?.Trim();
+        if (string.IsNullOrEmpty(text)
+            || text.Equals("null", StringComparison.OrdinalIgnoreCase)
+            || text.Equals("undefined", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        return text.Length > maxLength ? text[..maxLength] : text;
+    }
+
     public static PaymentTransaction ForOrderViaPayOs(long orderId, decimal amount, long payosOrderCode, string checkoutUrl, DateTimeOffset now) =>
         new()
         {

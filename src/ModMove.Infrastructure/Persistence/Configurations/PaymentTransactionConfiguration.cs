@@ -14,6 +14,9 @@ internal sealed class PaymentTransactionConfiguration : IEntityTypeConfiguration
         builder.Property(p => p.PayerRole).HasMaxLength(10);
         builder.Property(p => p.Amount).HasPrecision(15, 2);
         builder.Property(p => p.CheckoutUrl).HasMaxLength(500);
+        builder.Property(p => p.PayerBankBin).HasMaxLength(20);
+        builder.Property(p => p.PayerAccountNumber).HasMaxLength(19);
+        builder.Property(p => p.PayerAccountName).HasMaxLength(100);
         // Optimistic concurrency on TransactionStatus prevents a late JOB-PAY-01 tick or duplicate link creation from overwriting Paid.
         builder.Property(p => p.TransactionStatus).IsConcurrencyToken();
 
