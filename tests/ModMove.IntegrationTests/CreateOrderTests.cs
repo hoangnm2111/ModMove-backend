@@ -186,4 +186,47 @@ public class CreateOrderTests
 
         Assert.Equal("ACCOUNT_INACTIVE", error.Code);
     }
+
+    [Fact]
+    public async Task Cash_order_broadcasts_NEW_MATCHING_ORDER_to_nearby_eligible_drivers_while_PayOS_waits_for_payment_8_3()
+    {
+        var app = App();
+        var driverUser = User.Create("Tài Xế A", "0900000011", "drv@x.vn", "h:secret123", UserRole.Driver, emailVerified: true);
+        driverUser.SetFcmToken("fcm-drv-cash");
+        app.Users.Add(driverUser);
+
+        var profile = DriverProfile.Create(driverUser.Id, "079090000001", "790000000001", "f.jpg", "b.jpg");
+        TestIds.Set(profile, 11);
+        var vehicle = Vehicle.Create(profile.Id, 1, "51C-123.45", 500m, "170x120x120", "r.jpg", "i.jpg", "v.jpg");
+        TestIds.Set(vehicle, 11);
+        profile.Approve(vehicle);
+        profile.GoOnline();
+        profile.UpdateLocation(21.03m, 105.85m, TestApp.Start.AddSeconds(-20)); // near default FakeMapService pickup (21.0285, 105.8542)
+        app.DriverProfiles.Add(profile);
+
+        var wallet = DriverWallet.Create(profile.Id);
+        wallet.TopUpDeposit(500_000m);
+        app.DriverWallets.Add(wallet);
+
+        var createdCash = await app.Sender.Send(Order(method: PaymentMethod.Cash, payer: PayerRole.Sender));
+
+        var realtimeNotif = Assert.Single(app.Realtime.Sent);
+        Assert.Equal(("user", driverUser.Id.ToString(), "NotificationReceived"), (realtimeNotif.Target, realtimeNotif.Id, realtimeNotif.EventName));
+        var payload = Assert.IsType<Notification>(realtimeNotif.Payload);
+        Assert.Equal("NEW_MATCHING_ORDER", payload.Type);
+        Assert.Equal(createdCash.OrderId.ToString(), payload.Data?["orderId"]);
+
+        var pushSent = Assert.Single(app.Push.Sent);
+        Assert.Equal("fcm-drv-cash", pushSent.Token);
+        Assert.Equal("NEW_MATCHING_ORDER", pushSent.Data?["type"]);
+
+        // PayOS order does not notify drivers on creation (waits for webhook payment confirmation)
+        app.Realtime.Sent.Clear();
+        app.Push.Sent.Clear();
+        app.Orders.Items[0].CreatedAt = app.Time.Now;
+        await app.Sender.Send(Order(method: PaymentMethod.PayOS, payer: null));
+
+        Assert.Empty(app.Realtime.Sent);
+        Assert.Empty(app.Push.Sent);
+    }
 }
