@@ -78,13 +78,12 @@ internal sealed class GetReplacementDriversQueryHandler(
             ?? throw new NotFoundException(nameof(InTransitIncident), request.IncidentId);
 
         var radiusKm = (double)await settings.GetDecimalAsync(SettingKeys.MatchingRadiusKm, cancellationToken);
+        var requiredDeposit = await settings.GetDecimalAsync(SettingKeys.RequiredDeposit, cancellationToken);
         var isCash = string.Equals(ctx.PaymentMethod, "Cash", StringComparison.OrdinalIgnoreCase);
 
-        decimal minCodDeposit = 0m;
         decimal requiredCommission = 0m;
         if (isCash)
         {
-            minCodDeposit = await settings.GetDecimalAsync(SettingKeys.MinCodDeposit, cancellationToken);
             var commissionRate = await settings.GetDecimalAsync(SettingKeys.CommissionRate, cancellationToken);
             requiredCommission = Math.Round(commissionRate * ctx.TotalFee, 0, MidpointRounding.AwayFromZero);
         }
@@ -102,12 +101,9 @@ internal sealed class GetReplacementDriversQueryHandler(
         var results = new List<(double RawDistanceKm, ReplacementDriverResponse Dto)>();
         foreach (var c in candidates)
         {
-            if (isCash)
-            {
-                var walletActive = string.Equals(c.WalletStatus, "Active", StringComparison.OrdinalIgnoreCase);
-                if (!walletActive || c.DepositBalance < minCodDeposit || c.DepositBalance < requiredCommission)
-                    continue;
-            }
+            var walletActive = string.Equals(c.WalletStatus, "Active", StringComparison.OrdinalIgnoreCase);
+            if (!walletActive || c.DepositBalance < requiredDeposit || (isCash && c.DepositBalance < requiredCommission))
+                continue;
 
             var distKm = GeoDistance.HaversineKm(refLat, refLon, c.LastLatitude, c.LastLongitude);
             if (distKm > radiusKm)

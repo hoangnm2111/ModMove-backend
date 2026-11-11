@@ -67,13 +67,17 @@ internal sealed class ReassignIncidentDriverCommandHandler(
         if (await orders.GetActiveOrderIdForDriverAsync(newProfile.Id, cancellationToken) is not null)
             throw NotEligible("The replacement driver already has an active order.");
 
+        var wallet = await wallets.GetByDriverProfileIdAsync(newProfile.Id, cancellationToken);
+        var requiredDeposit = await settings.GetDecimalAsync(SettingKeys.RequiredDeposit, cancellationToken);
         if (order.PaymentMethod == PaymentMethod.Cash)
         {
-            var wallet = await wallets.GetByDriverProfileIdAsync(newProfile.Id, cancellationToken);
-            var minCodDeposit = await settings.GetDecimalAsync(SettingKeys.MinCodDeposit, cancellationToken);
             var commissionRate = await settings.GetDecimalAsync(SettingKeys.CommissionRate, cancellationToken);
-            if (wallet is null || !wallet.CanReceiveCod(minCodDeposit, order.CommissionFor(commissionRate)))
+            if (wallet is null || !wallet.CanReceiveCod(requiredDeposit, order.CommissionFor(commissionRate)))
                 throw NotEligible("The replacement driver's deposit balance cannot cover this cash order.");
+        }
+        else if (wallet is null || !wallet.CanReceiveOrders(requiredDeposit))
+        {
+            throw NotEligible("The replacement driver's deposit balance is below the required deposit.");
         }
 
         var reason = request.Reason.Trim();
