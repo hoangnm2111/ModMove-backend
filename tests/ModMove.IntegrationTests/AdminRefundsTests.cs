@@ -112,6 +112,7 @@ public class AdminRefundsTests
         var first = Refund.Request(s.Order.Id, incidentId: 1, RefundSourceType.Incident, "Sự cố 1", null, 120_000m);
         first.Propose(120_000m, "Hoàn 120k", s.Dispatcher.Id);
         first.Approve(s.Admin.Id, Now);
+        first.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now);
         first.MarkProcessed("FT001", Now);
         s.App.Refunds.Add(first);
 
@@ -155,6 +156,7 @@ public class AdminRefundsTests
         var s = Build();
         var refund = Refund.Request(s.Order.Id, null, RefundSourceType.Cancellation, "Khách hủy", null, 180_000m);
         refund.Approve(s.Admin.Id, Now, "Đồng ý hoàn 100%");
+        refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now);
         s.App.Refunds.Add(refund);
         var paidOutTime = Now.AddHours(2);
         s.App.Time.Now = paidOutTime;
@@ -171,6 +173,21 @@ public class AdminRefundsTests
     }
 
     [Fact]
+    public async Task Payout_without_a_customer_bank_account_is_refused_but_approval_is_not_R01()
+    {
+        var s = Build();
+        var refund = Refund.Request(s.Order.Id, null, RefundSourceType.Cancellation, "Khách hủy", null, 180_000m);
+        s.App.Refunds.Add(refund);
+
+        await s.App.Sender.Send(new ApproveRefundCommand(refund.Id));
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(new ProcessRefundPayoutCommand(refund.Id, "FT111")));
+
+        Assert.Equal("REFUND_BANK_ACCOUNT_REQUIRED", error.Code);
+        Assert.Equal(RefundStatus.Approved, refund.RefundStatus);
+    }
+
+    [Fact]
     public async Task Payout_on_unapproved_or_already_processed_refund_is_refused()
     {
         var s = Build();
@@ -181,6 +198,7 @@ public class AdminRefundsTests
             s.App.Sender.Send(new ProcessRefundPayoutCommand(requested.Id, "FT111")));
 
         requested.Approve(s.Admin.Id, Now);
+        requested.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now);
         await s.App.Sender.Send(new ProcessRefundPayoutCommand(requested.Id, "FT111"));
 
         // Second payout attempt on Processed refund fails
@@ -215,7 +233,8 @@ public class AdminRefundsTests
         await s.App.Sender.Send(new ApproveRefundCommand(complaint.Id, "Đồng ý 30k"));
         Assert.True(await s.App.Refunds.HasOpenComplaintAsync(s.Order.Id));
 
-        // 2. Admin pays out complaint -> now Processed (closed!)
+        // 2. Admin pays out complaint -> now Processed (closed!); the customer gave the account when filing (R-01)
+        complaint.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now);
         await s.App.Sender.Send(new ProcessRefundPayoutCommand(complaint.Id, "FT99999"));
         Assert.False(await s.App.Refunds.HasOpenComplaintAsync(s.Order.Id));
     }

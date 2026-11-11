@@ -139,7 +139,35 @@ public class CancelOrderTests
         await s.App.Sender.Send(Cancel(order));
 
         Assert.Equal(180_000m, Assert.Single(s.App.Refunds.Items).ProposedAmount);
-        Assert.Equal(s.Driver.Id.ToString(), Assert.Single(s.App.Realtime.Sent, x => x.EventName == RealtimeEvents.NotificationReceived).Id);
+        Assert.Single(s.App.Realtime.Sent, x => x.EventName == RealtimeEvents.NotificationReceived && x.Id == s.Driver.Id.ToString());
+    }
+
+    [Fact]
+    public async Task Cancelling_a_paid_order_asks_the_customer_for_a_bank_account_R01()
+    {
+        var s = Build();
+        var order = AddOrder(s, s.Customer.Id, PaymentMethod.PayOS);
+        order.MarkPaid(Now);
+
+        await s.App.Sender.Send(Cancel(order));
+
+        var sent = Assert.Single(s.App.Realtime.Sent, x => x.EventName == RealtimeEvents.NotificationReceived);
+        Assert.Equal(("user", s.Customer.Id.ToString()), (sent.Target, sent.Id));
+        var notification = Assert.IsType<Notification>(sent.Payload);
+        Assert.Equal("REFUND_BANK_INFO_REQUIRED", notification.Type);
+        Assert.Equal(order.Id.ToString(), notification.Data!["orderId"]);
+        Assert.Contains(order.OrderCode, notification.Body);
+    }
+
+    [Fact]
+    public async Task Cancelling_a_cash_order_does_not_ask_for_a_bank_account_R01()
+    {
+        var s = Build();
+        var order = AddOrder(s, s.Customer.Id);
+
+        await s.App.Sender.Send(Cancel(order));
+
+        Assert.DoesNotContain(s.App.Realtime.Sent, x => x.EventName == RealtimeEvents.NotificationReceived && x.Id == s.Customer.Id.ToString());
     }
 
     [Fact]

@@ -13,5 +13,6 @@ internal sealed class SubmitComplaintCommandValidator : AbstractValidator<Submit
         RuleFor(x => x.Reason).MaximumLength(CustomerRefundRules.MaxTextLength);
         RuleFor(x => x.EvidenceUrls).ValidEvidence(storage);
         RuleFor(x => x.RequestedAmount).ValidAmount();
+        RuleFor(x => x.PayoutAccount).NotNull().ValidPayoutAccount();
     }
 }

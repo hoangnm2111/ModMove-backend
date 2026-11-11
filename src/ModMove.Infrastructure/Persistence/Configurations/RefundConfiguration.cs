@@ -20,6 +20,11 @@ internal sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
         builder.Property(r => r.InfoRequestNote).HasMaxLength(1000);
         builder.Property(r => r.CustomerReply).HasMaxLength(1000); // DECISIONS 7.4
         builder.Property(r => r.BankReferenceCode).HasMaxLength(50);
+        builder.Property(r => r.PayoutBankCode).HasMaxLength(20);
+        builder.Property(r => r.PayoutBankName).HasMaxLength(100);
+        builder.Property(r => r.PayoutAccountNumber).HasMaxLength(19);
+        builder.Property(r => r.PayoutAccountHolder).HasMaxLength(100);
+        builder.Property(r => r.PayoutFailureReason).HasMaxLength(1000);
         builder.Property(r => r.RowVersion).IsConcurrencyToken();
 
         // "One open refund per (order, source)" and "one complaint per order" are checked by the

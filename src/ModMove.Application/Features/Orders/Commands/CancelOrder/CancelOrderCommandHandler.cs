@@ -3,6 +3,7 @@ using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
+using ModMove.Application.Common.Notifications;
 using ModMove.Application.Features.MasterData.Queries.GetPublicContent;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
@@ -34,7 +35,8 @@ internal sealed class CancelOrderCommandHandler(
         var now = clock.GetUtcNow();
         // ORDER_NOT_YOURS / ORDER_NOT_CANCELLABLE come from the entity. A coupon use is not given back (B11).
         var refundAmount = order.CancelByCustomer(customer.Id, reason, now, choice.Code);
-        if (refundAmount > 0)
+        var refundOwed = refundAmount > 0;
+        if (refundOwed)
             refunds.Add(Refund.Request(order.Id, null, RefundSourceType.Cancellation, reason, null, refundAmount, choice.Code));
 
         if (payments is not null)
@@ -54,5 +56,9 @@ internal sealed class CancelOrderCommandHandler(
         await notifications.PublishOrderStatusAsync(order, driverUserId, cancellationToken);
         await notifications.NotifyDriverAsync(driverUserId, order, "ORDER_CANCELLED",
             "Đơn đã bị hủy", $"Khách đã hủy đơn {order.OrderCode}.", cancellationToken);
+
+        // R-01: the refund is owed; the money has nowhere to go until the customer gives a bank account.
+        if (refundOwed)
+            await notifications.NotifyCustomerAsync(order, CustomerEvent.RefundBankInfoRequired, cancellationToken);
     }
 }

@@ -32,7 +32,7 @@ internal sealed class GetMyRefundsQueryHandler(ISqlConnectionFactory connectionF
 
         var items = rows.Select(r => new MyRefundSummaryResponse(
             r.Id, r.OrderId, r.OrderCode, r.SourceType, r.RefundStatus, r.RequestedAmount, r.ApprovedAmount, r.DecisionReason,
-            r.WaitingForReply, CustomerAccess.Utc(r.CreatedAt))).ToList();
+            r.WaitingForReply, r.NeedsPayoutAccount, CustomerAccess.Utc(r.CreatedAt))).ToList();
         return new PagedResult<MyRefundSummaryResponse>(items, request.Page, request.PageSize, total);
     }
 }
