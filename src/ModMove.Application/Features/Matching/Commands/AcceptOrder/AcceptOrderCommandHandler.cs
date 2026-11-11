@@ -69,14 +69,18 @@ internal sealed class AcceptOrderCommandHandler(
         if (await orders.GetActiveOrderIdForDriverAsync(profile.Id, cancellationToken) is not null)
             throw NotEligible("You already have an order in progress.");
 
-        // GB-16: cash orders require an Active wallet with DepositBalance >= MIN_COD_DEPOSIT and >= this order's commission.
+        // GB-16: all orders require an Active wallet with DepositBalance >= REQUIRED_DEPOSIT; cash orders also require >= this order's commission.
+        var wallet = await wallets.GetByDriverProfileIdAsync(profile.Id, cancellationToken);
+        var requiredDeposit = await settings.GetDecimalAsync(SettingKeys.RequiredDeposit, cancellationToken);
         if (order.PaymentMethod == PaymentMethod.Cash)
         {
-            var wallet = await wallets.GetByDriverProfileIdAsync(profile.Id, cancellationToken);
-            var minCodDeposit = await settings.GetDecimalAsync(SettingKeys.MinCodDeposit, cancellationToken);
             var commissionRate = await settings.GetDecimalAsync(SettingKeys.CommissionRate, cancellationToken);
-            if (wallet is null || !wallet.CanReceiveCod(minCodDeposit, order.CommissionFor(commissionRate)))
+            if (wallet is null || !wallet.CanReceiveCod(requiredDeposit, order.CommissionFor(commissionRate)))
                 throw NotEligible("Your deposit wallet balance is insufficient to accept this cash order.");
+        }
+        else if (wallet is null || !wallet.CanReceiveOrders(requiredDeposit))
+        {
+            throw NotEligible("Your deposit wallet balance is insufficient to accept orders.");
         }
 
         order.Accept(profile.Id, user.Id, now);

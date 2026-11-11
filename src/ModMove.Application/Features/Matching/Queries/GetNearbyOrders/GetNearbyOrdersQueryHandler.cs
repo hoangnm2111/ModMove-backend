@@ -112,7 +112,7 @@ internal sealed class GetNearbyOrdersQueryHandler(
         }
 
         var radiusKm = (double)await settings.GetDecimalAsync(SettingKeys.MatchingRadiusKm, cancellationToken);
-        var minCodDeposit = await settings.GetDecimalAsync(SettingKeys.MinCodDeposit, cancellationToken);
+        var requiredDeposit = await settings.GetDecimalAsync(SettingKeys.RequiredDeposit, cancellationToken);
         var commissionRate = await settings.GetDecimalAsync(SettingKeys.CommissionRate, cancellationToken);
         var walletActive = driver.WalletStatus == nameof(WalletStatus.Active);
 
@@ -159,8 +159,8 @@ internal sealed class GetNearbyOrdersQueryHandler(
             var commission = Math.Round(commissionRate * row.TotalFee, 0, MidpointRounding.AwayFromZero);
             var driverEarning = row.TotalFee - commission;
 
-            // GB-16: cash orders require an Active wallet with DepositBalance >= MIN_COD_DEPOSIT and >= this order's commission.
-            if (isCash && (!walletActive || driver.DepositBalance < minCodDeposit || driver.DepositBalance < commission))
+            // GB-16: all orders require an Active wallet with DepositBalance >= REQUIRED_DEPOSIT; cash orders also require >= this order's commission.
+            if (!walletActive || driver.DepositBalance < requiredDeposit || (isCash && driver.DepositBalance < commission))
                 continue;
 
             var distKm = GeoDistance.HaversineKm(driverLat, driverLon, row.PickupLatitude, row.PickupLongitude);

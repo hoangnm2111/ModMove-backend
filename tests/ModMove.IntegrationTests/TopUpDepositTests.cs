@@ -33,6 +33,7 @@ public class TopUpDepositTests
         if (frozen)
             typeof(DriverWallet).GetProperty("WalletStatus")!.SetValue(wallet, WalletStatus.Frozen);
         app.DriverWallets.Add(wallet);
+        app.Settings.Add(PlatformSetting.Create(SettingKeys.RequiredDeposit, "200000", Now));
 
         return new Setup(app, driver, profile, wallet);
     }
@@ -63,11 +64,11 @@ public class TopUpDepositTests
     public async Task Calling_again_cancels_the_previous_pending_deposit_session_in_db_and_at_PayOS()
     {
         var s = Build();
-        await s.App.Sender.Send(new TopUpDepositCommand(100_000m));
+        await s.App.Sender.Send(new TopUpDepositCommand(200_000m));
         var firstTx = s.App.Payments.Items[0];
         s.App.Time.Now = Now.AddMinutes(2);
 
-        await s.App.Sender.Send(new TopUpDepositCommand(150_000m));
+        await s.App.Sender.Send(new TopUpDepositCommand(250_000m));
 
         Assert.Equal(2, s.App.Payments.Items.Count);
         Assert.Equal(PaymentTransactionStatus.Cancelled, firstTx.TransactionStatus);
@@ -110,9 +111,9 @@ public class TopUpDepositTests
 
     [Theory]
     [InlineData(0)]
-    [InlineData(49_999)]
+    [InlineData(-1_000)]
     [InlineData(50_000.5)]
-    public async Task Amount_below_50000_or_not_whole_VND_fails_validation_5_2(double badAmount)
+    public async Task Non_positive_or_not_whole_VND_amount_fails_validation_DRV21(double badAmount)
     {
         var s = Build();
 
@@ -120,6 +121,22 @@ public class TopUpDepositTests
             s.App.Sender.Send(new TopUpDepositCommand((decimal)badAmount)));
 
         Assert.Empty(s.App.Gateway.Created);
+    }
+
+    [Fact]
+    public async Task Amount_below_missing_deposit_is_rejected_while_any_positive_amount_is_allowed_above_required_deposit_GB32()
+    {
+        var s = Build();
+
+        var ex = await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(new TopUpDepositCommand(199_999m)));
+        Assert.Equal("TOP_UP_BELOW_MISSING_DEPOSIT", ex.Code);
+        Assert.Empty(s.App.Gateway.Created);
+
+        // Once DepositBalance >= 200,000, any whole VND amount > 0 is allowed
+        s.Wallet.CreditTopUp(200_000m);
+        var res = await s.App.Sender.Send(new TopUpDepositCommand(10_000m));
+        Assert.Equal(10_000m, res.Amount);
     }
 
     [Fact]

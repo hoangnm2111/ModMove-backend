@@ -1620,6 +1620,16 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetime(6)")
                         .HasColumnName("created_at");
 
+                    b.Property<decimal>("DepositAmount")
+                        .HasPrecision(15, 2)
+                        .HasColumnType("decimal(15,2)")
+                        .HasColumnName("deposit_amount");
+
+                    b.Property<decimal>("EarningsAmount")
+                        .HasPrecision(15, 2)
+                        .HasColumnType("decimal(15,2)")
+                        .HasColumnName("earnings_amount");
+
                     b.Property<long?>("OrderId")
                         .HasColumnType("bigint")
                         .HasColumnName("order_id");

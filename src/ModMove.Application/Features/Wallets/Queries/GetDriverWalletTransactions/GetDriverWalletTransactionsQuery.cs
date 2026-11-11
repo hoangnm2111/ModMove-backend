@@ -15,6 +15,8 @@ public sealed record DriverWalletTransactionResponse(
     long Id,
     string TransactionType,
     decimal Amount,
+    decimal EarningsAmount,
+    decimal DepositAmount,
     decimal BalanceAfter,
     string TransactionStatus,
     long? OrderId,

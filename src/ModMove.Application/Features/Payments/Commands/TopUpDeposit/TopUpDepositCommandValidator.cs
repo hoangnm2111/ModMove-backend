@@ -1,5 +1,4 @@
 using FluentValidation;
-using ModMove.Domain.Constants;
 
 namespace ModMove.Application.Features.Payments.Commands.TopUpDeposit;
 
@@ -7,12 +6,12 @@ internal sealed class TopUpDepositCommandValidator : AbstractValidator<TopUpDepo
 {
     public TopUpDepositCommandValidator()
     {
+        // GB-32, UC-DRV-21: any positive whole amount; the handler checks it covers the missing deposit (the suggested amount).
         RuleFor(x => x.Amount)
-            .GreaterThanOrEqualTo(BusinessRules.MinDepositTopUp)
+            .GreaterThan(0m)
             .Must(amount => amount == decimal.Truncate(amount))
             .WithMessage("Deposit top-up amount must be a whole VND number.");
 
         RuleFor(x => x.Platform).IsInEnum();
     }
 }
-

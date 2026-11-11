@@ -73,7 +73,7 @@ internal static class DemoDataSeeder
 
         if (driverWallet is not null
             && completedDemoOrder is not null
-            && !driverWallet.Transactions.Any(t => t.TransactionType == WalletTransactionType.WithdrawEarnings))
+            && !driverWallet.Transactions.Any(t => t.TransactionType == WalletTransactionType.Withdrawal))
         {
             if (!driverWallet.Transactions.Any(t => t.OrderId == completedDemoOrder.Id && t.TransactionType == WalletTransactionType.TripEarning))
             {

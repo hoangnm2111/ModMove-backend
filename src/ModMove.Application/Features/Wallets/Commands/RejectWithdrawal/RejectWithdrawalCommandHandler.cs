@@ -11,6 +11,7 @@ internal sealed class RejectWithdrawalCommandHandler(
     IDriverWalletRepository driverWallets,
     IDriverProfileRepository driverProfiles,
     IUserRepository users,
+    IPlatformSettings settings,
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUser,
     INotificationService notifications,
@@ -26,7 +27,8 @@ internal sealed class RejectWithdrawalCommandHandler(
         var transaction = wallet.Transactions.FirstOrDefault(t => t.Id == request.TransactionId)
             ?? throw new NotFoundException("WalletTransaction", request.TransactionId);
 
-        wallet.RejectWithdrawal(transaction, admin.Id, clock.GetUtcNow());
+        var requiredDeposit = await settings.GetDecimalAsync(SettingKeys.RequiredDeposit, cancellationToken);
+        wallet.RejectWithdrawal(transaction, admin.Id, clock.GetUtcNow(), requiredDeposit);
 
         driverWallets.Update(wallet);
         await unitOfWork.SaveChangesAsync(cancellationToken);

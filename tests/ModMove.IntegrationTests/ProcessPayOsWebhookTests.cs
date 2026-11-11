@@ -106,6 +106,10 @@ public class ProcessPayOsWebhookTests
         profile.UpdateLocation(21.01m, 105.81m, paidTime.AddSeconds(-30)); // ~1.51 km away, fresh GPS
         s.App.DriverProfiles.Add(profile);
 
+        var driverWallet = DriverWallet.Create(profile.Id);
+        driverWallet.TopUpDeposit(200_000m);
+        s.App.DriverWallets.Add(driverWallet);
+
         await s.App.Sender.Send(new CreateOrderPaymentCommand(order.Id, PaymentPlatform.Web));
         var transaction = Assert.Single(s.App.Payments.Items);
         s.App.Time.Now = paidTime;
