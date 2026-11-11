@@ -1,0 +1,239 @@
+<mxfile host="app.diagrams.net" agent="ModMove">
+  <diagram id="d1" name="Driver Onboarding - Class">
+    <mxGraphModel dx="2073" dy="1133" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1380" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="frame" parent="1" style="shape=umlFrame;whiteSpace=wrap;html=1;pointerEvents=0;width=420;height=30;fontStyle=1;fontSize=13;fillColor=none;" value="Driver Onboarding (Submit Application) - Class Diagram" vertex="1">
+          <mxGeometry height="1340" width="1660" x="10" y="10" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="ctl" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=block;endFill=0;endSize=12;" target="base" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="ctl" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=open;endSize=10;dashed=1;strokeColor=#666666;" target="sender" value="sends">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="ctl" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=open;endSize=10;dashed=1;strokeColor=#666666;" target="cmd" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="sender" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=open;endSize=10;dashed=1;strokeColor=#666666;" target="pipe" value="pipeline">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="pipe" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=open;endSize=10;dashed=1;strokeColor=#666666;" target="val" value="runs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="pipe" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=open;endSize=10;dashed=1;strokeColor=#666666;" target="hdl" value="next">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="val" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=open;endSize=10;dashed=1;strokeColor=#666666;" target="cmd" value="validates">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="hdl" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=block;endFill=0;endSize=12;dashed=1;entryX=0.25;entryY=1;entryDx=0;entryDy=0;" target="ich" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="hdl" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=open;endSize=10;dashed=1;strokeColor=#666666;exitX=-0.02;exitY=0.648;exitDx=0;exitDy=0;exitPerimeter=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0;" target="cmd" value="handles">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e10" edge="1" parent="1" source="hdl" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=open;endSize=10;entryX=1;entryY=0;entryDx=0;entryDy=0;" target="icur" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" edge="1" parent="1" source="hdl" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=open;endSize=10;" target="iuser" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" edge="1" parent="1" source="hdl" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=open;endSize=10;entryX=1;entryY=0;entryDx=0;entryDy=0;" target="irepo" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e13" edge="1" parent="1" source="hdl" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=open;endSize=10;" target="iprof" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e14" edge="1" parent="1" source="hdl" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=open;endSize=10;entryX=0.109;entryY=-0.01;entryDx=0;entryDy=0;entryPerimeter=0;" target="isql" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e15" edge="1" parent="1" source="hdl" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=open;endSize=10;entryX=0;entryY=0;entryDx=0;entryDy=0;" target="iuow" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e16" edge="1" parent="1" source="iuser" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=block;endFill=0;endSize=12;" target="irepo" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e17" edge="1" parent="1" source="iprof" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=block;endFill=0;endSize=12;" target="irepo" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e18" edge="1" parent="1" source="cur" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=block;endFill=0;endSize=12;dashed=1;" target="icur" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e19" edge="1" parent="1" source="user" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=block;endFill=0;endSize=12;dashed=1;" target="iuser" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e20" edge="1" parent="1" source="repo" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=block;endFill=0;endSize=12;dashed=1;" target="irepo" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e21" edge="1" parent="1" source="prof" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=block;endFill=0;endSize=12;dashed=1;" target="iprof" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e22" edge="1" parent="1" source="sql" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=block;endFill=0;endSize=12;dashed=1;" target="isql" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e23" edge="1" parent="1" source="db" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=block;endFill=0;endSize=12;dashed=1;" target="iuow" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e24" edge="1" parent="1" source="user" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=block;endFill=0;endSize=12;" target="repo" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e25" edge="1" parent="1" source="prof" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=block;endFill=0;endSize=12;" target="repo" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e26" edge="1" parent="1" source="repo" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=open;endSize=10;dashed=1;strokeColor=#666666;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.75;entryDx=0;entryDy=0;" target="db" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e27" edge="1" parent="1" source="hdl" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=open;endSize=10;dashed=1;strokeColor=#666666;entryX=0.859;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" target="ep" value="creates">
+          <mxGeometry relative="1" x="0.2406" y="8" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e28" edge="1" parent="1" source="iprof" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=open;endSize=10;dashed=1;strokeColor=#666666;entryX=0.682;entryY=0.001;entryDx=0;entryDy=0;entryPerimeter=0;exitX=0.842;exitY=1.006;exitDx=0;exitDy=0;exitPerimeter=0;" target="ea" value="creates">
+          <mxGeometry relative="1" x="0.1605" y="4" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e29" edge="1" parent="1" source="ep" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=block;endFill=0;endSize=12;" target="audit" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e30" edge="1" parent="1" source="ea" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=block;endFill=0;endSize=12;" target="audit" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e31" edge="1" parent="1" source="eu" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=block;endFill=0;endSize=12;" target="audit" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e32" edge="1" parent="1" source="ev" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=block;endFill=0;endSize=12;" target="audit" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e33" edge="1" parent="1" source="ep" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;startArrow=diamond;startFill=1;startSize=14;endArrow=none;" target="ea" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e33s" connectable="0" parent="e33" style="edgeLabel;html=1;fontSize=13;labelBackgroundColor=#FFFFFF;" value="1" vertex="1">
+          <mxGeometry relative="1" x="-0.8" as="geometry">
+            <mxPoint x="3" y="-6" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e33t" connectable="0" parent="e33" style="edgeLabel;html=1;fontSize=13;labelBackgroundColor=#FFFFFF;" value="1..*" vertex="1">
+          <mxGeometry relative="1" x="0.8" as="geometry">
+            <mxPoint x="-15" y="-25" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e34" edge="1" parent="1" source="ep" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=open;endSize=10;" target="eu" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e34s" connectable="0" parent="e34" style="edgeLabel;html=1;fontSize=13;labelBackgroundColor=#FFFFFF;" value="0..1" vertex="1">
+          <mxGeometry relative="1" x="-0.8" as="geometry">
+            <mxPoint x="-19" y="-5" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e34t" connectable="0" parent="e34" style="edgeLabel;html=1;fontSize=13;labelBackgroundColor=#FFFFFF;" value="1" vertex="1">
+          <mxGeometry relative="1" x="0.8" as="geometry">
+            <mxPoint x="-3" y="-25" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e35" edge="1" parent="1" source="ea" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=open;endSize=10;" target="ev" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e35s" connectable="0" parent="e35" style="edgeLabel;html=1;fontSize=13;labelBackgroundColor=#FFFFFF;" value="*" vertex="1">
+          <mxGeometry relative="1" x="-0.8" as="geometry">
+            <mxPoint y="-9" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e35t" connectable="0" parent="e35" style="edgeLabel;html=1;fontSize=13;labelBackgroundColor=#FFFFFF;" value="1" vertex="1">
+          <mxGeometry relative="1" x="0.8" as="geometry">
+            <mxPoint x="-6" y="-3" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e36" edge="1" parent="1" source="ea" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=open;endSize=10;dashed=1;strokeColor=#666666;" target="en" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="base" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;abstract&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;ApiControllerBase&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;# Sender : ISender&lt;/p&gt;" vertex="1">
+          <mxGeometry height="69" width="164" x="53" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ctl" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;controller&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;OnboardingController&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ GetStatus(ct) : DriverOnboardingStatusResponse&lt;br&gt;+ Submit(command, ct) : 201 { id }&lt;/p&gt;" vertex="1">
+          <mxGeometry height="84" width="309" x="290" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="sender" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;mediator&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;ISender (MediatR)&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ Send(request, ct) : Task&amp;lt;TResponse&amp;gt;&lt;/p&gt;" vertex="1">
+          <mxGeometry height="69" width="246" x="680" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="pipe" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;pipeline&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;ValidationBehavior&amp;lt;TReq, TRes&amp;gt;&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;- validators : IEnumerable&amp;lt;IValidator&amp;lt;TReq&amp;gt;&amp;gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ Handle(request, next, ct) : TRes&lt;/p&gt;" vertex="1">
+          <mxGeometry height="94" width="300" x="1024" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ich" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;interface&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;ICommandHandler&amp;lt;TCommand, TResponse&amp;gt;&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ Handle(command, ct) : Task&amp;lt;TResponse&amp;gt;&lt;/p&gt;" vertex="1">
+          <mxGeometry height="69" width="290" x="1348" y="67.5" as="geometry" />
+        </mxCell>
+        <mxCell id="cmd" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;record&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;SubmitDriverApplicationCommand&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ VehicleTypeId : long&lt;br&gt;+ CitizenIdNumber : string&lt;br&gt;+ DriverLicenseNumber : string&lt;br&gt;+ LicensePlate : string&lt;br&gt;+ MaxLoadWeightKg : decimal&lt;br&gt;+ DocumentUrls : IReadOnlyList&amp;lt;string&amp;gt; (exactly 5)&lt;/p&gt;" vertex="1">
+          <mxGeometry height="144" width="320" x="40" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="val" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;validator&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;SubmitDriverApplicationCommandValidator&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;- RequiredDocumentCount = 5&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ Validate(command) : ValidationResult&lt;/p&gt;" vertex="1">
+          <mxGeometry height="94" width="285" x="470" y="250" as="geometry" />
+        </mxCell>
+        <mxCell id="hdl" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;handler&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;SubmitDriverApplicationCommandHandler&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;- currentUser : ICurrentUserService&lt;br&gt;- users : IUserRepository&lt;br&gt;- driverProfiles : IDriverProfileRepository&lt;br&gt;- vehicleTypes : IRepository&amp;lt;VehicleType&amp;gt;&lt;br&gt;- connectionFactory : ISqlConnectionFactory&lt;br&gt;- unitOfWork : IUnitOfWork&lt;br&gt;- clock : TimeProvider&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ Handle(command, ct) : long&lt;/p&gt;" vertex="1">
+          <mxGeometry height="196" width="296" x="898" y="239" as="geometry" />
+        </mxCell>
+        <mxCell id="icur" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;interface&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;ICurrentUserService&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ UserId : long?&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ IsInRole(role) : bool&lt;/p&gt;" vertex="1">
+          <mxGeometry height="94" width="210" x="35" y="485" as="geometry" />
+        </mxCell>
+        <mxCell id="iuser" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;interface&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;IUserRepository&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ GetByEmailAsync(email, ct) : User?&lt;/p&gt;" vertex="1">
+          <mxGeometry height="69" width="240" x="255" y="495.5" as="geometry" />
+        </mxCell>
+        <mxCell id="irepo" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;interface&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;IRepository&amp;lt;TAggregate&amp;gt;&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ GetByIdAsync(id, ct) : TAggregate?&lt;br&gt;+ Add(aggregate)&lt;/p&gt;" vertex="1">
+          <mxGeometry height="84" width="250" x="540" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="isql" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;interface&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;ISqlConnectionFactory&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ CreateConnection() : IDbConnection&lt;/p&gt;" vertex="1">
+          <mxGeometry height="69" width="240" x="1143" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="iuow" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;interface&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;IUnitOfWork&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ SaveChangesAsync(ct) : int&lt;/p&gt;" vertex="1">
+          <mxGeometry height="69" width="200" x="1408" y="485" as="geometry" />
+        </mxCell>
+        <mxCell id="cur" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;service&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;CurrentUserService&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;- httpContextAccessor&lt;/p&gt;" vertex="1">
+          <mxGeometry height="69" width="210" x="30" y="633.5" as="geometry" />
+        </mxCell>
+        <mxCell id="user" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;repository&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;UserRepository&lt;/b&gt;&lt;/p&gt;" vertex="1">
+          <mxGeometry height="44" width="170" x="290" y="633.5" as="geometry" />
+        </mxCell>
+        <mxCell id="repo" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;repository&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;Repository&amp;lt;TAggregate&amp;gt;&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;# dbContext : ApplicationDbContext&lt;/p&gt;" vertex="1">
+          <mxGeometry height="102.5" width="233" x="546" y="633.5" as="geometry" />
+        </mxCell>
+        <mxCell id="prof" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;repository&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;DriverProfileRepository&lt;/b&gt;&lt;/p&gt;" vertex="1">
+          <mxGeometry height="44" width="215" x="865" y="646" as="geometry" />
+        </mxCell>
+        <mxCell id="sql" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;service&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;SqlConnectionFactory&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;- connectionString&lt;/p&gt;" vertex="1">
+          <mxGeometry height="69" width="200" x="1129" y="628" as="geometry" />
+        </mxCell>
+        <mxCell id="db" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;dbcontext&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;ApplicationDbContext&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ DriverProfiles, DriverApplications, VehicleTypes, Users : DbSet&lt;/p&gt;" vertex="1">
+          <mxGeometry height="89" width="220" x="1377" y="635.5" as="geometry" />
+        </mxCell>
+        <mxCell id="audit" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;abstract&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;BaseAuditableEntity&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ Id : long&lt;br&gt;+ CreatedAt : DateTimeOffset&lt;br&gt;+ UpdatedAt : DateTimeOffset?&lt;/p&gt;" vertex="1">
+          <mxGeometry height="99" width="230" x="785" y="757" as="geometry" />
+        </mxCell>
+        <mxCell id="eu" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;entity&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;User&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ Role : UserRole&lt;br&gt;+ AccountStatus : AccountStatus&lt;br&gt;+ EmailVerified : bool&lt;/p&gt;" vertex="1">
+          <mxGeometry height="99" width="200" x="68" y="801" as="geometry" />
+        </mxCell>
+        <mxCell id="ep" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;entity&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;DriverProfile&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ UserId : long&lt;br&gt;+ CitizenIdNumber, DriverLicenseNumber : string&lt;br&gt;+ LicenseFrontUrl, LicenseBackUrl : string&lt;br&gt;+ ApprovalStatus : ApprovalStatus&lt;br&gt;+ OnlineStatus : OnlineStatus&lt;br&gt;+ Applications : IReadOnlyCollection&amp;lt;DriverApplication&amp;gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ Create(userId, citizenId, licence, front, back) : DriverProfile&lt;br&gt;+ UpdateCredentials(citizenId, licence, front, back)&lt;br&gt;+ NextVersionNumber() : int&lt;br&gt;+ Submit(application)&lt;/p&gt;" vertex="1">
+          <mxGeometry height="226" width="390" x="355" y="900" as="geometry" />
+        </mxCell>
+        <mxCell id="ea" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;entity&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;DriverApplication&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ DriverProfileId, VehicleTypeId : long&lt;br&gt;+ VersionNumber : int&lt;br&gt;+ CitizenIdNumber, DriverLicenseNumber, LicensePlate : string&lt;br&gt;+ MaxLoadWeightKg : decimal&lt;br&gt;+ DocumentUrls : List&amp;lt;string&amp;gt;&lt;br&gt;+ ApplicationStatus : ApprovalStatus&lt;br&gt;+ RejectionReasons : List&amp;lt;string&amp;gt;?&lt;br&gt;+ ReviewedBy : long?&lt;br&gt;+ ReviewedAt : DateTimeOffset?&lt;br&gt;+ SubmittedAt : DateTimeOffset&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ Create(profileId, version, vehicleTypeId, citizenId, licence, plate, maxLoad, urls, now) : DriverApplication&lt;/p&gt;" vertex="1">
+          <mxGeometry height="253" width="400" x="830" y="913" as="geometry" />
+        </mxCell>
+        <mxCell id="ev" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;entity&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;VehicleType&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ Name : string&lt;br&gt;+ MaxLoadWeightKg : decimal&lt;br&gt;+ IsActive : bool&lt;/p&gt;" vertex="1">
+          <mxGeometry height="99" width="190" x="1298" y="913" as="geometry" />
+        </mxCell>
+        <mxCell id="en" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;enumeration&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;ApprovalStatus&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;Pending&lt;br&gt;Approved&lt;br&gt;Rejected&lt;/p&gt;" vertex="1">
+          <mxGeometry height="99" width="100" x="1371" y="1027" as="geometry" />
+        </mxCell>
+        <mxCell id="jsQPt1GzSPRo8kllvWjD-1" edge="1" parent="1" source="hdl" style="html=1;fontSize=13;labelBackgroundColor=#FFFFFF;endArrow=open;endSize=10;dashed=1;strokeColor=#666666;" target="iprof" value="">
+          <mxGeometry relative="1" x="0.62" as="geometry">
+            <mxPoint x="1042" y="435" as="sourcePoint" />
+            <mxPoint x="1015" y="1040" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="iprof" parent="1" style="verticalAlign=top;align=left;overflow=fill;html=1;whiteSpace=wrap;fontSize=13;fillColor=#FFFFFF;strokeColor=#333333;" value="&lt;p style=&quot;margin:4px 0 0;text-align:center&quot;&gt;&lt;i&gt;&amp;lt;&amp;lt;interface&amp;gt;&amp;gt;&lt;/i&gt;&lt;br&gt;&lt;b&gt;IDriverProfileRepository&lt;/b&gt;&lt;/p&gt;&lt;hr size=&quot;1&quot; style=&quot;border-style:solid;&quot;&gt;&lt;p style=&quot;margin:0 0 0 6px&quot;&gt;+ GetByUserIdWithApplicationsAndVehicleAsync&lt;br&gt;(userId, ct) : DriverProfile?&lt;/p&gt;" vertex="1">
+          <mxGeometry height="89" width="300" x="835.5" y="483" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
