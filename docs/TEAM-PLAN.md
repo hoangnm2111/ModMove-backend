@@ -67,7 +67,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [x] Danh mục `api/public/lookups/...`, mã loại hàng và mã lý do khi tạo đơn, hủy, khiếu nại; danh sách coupon cho khách (GST-10, 14, CUS-21, 29)
 - [x] Khách thấy lý do quyết định hoàn tiền (CUS-23); tài xế nhận `INCIDENT_REPORTED`, `RATING_RECEIVED`
 - [x] JOB-GPS-01 (xóa GPS log quá 30 ngày): `GpsLogCleanupJob` chạy mỗi 24 giờ; job của Hoàng kế thừa `PeriodicCommandJob`
-- [ ] Tài khoản nhận hoàn tiền (R-01): khai kèm khiếu nại/hoàn sự cố, `PUT api/customer/refunds/{id}/payout-account`, khách xem số đã che, `GET api/public/lookups/banks`, nhắc khi hủy đơn đã trả (`REFUND_BANK_INFO_REQUIRED`). Còn chờ K2: gợi ý tài khoản PayOS (`useSuggested`, `suggestedPayoutAccount`)
+- [x] Tài khoản nhận hoàn tiền (R-01): khai kèm khiếu nại/hoàn sự cố, `PUT api/customer/refunds/{id}/payout-account`, khách xem số đã che, `GET api/public/lookups/banks`, nhắc khi hủy đơn đã trả (`REFUND_BANK_INFO_REQUIRED`), gợi ý tài khoản PayOS (`useSuggested`, `suggestedPayoutAccount`)
 - [ ] Bảng mã lỗi cho frontend trong `api/README.md` đủ cho mọi endpoint (9.4)
 
 ## 5. Hoàng: Admin / Driver / Payments
@@ -95,6 +95,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [x] Báo cáo, doanh thu (8.1: tổng `commission_amount` của đơn `Completed`, giờ VN), xuất Excel (B16, xin duyệt package)
 - [x] Thông báo cho tài xế theo bảng sự kiện 8.3, gọi qua `INotificationService` (B17)
 - [x] Thông báo cho **khách** khi chính bước của Hoàng đổi trạng thái (8.3): nhận đơn `CustomerEvent.OrderAccepted`, đến điểm lấy `DriverArrived`, gửi ảnh lấy hàng `PickupPhotosToReview`, giao hàng `OrderDelivered`, JOB-ORDER-01 `OrderCompleted`, Admin duyệt/chi hoàn tiền `RefundDecided`, job tự hủy đơn `OrderCancelled`: gọi `NotifyCustomerAsync`, và `PublishOrderStatusAsync` sau mỗi lần đổi trạng thái đơn (B12)
+- [x] Tài khoản nhận hoàn tiền phía Admin/PayOS (R-01, K1–K6): seed master data `BANK` theo VietQR (`BankSeedData`), lưu tài khoản người trả từ webhook PayOS (`payment_transactions.payer_*` + migration) và nối gợi ý `useSuggested`/`suggestedPayoutAccount`, gọi `RefundBankInfoRequired` ở `CancelUnmatchedOrders` và webhook, Admin xem đầy đủ tài khoản nhận + `hasPayoutAccount`, `payout` chặn khi thiếu tài khoản (`REFUND_BANK_ACCOUNT_REQUIRED`), và endpoint `POST api/admin/refunds/{id}/payout-failed` (`REFUND_PAYOUT_FAILED`)
 
 ## 6. Huy: Dispatcher
 

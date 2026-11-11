@@ -32,7 +32,7 @@ internal sealed class ProcessPayOsWebhookCommandHandler(
         if (!gateway.VerifyWebhookSignature(request.RawBody, signature))
             throw new UnauthorizedException("Invalid PayOS webhook signature.");
 
-        var (payosOrderCode, amount, isSuccess) = ParsePayload(request.RawBody);
+        var (payosOrderCode, amount, isSuccess, payer) = ParsePayload(request.RawBody);
 
         var transaction = await payments.GetByPayOsOrderCodeAsync(payosOrderCode, cancellationToken);
         if (transaction is null)
@@ -65,6 +65,9 @@ internal sealed class ProcessPayOsWebhookCommandHandler(
         var now = clock.GetUtcNow();
         if (!transaction.MarkPaid(now))
             return;
+
+        // R-01: remember who paid, so a later refund can offer that account. The numbers never go to a log or a notification.
+        transaction.RecordPayer(payer.BankBin, payer.AccountNumber, payer.AccountName);
 
         ShippingOrder? paidOrder = null;
         ShippingOrder? refundOrder = null;
@@ -175,7 +178,7 @@ internal sealed class ProcessPayOsWebhookCommandHandler(
         }
     }
 
-    private static (long OrderCode, decimal Amount, bool IsSuccess) ParsePayload(string rawBody)
+    private static (long OrderCode, decimal Amount, bool IsSuccess, PayerAccount Payer) ParsePayload(string rawBody)
     {
         using var json = JsonDocument.Parse(rawBody);
         var root = json.RootElement;
@@ -215,7 +218,17 @@ internal sealed class ProcessPayOsWebhookCommandHandler(
         var dataCodeOk = !data.TryGetProperty("code", out var dc)
             || (dc.ValueKind == JsonValueKind.String && dc.GetString() == SuccessCode);
 
-        return (orderCode, amount, rootCodeOk && rootSuccessOk && dataCodeOk);
+        return (orderCode, amount, rootCodeOk && rootSuccessOk && dataCodeOk,
+            new PayerAccount(
+                ReadText(data, "counterAccountBankId"),
+                ReadText(data, "counterAccountNumber"),
+                ReadText(data, "counterAccountName")));
     }
+
+    /// <summary>The payer fields are optional and PayOS may send a number or null for them: anything but a string is "not given".</summary>
+    private static string? ReadText(JsonElement data, string name) =>
+        data.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+
+    private sealed record PayerAccount(string? BankBin, string? AccountNumber, string? AccountName);
 }
 

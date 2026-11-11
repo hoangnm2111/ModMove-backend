@@ -30,5 +30,15 @@ public sealed class PaymentTransactionRepository(ApplicationDbContext dbContext)
 
     public Task<PaymentTransaction?> GetByPayOsOrderCodeAsync(long payosOrderCode, CancellationToken cancellationToken = default) =>
         Set.FirstOrDefaultAsync(p => p.PayosOrderCode == payosOrderCode, cancellationToken);
+
+    public Task<PaymentTransaction?> GetLatestPaidWithPayerAsync(long orderId, CancellationToken cancellationToken = default) =>
+        Set.Where(p => p.OrderId == orderId
+                && p.PaymentMethod == PaymentMethod.PayOS
+                && p.TransactionStatus == PaymentTransactionStatus.Paid
+                && p.PayerBankBin != null
+                && p.PayerAccountNumber != null)
+            .OrderByDescending(p => p.PaidAt)
+            .ThenByDescending(p => p.Id)
+            .FirstOrDefaultAsync(cancellationToken);
 }
 

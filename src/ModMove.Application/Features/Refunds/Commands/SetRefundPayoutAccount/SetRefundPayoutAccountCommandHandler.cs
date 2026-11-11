@@ -14,6 +14,7 @@ internal sealed class SetRefundPayoutAccountCommandHandler(
     IRefundRepository refunds,
     IShippingOrderRepository orders,
     IMasterDataRepository masterData,
+    IPaymentTransactionRepository payments,
     IUnitOfWork unitOfWork,
     TimeProvider clock) : ICommandHandler<SetRefundPayoutAccountCommand>
 {
@@ -34,7 +35,7 @@ internal sealed class SetRefundPayoutAccountCommandHandler(
             await EnsureCanBeOpenAgainAsync(refund, order, cancellationToken);
 
         // REFUND_PAYOUT_LOCKED comes from the refund once it is Processed, Rejected or Withdrawn.
-        await refund.SetPayoutAccountAsync(request.PayoutAccount, masterData, clock.GetUtcNow(), cancellationToken);
+        await refund.SetPayoutAccountAsync(request.PayoutAccount, masterData, payments, clock.GetUtcNow(), cancellationToken);
 
         // A concurrent Administrator save moves RowVersion: 409 CONFLICT.
         // A Failed refund that returns to Approved is not pushed to the Administrator: INotificationService has no

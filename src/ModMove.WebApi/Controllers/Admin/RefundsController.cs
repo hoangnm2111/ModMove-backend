@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using ModMove.Application.Common.Models;
 using ModMove.Application.Features.Refunds.Commands.ApproveRefund;
+using ModMove.Application.Features.Refunds.Commands.MarkRefundPayoutFailed;
 using ModMove.Application.Features.Refunds.Commands.ProcessRefundPayout;
 using ModMove.Application.Features.Refunds.Commands.RejectRefund;
 using ModMove.Application.Features.Refunds.Queries.GetAdminRefundDetail;
@@ -52,6 +53,15 @@ public sealed class RefundsController : ApiControllerBase
     public async Task<IActionResult> Payout(long id, ProcessRefundPayoutRequest body, CancellationToken cancellationToken)
     {
         await Sender.Send(new ProcessRefundPayoutCommand(id, body.BankReferenceCode), cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>UC-ADM-18 5a (R-01): record that the manual transfer failed so the customer updates their bank account.</summary>
+    [HttpPost("{id:long}/payout-failed")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> PayoutFailed(long id, MarkRefundPayoutFailedRequest body, CancellationToken cancellationToken)
+    {
+        await Sender.Send(new MarkRefundPayoutFailedCommand(id, body.Reason), cancellationToken);
         return NoContent();
     }
 }
