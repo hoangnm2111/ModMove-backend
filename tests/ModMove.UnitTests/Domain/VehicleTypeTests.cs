@@ -21,6 +21,13 @@ public class VehicleTypeTests
     }
 
     [Fact]
+    public void Exact_load_and_bed_size_are_still_accepted_GB10()
+    {
+        Assert.True(Van().CanCarry(weightKg: 500, lengthCm: 170, widthCm: 120, heightCm: 120));
+        Assert.False(Van().CanCarry(weightKg: 500, lengthCm: 171, widthCm: 120, heightCm: 120));
+    }
+
+    [Fact]
     public void Total_weight_over_the_load_is_rejected_GB10()
     {
         Assert.False(Van().CanCarry(weightKg: 501, lengthCm: 10, widthCm: 10, heightCm: 10));
