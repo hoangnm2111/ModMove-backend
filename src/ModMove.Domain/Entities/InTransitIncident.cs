@@ -22,6 +22,9 @@ public sealed class InTransitIncident : BaseAuditableEntity, IAggregateRoot
     public long? HandledBy { get; private set; }
     public DateTimeOffset? ResolvedAt { get; private set; }
 
+    /// <summary>Open or InProgress: still waiting for a Dispatcher's decision. A driver's open incident holds the trip (DECISIONS 7.6).</summary>
+    public bool IsOpen => ResolutionStatus is IncidentResolutionStatus.Open or IncidentResolutionStatus.InProgress;
+
     public static InTransitIncident Report(
         long orderId, long reportedBy, IncidentType type, string description,
         IEnumerable<string>? photoUrls, decimal? latitude, decimal? longitude) =>
@@ -63,9 +66,22 @@ public sealed class InTransitIncident : BaseAuditableEntity, IAggregateRoot
         ResolutionStatus = IncidentResolutionStatus.Cancelled;
     }
 
+    /// <summary>
+    /// DECISIONS 7.6: the customer cancelled the order (Pending/Accepted), so nothing is left for a Dispatcher to decide.
+    /// No Dispatcher handled it, so <see cref="HandledBy"/> is cleared.
+    /// </summary>
+    public void CloseBecauseOrderCancelled(string note, DateTimeOffset now)
+    {
+        EnsureOpen();
+        ResolutionNote = note;
+        HandledBy = null;
+        ResolvedAt = now;
+        ResolutionStatus = IncidentResolutionStatus.Cancelled;
+    }
+
     private void EnsureOpen()
     {
-        if (ResolutionStatus is IncidentResolutionStatus.Resolved or IncidentResolutionStatus.Cancelled)
+        if (!IsOpen)
             throw new DomainException("The incident is already closed.");
     }
 }

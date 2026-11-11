@@ -15,6 +15,7 @@ internal sealed class CancelOrderCommandHandler(
     IUserRepository users,
     IShippingOrderRepository orders,
     IRefundRepository refunds,
+    IIncidentRepository incidents,
     IDriverProfileRepository driverProfiles,
     IMasterDataRepository masterData,
     INotificationService notifications,
@@ -38,6 +39,10 @@ internal sealed class CancelOrderCommandHandler(
         var refundOwed = refundAmount > 0;
         if (refundOwed)
             refunds.Add(Refund.Request(order.Id, null, RefundSourceType.Cancellation, reason, null, refundAmount, choice.Code));
+
+        // 7.6: an incident the driver reported on the Accepted order has nothing left to decide; close it with the order.
+        foreach (var incident in await incidents.GetOpenForOrderAsync(order.Id, excludeIncidentId: 0, cancellationToken))
+            incident.CloseBecauseOrderCancelled("Khách đã hủy đơn.", now);
 
         if (payments is not null)
         {

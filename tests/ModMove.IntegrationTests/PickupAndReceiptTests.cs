@@ -102,6 +102,45 @@ public class ReviewPickupEvidenceTests
         Assert.Equal("Ảnh mờ", notification.Data!["reason"]);
     }
 
+    [Fact]
+    public async Task Approving_waits_while_the_driver_has_an_open_incident_7_6()
+    {
+        var s = new TripSetup();
+        var order = s.PickedUp();
+        s.App.Incidents.Add(InTransitIncident.Report(order.Id, s.Driver.Id, IncidentType.DamagedCargo, "Hàng vỡ khi bốc", null, null, null));
+
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(new ReviewPickupEvidenceCommand(order.Id, Approve: true, Reason: null)));
+
+        Assert.Equal("INCIDENT_PENDING", error.Code);
+        Assert.Equal(OrderStatus.PickedUp, order.OrderStatus);
+        Assert.Equal(0, s.App.UnitOfWork.Saves);
+    }
+
+    [Fact]
+    public async Task Rejecting_is_still_allowed_while_the_driver_has_an_open_incident_7_6()
+    {
+        var s = new TripSetup();
+        var order = s.PickedUp();
+        s.App.Incidents.Add(InTransitIncident.Report(order.Id, s.Driver.Id, IncidentType.DamagedCargo, "Hàng vỡ khi bốc", null, null, null));
+
+        await s.App.Sender.Send(new ReviewPickupEvidenceCommand(order.Id, Approve: false, Reason: "Ảnh mờ"));
+
+        Assert.Equal(ProofStatus.Rejected, order.Proof!.ProofStatus);
+    }
+
+    [Fact]
+    public async Task Customers_own_open_incident_does_not_hold_the_approval_7_6()
+    {
+        var s = new TripSetup();
+        var order = s.PickedUp();
+        s.App.Incidents.Add(InTransitIncident.Report(order.Id, s.Customer.Id, IncidentType.Other, "Tài xế đến trễ", null, null, null));
+
+        await s.App.Sender.Send(new ReviewPickupEvidenceCommand(order.Id, Approve: true, Reason: null));
+
+        Assert.Equal(OrderStatus.InTransit, order.OrderStatus);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData(" ")]

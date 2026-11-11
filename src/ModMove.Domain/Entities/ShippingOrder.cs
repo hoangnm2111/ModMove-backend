@@ -305,6 +305,7 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     /// <summary>
     /// UC-CUS-15, DECISIONS 2.2: once the driver has arrived the customer cannot cancel but reports an incident for a
     /// Dispatcher (GB-17), while the order is Arrived, PickedUp or InTransit. After delivery a complaint is used (7.3).
+    /// A customer's incident does not hold the trip (7.6) and its text goes to Dispatchers only (8.3).
     /// </summary>
     public InTransitIncident ReportIncidentByCustomer(
         long customerId, IncidentType type, string description, IEnumerable<string>? photoUrls, decimal? latitude, decimal? longitude)
@@ -320,7 +321,8 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
 
     /// <summary>
     /// UC-DRV-18, DECISIONS 6.1, 7.1: a driver who accepted an order cannot self-cancel; from Accepted until before
-    /// Delivered they report an incident for a Dispatcher to resolve, reassign or cancel (GB-17).
+    /// Delivered they report an incident for a Dispatcher to resolve, reassign or cancel (GB-17). Until the Dispatcher
+    /// decides, the trip is on hold: the next steps are refused with INCIDENT_PENDING (7.6).
     /// </summary>
     public InTransitIncident ReportIncidentByDriver(
         long driverProfileId, long driverUserId, IncidentType type, string description,

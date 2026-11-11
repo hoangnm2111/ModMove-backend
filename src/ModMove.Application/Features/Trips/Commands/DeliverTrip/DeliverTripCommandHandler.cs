@@ -3,6 +3,7 @@ using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
+using ModMove.Application.Features.Incidents;
 using ModMove.Application.Common.Notifications;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
@@ -15,6 +16,7 @@ internal sealed class DeliverTripCommandHandler(
     IUserRepository users,
     IDriverProfileRepository driverProfiles,
     IShippingOrderRepository orders,
+    IIncidentRepository incidents,
     IPaymentTransactionRepository payments,
     INotificationService notifications,
     IUnitOfWork unitOfWork,
@@ -29,6 +31,7 @@ internal sealed class DeliverTripCommandHandler(
             ?? throw new NotFoundException(nameof(ShippingOrder), request.OrderId);
 
         order.EnsureDriver(profile.Id);
+        await IncidentGuard.EnsureDriverHasNoOpenIncidentAsync(incidents, order.Id, driver.Id, cancellationToken); // 7.6
 
         var now = clock.GetUtcNow();
 
