@@ -12,14 +12,17 @@ namespace ModMove.Application.Common.Notifications;
 /// </summary>
 internal sealed class NotificationService(
     IUserRepository users,
-    IRealtimeNotifier realtime,
     ILogger<NotificationService> logger,
+    IRealtimeNotifier? realtime = null,
     IPushNotificationService? push = null) : INotificationService
 {
-    private static readonly TimeSpan PushTimeout = TimeSpan.FromSeconds(3); // the response must not wait on FCM
+    private static readonly TimeSpan PushTimeout = TimeSpan.FromSeconds(5); // the response must not wait on FCM
 
     public async Task NotifyDispatchersAsync(Notification notification, CancellationToken cancellationToken)
     {
+        if (realtime is null)
+            return;
+
         try
         {
             await realtime.SendToDispatchersAsync(RealtimeEvents.NotificationReceived, notification, CancellationToken.None);
@@ -32,6 +35,9 @@ internal sealed class NotificationService(
 
     public async Task PublishOrderStatusAsync(ShippingOrder order, long? driverUserId, CancellationToken cancellationToken)
     {
+        if (realtime is null)
+            return;
+
         var update = new OrderStatusUpdate(order.Id, order.OrderStatus.ToString());
         // Two separate sends: a failing order group must not keep the driver from hearing the change.
         try
@@ -57,13 +63,16 @@ internal sealed class NotificationService(
 
     public async Task NotifyAsync(long userId, Notification notification, CancellationToken cancellationToken)
     {
-        try
+        if (realtime is not null)
         {
-            await realtime.SendToUserAsync(userId, RealtimeEvents.NotificationReceived, notification, CancellationToken.None);
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "SignalR notification {Type} to user {UserId} failed", notification.Type, userId);
+            try
+            {
+                await realtime.SendToUserAsync(userId, RealtimeEvents.NotificationReceived, notification, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "SignalR notification {Type} to user {UserId} failed", notification.Type, userId);
+            }
         }
 
         if (push is null)
@@ -74,7 +83,10 @@ internal sealed class NotificationService(
             using var timeout = new CancellationTokenSource(PushTimeout);
             var user = await users.GetByIdAsync(userId, timeout.Token);
             if (string.IsNullOrEmpty(user?.FcmToken))
+            {
+                logger.LogInformation("Skipping push notification {Type} to user {UserId}: user has no registered FCM token", notification.Type, userId);
                 return;
+            }
 
             var data = new Dictionary<string, string>(notification.Data ?? new Dictionary<string, string>()) { ["type"] = notification.Type };
             await push.SendAsync(user.FcmToken, notification.Title, notification.Body, data, timeout.Token);

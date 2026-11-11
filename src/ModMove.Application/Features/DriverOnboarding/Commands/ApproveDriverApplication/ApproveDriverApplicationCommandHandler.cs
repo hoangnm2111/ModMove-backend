@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Logging;
 using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
@@ -12,13 +11,10 @@ internal sealed class ApproveDriverApplicationCommandHandler(
     IDriverProfileRepository driverProfiles,
     IDriverWalletRepository driverWallets,
     IRepository<VehicleType> vehicleTypes,
-    IUserRepository users,
     IUnitOfWork unitOfWork,
     ICurrentUserService currentUser,
     TimeProvider clock,
-    IPushNotificationService? pushNotifications = null,
-    IRealtimeNotifier? realtime = null,
-    ILogger<ApproveDriverApplicationCommandHandler>? logger = null) : ICommandHandler<ApproveDriverApplicationCommand>
+    INotificationService? notifications = null) : ICommandHandler<ApproveDriverApplicationCommand>
 {
     public async Task Handle(ApproveDriverApplicationCommand request, CancellationToken cancellationToken)
     {
@@ -71,43 +67,9 @@ internal sealed class ApproveDriverApplicationCommandHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         // 5. Send push + real-time notification to driver (DECISIONS B17, 8.3)
-        var (type, title, body) = DriverNotifications.GetTemplate(DriverEvent.ApplicationApproved);
-        var data = new Dictionary<string, string>
+        if (notifications is not null)
         {
-            ["type"] = type,
-            ["applicationId"] = application.Id.ToString(),
-        };
-
-        if (realtime is not null)
-        {
-            try
-            {
-                await realtime.SendToUserAsync(
-                    driverProfile.UserId,
-                    "NotificationReceived",
-                    new Notification(type, title, body, data),
-                    cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                logger?.LogWarning(ex, "Failed to send SignalR notification for approved driver application {ApplicationId}", application.Id);
-            }
-        }
-
-        if (pushNotifications is not null)
-        {
-            try
-            {
-                var user = await users.GetByIdAsync(driverProfile.UserId, cancellationToken);
-                if (!string.IsNullOrWhiteSpace(user?.FcmToken))
-                {
-                    await pushNotifications.SendAsync(user.FcmToken, title, body, data, cancellationToken);
-                }
-            }
-            catch (Exception ex)
-            {
-                logger?.LogWarning(ex, "Failed to send push notification for approved driver application {ApplicationId}", application.Id);
-            }
+            await notifications.NotifyApplicationApprovedAsync(driverProfile.UserId, application.Id, cancellationToken);
         }
     }
 }
