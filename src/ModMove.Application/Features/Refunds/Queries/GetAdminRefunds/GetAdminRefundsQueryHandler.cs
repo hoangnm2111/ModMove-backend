@@ -32,7 +32,8 @@ internal sealed class GetAdminRefundsQueryHandler(ISqlConnectionFactory connecti
                r.reason_code AS ReasonCode, r.reason AS Reason,
                r.proposal_reason AS ProposalReason, proposer.full_name AS ProposedByName,
                r.decision_note AS DecisionNote, r.bank_reference_code AS BankReferenceCode,
-               r.decided_at AS DecidedAt, r.processed_at AS ProcessedAt, r.created_at AS CreatedAt
+               r.decided_at AS DecidedAt, r.processed_at AS ProcessedAt, r.created_at AS CreatedAt,
+               r.payout_account_number AS PayoutAccountNumber, r.payout_failure_reason AS PayoutFailureReason
         """ + "\n" + FromSql + "\n" + """
         ORDER BY CASE
             WHEN r.refund_status = 'Requested' AND r.proposed_amount IS NOT NULL THEN 0
@@ -68,7 +69,8 @@ internal sealed class GetAdminRefundsQueryHandler(ISqlConnectionFactory connecti
             r.SourceType, r.RefundStatus, r.RequestedAmount, r.ProposedAmount,
             r.ReasonCode, r.Reason, r.ProposalReason, r.ProposedByName,
             r.DecisionNote, r.BankReferenceCode,
-            SqlHelpers.ToUtc(r.DecidedAt), SqlHelpers.ToUtc(r.ProcessedAt), SqlHelpers.ToUtc(r.CreatedAt))).ToList();
+            SqlHelpers.ToUtc(r.DecidedAt), SqlHelpers.ToUtc(r.ProcessedAt), SqlHelpers.ToUtc(r.CreatedAt),
+            r.PayoutAccountNumber is not null, r.PayoutFailureReason)).ToList();
 
         return new PagedResult<AdminRefundDto>(items, page, pageSize, totalCount);
     }
@@ -93,6 +95,8 @@ internal sealed class GetAdminRefundsQueryHandler(ISqlConnectionFactory connecti
         public DateTime? DecidedAt { get; init; }
         public DateTime? ProcessedAt { get; init; }
         public DateTime CreatedAt { get; init; }
+        public string? PayoutAccountNumber { get; init; }
+        public string? PayoutFailureReason { get; init; }
     }
 }
 

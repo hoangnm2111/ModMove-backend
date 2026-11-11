@@ -30,5 +30,7 @@ public sealed record AdminRefundDto(
     string? BankReferenceCode,
     DateTimeOffset? DecidedAt,
     DateTimeOffset? ProcessedAt,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    bool HasPayoutAccount,
+    string? PayoutFailureReason);
 
