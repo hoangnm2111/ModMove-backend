@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
@@ -29,7 +29,7 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                 defaultValue: 0m);
 
             migrationBuilder.Sql(
-                "UPDATE `platform_settings` SET `setting_key` = 'REQUIRED_DEPOSIT', `description` = 'Minimum deposit balance (VND) required to receive any order (GB-16)' WHERE `setting_key` = 'MIN_COD_DEPOSIT';");
+                "UPDATE `platform_settings` SET `setting_key` = 'REQUIRED_DEPOSIT' WHERE `setting_key` = 'MIN_COD_DEPOSIT';");
             migrationBuilder.Sql(
                 "UPDATE `wallet_transactions` SET `transaction_type` = 'Withdrawal', `earnings_amount` = `amount`, `deposit_amount` = 0 WHERE `transaction_type` = 'WithdrawEarnings';");
             migrationBuilder.Sql(
