@@ -32,6 +32,7 @@ public class AdminWithdrawalsTests
 
         var wallet = DriverWallet.Create(profile.Id);
         app.DriverWallets.Add(wallet);
+        app.Settings.Add(PlatformSetting.Create(SettingKeys.RequiredDeposit, "200000", TestApp.Start));
 
         return new Setup(app, admin, driverUser, profile, wallet);
     }
@@ -53,6 +54,8 @@ public class AdminWithdrawalsTests
         dt.Columns.Add("DriverName", typeof(string));
         dt.Columns.Add("DriverPhone", typeof(string));
         dt.Columns.Add("Amount", typeof(decimal));
+        dt.Columns.Add("EarningsAmount", typeof(decimal));
+        dt.Columns.Add("DepositAmount", typeof(decimal));
         dt.Columns.Add("BalanceAfter", typeof(decimal));
         dt.Columns.Add("TransactionStatus", typeof(string));
         dt.Columns.Add("BankName", typeof(string));
@@ -65,7 +68,7 @@ public class AdminWithdrawalsTests
 
         dt.Rows.Add(
             20L, 1L, 1L, s.DriverUser.Id, "Nguyễn Văn Tài", "0912345678",
-            500_000m, 100_000m, "Pending", "Vietcombank", "0071001234567", "NGUYEN VAN TAI",
+            500_000m, 400_000m, 100_000m, 100_000m, "Pending", "Vietcombank", "0071001234567", "NGUYEN VAN TAI",
             null, DBNull.Value, DBNull.Value, TestApp.Start.UtcDateTime);
 
         s.App.Sql.ScalarResult = 1;
@@ -76,9 +79,9 @@ public class AdminWithdrawalsTests
         Assert.Equal(1, page.TotalCount);
         var item = Assert.Single(page.Items);
         Assert.Equal(20L, item.TransactionId);
-        Assert.Equal(500_000m, item.Amount);
+        Assert.Equal((500_000m, 400_000m, 100_000m), (item.Amount, item.EarningsAmount, item.DepositAmount));
         Assert.Equal("Vietcombank", item.BankName);
-        Assert.Contains("wt.transaction_type = 'WithdrawEarnings'", s.App.Sql.LastSql);
+        Assert.Contains("wt.transaction_type = 'Withdrawal'", s.App.Sql.LastSql);
         Assert.Contains("wt.transaction_status = @Status", s.App.Sql.LastSql);
     }
 
@@ -96,6 +99,8 @@ public class AdminWithdrawalsTests
         dt.Columns.Add("DriverPhone", typeof(string));
         dt.Columns.Add("DriverEmail", typeof(string));
         dt.Columns.Add("Amount", typeof(decimal));
+        dt.Columns.Add("EarningsAmount", typeof(decimal));
+        dt.Columns.Add("DepositAmount", typeof(decimal));
         dt.Columns.Add("BalanceAfter", typeof(decimal));
         dt.Columns.Add("CurrentEarningsBalance", typeof(decimal));
         dt.Columns.Add("CurrentDepositBalance", typeof(decimal));
@@ -112,7 +117,7 @@ public class AdminWithdrawalsTests
 
         dt.Rows.Add(
             20L, 1L, 1L, s.DriverUser.Id, "Nguyễn Văn Tài", "0912345678", "driver@modmove.vn",
-            500_000m, 100_000m, 100_000m, 250_000m, "Active", "Pending",
+            500_000m, 400_000m, 100_000m, 100_000m, 100_000m, 250_000m, "Active", "Pending",
             "Vietcombank", "0071001234567", "NGUYEN VAN TAI",
             null, DBNull.Value, null, DBNull.Value, TestApp.Start.UtcDateTime);
 
@@ -121,7 +126,7 @@ public class AdminWithdrawalsTests
         var detail = await s.App.Sender.Send(new GetAdminWithdrawalDetailQuery(20));
 
         Assert.Equal(20L, detail.TransactionId);
-        Assert.Equal(500_000m, detail.Amount);
+        Assert.Equal((500_000m, 400_000m, 100_000m), (detail.Amount, detail.EarningsAmount, detail.DepositAmount));
         Assert.Equal("0071001234567", detail.BankAccountNumber);
 
         s.App.Sql.Result = new DataTable();
@@ -187,8 +192,9 @@ public class AdminWithdrawalsTests
     public async Task Admin_can_reject_pending_withdrawal_and_restore_earnings_balance()
     {
         var s = Build();
+        s.Wallet.TopUpDeposit(200_000m);
         s.Wallet.CreditTripEarning(orderId: 10, fare: 500_000m, commission: 50_000m); // 450,000
-        var withdrawal = s.Wallet.RequestWithdrawal(300_000m); // 150,000 left
+        var withdrawal = s.Wallet.RequestWithdrawal(300_000m); // 150,000 left in earnings, 200,000 in deposit
         s.App.DriverWallets.Update(s.Wallet);
 
         await s.App.Sender.Send(new RejectWithdrawalCommand(withdrawal.Id, "Số tài khoản ngân hàng thụ hưởng không khớp tên chủ thẻ."));
@@ -196,7 +202,7 @@ public class AdminWithdrawalsTests
         Assert.Equal(WalletTransactionStatus.Rejected, withdrawal.TransactionStatus);
         Assert.Equal(s.Admin.Id, withdrawal.ProcessedBy);
         Assert.Equal(TestApp.Start, withdrawal.ProcessedAt);
-        Assert.Equal(450_000m, s.Wallet.EarningsBalance);
+        Assert.Equal((450_000m, 200_000m), (s.Wallet.EarningsBalance, s.Wallet.DepositBalance));
         Assert.Equal(1, s.App.UnitOfWork.Saves);
 
         var signalR = Assert.Single(s.App.Realtime.Sent, m => m.EventName == RealtimeEvents.NotificationReceived);
@@ -208,22 +214,21 @@ public class AdminWithdrawalsTests
     }
 
     [Fact]
-    public async Task Admin_rejecting_withdrawal_restores_held_amount_while_commission_debt_stays_paid_DECISIONS_5_1()
+    public async Task Admin_rejecting_withdrawal_restores_each_held_part_to_its_source_balance_GB32()
     {
         var s = Build();
-        s.Wallet.CreditTripEarning(orderId: 10, fare: 100_000m, commission: 10_000m); // +90,000 earnings
-        s.Wallet.TopUpDeposit(50_000m);
-        s.Wallet.DeductCommissionFromDeposit(orderId: 11, commission: 60_000m); // -10,000 deposit debt
+        s.Wallet.TopUpDeposit(200_000m);
+        s.Wallet.CreditTripEarning(orderId: 10, fare: 100_000m, commission: 10_000m); // +90,000 earnings, +200,000 deposit
 
-        // Requesting 50,000 withdrawal pays 10,000 debt first -> Deposit = 0, Earnings = 30,000
-        var withdrawal = s.Wallet.RequestWithdrawal(50_000m);
+        // Requesting 150,000 withdrawal takes 90,000 from earnings + 60,000 from deposit -> Earnings = 0, Deposit = 140,000
+        var withdrawal = s.Wallet.RequestWithdrawal(150_000m);
         s.App.DriverWallets.Update(s.Wallet);
-        Assert.Equal((30_000m, 0m), (s.Wallet.EarningsBalance, s.Wallet.DepositBalance));
+        Assert.Equal((0m, 140_000m), (s.Wallet.EarningsBalance, s.Wallet.DepositBalance));
 
         await s.App.Sender.Send(new RejectWithdrawalCommand(withdrawal.Id, "Tạm hoãn đối soát."));
 
-        // Only the 50,000 withdrawal is refunded to earnings; the 10,000 commission debt stays paid!
-        Assert.Equal((80_000m, 0m), (s.Wallet.EarningsBalance, s.Wallet.DepositBalance));
+        // 90,000 is returned to earnings and 60,000 is returned to deposit
+        Assert.Equal((90_000m, 200_000m), (s.Wallet.EarningsBalance, s.Wallet.DepositBalance));
         Assert.Equal(WalletTransactionStatus.Rejected, withdrawal.TransactionStatus);
     }
 

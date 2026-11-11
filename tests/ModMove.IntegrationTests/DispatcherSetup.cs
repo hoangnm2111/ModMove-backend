@@ -31,7 +31,7 @@ internal sealed class DispatcherSetup
         Wallet.TopUpDeposit(300_000);
         App.DriverWallets.Add(Wallet);
         App.Settings.Add(PlatformSetting.Create(SettingKeys.CommissionRate, "0.10", Now));
-        App.Settings.Add(PlatformSetting.Create(SettingKeys.MinCodDeposit, "200000", Now));
+        App.Settings.Add(PlatformSetting.Create(SettingKeys.RequiredDeposit, "200000", Now));
         App.Settings.Add(PlatformSetting.Create(SettingKeys.MatchingRadiusKm, "5", Now));
     }
 
@@ -62,8 +62,8 @@ internal sealed class DispatcherSetup
         profile.UpdateLocation(latitude, longitude, locationAt ?? Now);
 
         var wallet = DriverWallet.Create(profile.Id);
-        if (deposit >= 50_000)
-            wallet.TopUpDeposit(deposit);
+        if (deposit > 0)
+            wallet.CreditTopUp(deposit);
         App.DriverWallets.Add(wallet);
 
         return (user, profile, wallet);

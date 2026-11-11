@@ -9,19 +9,21 @@ public class DriverWalletTests
     private static readonly DateTimeOffset Now = new(2026, 10, 20, 8, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public void Cod_needs_a_deposit_of_at_least_200000_GB16()
+    public void Orders_need_a_deposit_of_at_least_required_deposit_200000_GB16()
     {
-        const decimal minDeposit = 200_000; // seeded MIN_COD_DEPOSIT
+        const decimal requiredDeposit = 200_000; // seeded REQUIRED_DEPOSIT
         const decimal commission = 18_000; // 10% of a 180,000 order
         var wallet = DriverWallet.Create(1);
-        Assert.False(wallet.CanReceiveCod(minDeposit, commission));
+        Assert.False(wallet.CanReceiveOrders(requiredDeposit));
+        Assert.False(wallet.CanReceiveCod(requiredDeposit, commission));
 
-        wallet.TopUpDeposit(149_999);
-        wallet.TopUpDeposit(50_000); // 199,999
-        Assert.False(wallet.CanReceiveCod(minDeposit, commission));
+        wallet.CreditTopUp(199_999);
+        Assert.False(wallet.CanReceiveOrders(requiredDeposit));
+        Assert.False(wallet.CanReceiveCod(requiredDeposit, commission));
 
-        wallet.TopUpDeposit(50_000);
-        Assert.True(wallet.CanReceiveCod(minDeposit, commission));
+        wallet.TopUpDeposit(1, requiredDeposit);
+        Assert.True(wallet.CanReceiveOrders(requiredDeposit));
+        Assert.True(wallet.CanReceiveCod(requiredDeposit, commission));
     }
 
     [Fact]
@@ -30,8 +32,8 @@ public class DriverWalletTests
         var wallet = DriverWallet.Create(1);
         wallet.TopUpDeposit(200_000);
 
-        Assert.True(wallet.CanReceiveCod(minDeposit: 200_000, orderCommission: 200_000));
-        Assert.False(wallet.CanReceiveCod(minDeposit: 200_000, orderCommission: 250_000)); // 10% of a 2,500,000 order
+        Assert.True(wallet.CanReceiveCod(requiredDeposit: 200_000, orderCommission: 200_000));
+        Assert.False(wallet.CanReceiveCod(requiredDeposit: 200_000, orderCommission: 250_000)); // 10% of a 2,500,000 order
     }
 
     [Fact]
@@ -43,6 +45,7 @@ public class DriverWalletTests
 
         Assert.Equal(180_000m, wallet.EarningsBalance);
         Assert.Equal(180_000m, tx.BalanceAfter);
+        Assert.Equal((180_000m, 0m), (tx.EarningsAmount, tx.DepositAmount));
     }
 
     [Fact]
@@ -60,27 +63,28 @@ public class DriverWalletTests
     public void Commission_larger_than_deposit_leaves_a_negative_deposit_GB15()
     {
         var wallet = DriverWallet.Create(1);
-        wallet.TopUpDeposit(50_000);
+        wallet.TopUpDeposit(200_000);
 
-        var tx = wallet.DeductCommissionFromDeposit(10, 60_000);
+        var tx = wallet.DeductCommissionFromDeposit(10, 210_000);
 
         Assert.Equal(-10_000m, wallet.DepositBalance);
         Assert.Equal(-10_000m, tx.BalanceAfter);
     }
 
     [Fact]
-    public void Negative_deposit_stops_the_driver_taking_cash_orders_GB16()
+    public void Negative_deposit_stops_the_driver_taking_orders_GB16()
     {
         var wallet = DriverWallet.Create(1);
-        wallet.TopUpDeposit(50_000);
+        wallet.TopUpDeposit(200_000);
 
-        wallet.DeductCommissionFromDeposit(10, 60_000);
+        wallet.DeductCommissionFromDeposit(10, 210_000);
 
-        Assert.False(wallet.CanReceiveCod(minDeposit: 0, orderCommission: 0));
+        Assert.False(wallet.CanReceiveOrders(requiredDeposit: 200_000));
+        Assert.False(wallet.CanReceiveCod(requiredDeposit: 0, orderCommission: 0));
     }
 
     [Fact]
-    public void Withdrawal_more_than_earnings_is_rejected()
+    public void Withdrawal_more_than_wallet_total_is_rejected()
     {
         var wallet = DriverWallet.Create(1);
         wallet.CreditTripEarning(10, 100_000, 10_000);
@@ -89,16 +93,18 @@ public class DriverWalletTests
     }
 
     [Fact]
-    public void Rejected_withdrawal_gives_the_money_back_GB27()
+    public void Rejected_withdrawal_gives_the_money_back_to_each_source_balance_GB27_GB32()
     {
         var wallet = DriverWallet.Create(1);
-        wallet.CreditTripEarning(10, 100_000, 10_000);
-        var withdrawal = wallet.RequestWithdrawal(50_000);
-        Assert.Equal(40_000m, wallet.EarningsBalance);
+        wallet.TopUpDeposit(200_000);
+        wallet.CreditTripEarning(10, 100_000, 10_000); // 90,000 earnings
+        var withdrawal = wallet.RequestWithdrawal(140_000); // 90,000 from earnings + 50,000 from deposit
+        Assert.Equal((0m, 150_000m), (wallet.EarningsBalance, wallet.DepositBalance));
+        Assert.Equal((90_000m, 50_000m), (withdrawal.EarningsAmount, withdrawal.DepositAmount));
 
-        wallet.RejectWithdrawal(withdrawal, adminId: 2, Now);
+        wallet.RejectWithdrawal(withdrawal, adminId: 2, Now, requiredDeposit: 200_000);
 
-        Assert.Equal(90_000m, wallet.EarningsBalance);
+        Assert.Equal((90_000m, 200_000m), (wallet.EarningsBalance, wallet.DepositBalance));
         Assert.Equal(WalletTransactionStatus.Rejected, withdrawal.TransactionStatus);
     }
 
@@ -135,7 +141,7 @@ public class DriverWalletTests
         var wallet = DriverWallet.Create(1);
         typeof(DriverWallet).GetProperty("WalletStatus")!.SetValue(wallet, WalletStatus.Frozen);
 
-        Assert.Throws<DomainException>(() => wallet.TopUpDeposit(1_000));
+        Assert.Throws<DomainException>(() => wallet.TopUpDeposit(200_000));
     }
 
     [Fact]
@@ -151,19 +157,23 @@ public class DriverWalletTests
     }
 
     [Fact]
-    public void Top_up_below_50000_is_rejected_5_2()
+    public void Top_up_below_missing_deposit_is_rejected_and_any_positive_amount_is_allowed_above_required_deposit_GB32()
     {
         var wallet = DriverWallet.Create(1);
 
-        var error = Assert.Throws<DomainException>(() => wallet.TopUpDeposit(49_999));
+        var error = Assert.Throws<DomainException>(() => wallet.TopUpDeposit(199_999, requiredDeposit: 200_000));
+        Assert.Equal("TOP_UP_BELOW_MISSING_DEPOSIT", error.Code);
 
-        Assert.Equal("TOP_UP_TOO_SMALL", error.Code);
-        wallet.TopUpDeposit(50_000);
-        Assert.Equal(50_000m, wallet.DepositBalance);
+        wallet.TopUpDeposit(200_000, requiredDeposit: 200_000);
+        Assert.Equal(200_000m, wallet.DepositBalance);
+
+        // Once DepositBalance >= REQUIRED_DEPOSIT, any positive top-up is allowed (no 50,000 minimum)
+        wallet.TopUpDeposit(1_000, requiredDeposit: 200_000);
+        Assert.Equal(201_000m, wallet.DepositBalance);
     }
 
     [Fact]
-    public void Withdrawal_has_no_minimum_5_1()
+    public void Withdrawal_has_no_minimum_GB32()
     {
         var wallet = DriverWallet.Create(1);
         wallet.CreditTripEarning(10, 100_000, 10_000);
@@ -173,73 +183,67 @@ public class DriverWalletTests
         Assert.Equal(89_000m, wallet.EarningsBalance);
     }
 
-    /// <summary>Earnings 90,000 and a deposit of -10,000.</summary>
-    private static DriverWallet WalletOwingCommission()
+    [Fact]
+    public void RefillDepositFromEarnings_moves_earnings_to_deposit_up_to_required_deposit_GB32()
     {
         var wallet = DriverWallet.Create(1);
-        wallet.CreditTripEarning(10, 100_000, 10_000);
-        wallet.TopUpDeposit(50_000);
-        wallet.DeductCommissionFromDeposit(11, 60_000);
-        return wallet;
+        wallet.TopUpDeposit(200_000);
+        wallet.DeductCommissionFromDeposit(11, 60_000); // Deposit = 140,000 (short by 60,000)
+        wallet.CreditTripEarning(10, 100_000, 10_000);  // Earnings = 90,000
+
+        var refill = wallet.RefillDepositFromEarnings(requiredDeposit: 200_000);
+
+        Assert.NotNull(refill);
+        Assert.Equal((30_000m, 200_000m), (wallet.EarningsBalance, wallet.DepositBalance));
+        Assert.Equal(
+            (WalletTransactionType.DepositRefill, 60_000m, 60_000m, 60_000m, 200_000m, WalletTransactionStatus.Completed),
+            (refill.TransactionType, refill.Amount, refill.EarningsAmount, refill.DepositAmount, refill.BalanceAfter, refill.TransactionStatus));
     }
 
     [Fact]
-    public void Withdrawal_pays_the_deposit_debt_from_earnings_first_5_1()
-    {
-        var wallet = WalletOwingCommission();
-
-        var withdrawal = wallet.RequestWithdrawal(50_000);
-
-        Assert.Equal((30_000m, 0m), (wallet.EarningsBalance, wallet.DepositBalance));
-        Assert.Equal((50_000m, 30_000m), (withdrawal.Amount, withdrawal.BalanceAfter));
-        var paid = Assert.Single(wallet.Transactions, t => t.TransactionType == WalletTransactionType.CommissionDebtPaid);
-        Assert.Equal((10_000m, 0m, WalletTransactionStatus.Completed), (paid.Amount, paid.BalanceAfter, paid.TransactionStatus));
-    }
-
-    [Fact]
-    public void Withdrawal_can_take_all_earnings_left_after_the_debt_5_1()
-    {
-        var wallet = WalletOwingCommission();
-
-        wallet.RequestWithdrawal(80_000);
-
-        Assert.Equal((0m, 0m), (wallet.EarningsBalance, wallet.DepositBalance));
-    }
-
-    [Fact]
-    public void Withdrawal_above_what_is_left_after_the_debt_changes_nothing_5_1()
-    {
-        var wallet = WalletOwingCommission();
-        var before = wallet.Transactions.Count;
-
-        Assert.Throws<DomainException>(() => wallet.RequestWithdrawal(80_001));
-
-        Assert.Equal((90_000m, -10_000m), (wallet.EarningsBalance, wallet.DepositBalance));
-        Assert.Equal(before, wallet.Transactions.Count);
-    }
-
-    [Fact]
-    public void Rejected_withdrawal_gives_back_the_amount_but_the_debt_stays_paid_5_1()
-    {
-        var wallet = WalletOwingCommission();
-        var withdrawal = wallet.RequestWithdrawal(50_000);
-
-        wallet.RejectWithdrawal(withdrawal, adminId: 2, Now);
-
-        Assert.Equal((80_000m, 0m), (wallet.EarningsBalance, wallet.DepositBalance));
-    }
-
-    [Fact]
-    public void Withdrawal_leaves_a_positive_deposit_alone_5_1()
+    public void Withdrawal_deducts_from_earnings_first_then_deposit_when_no_active_order_GB32()
     {
         var wallet = DriverWallet.Create(1);
-        wallet.CreditTripEarning(10, 100_000, 10_000);
-        wallet.TopUpDeposit(50_000);
+        wallet.TopUpDeposit(200_000);
+        wallet.CreditTripEarning(10, 100_000, 10_000); // Earnings = 90,000, Deposit = 200,000, Total = 290,000
 
-        wallet.RequestWithdrawal(90_000);
+        var withdrawal = wallet.RequestWithdrawal(240_000, hasActiveOrder: false);
 
-        Assert.Equal((0m, 50_000m), (wallet.EarningsBalance, wallet.DepositBalance));
-        Assert.DoesNotContain(wallet.Transactions, t => t.TransactionType == WalletTransactionType.CommissionDebtPaid);
+        Assert.Equal((0m, 50_000m, 50_000m), (wallet.EarningsBalance, wallet.DepositBalance, wallet.WalletTotal));
+        Assert.Equal((240_000m, 90_000m, 150_000m, 50_000m),
+            (withdrawal.Amount, withdrawal.EarningsAmount, withdrawal.DepositAmount, withdrawal.BalanceAfter));
+    }
+
+    [Fact]
+    public void Withdrawal_while_driver_has_active_order_cannot_touch_deposit_balance_GB32()
+    {
+        var wallet = DriverWallet.Create(1);
+        wallet.TopUpDeposit(200_000);
+        wallet.CreditTripEarning(10, 100_000, 10_000); // Earnings = 90,000, Deposit = 200,000
+
+        var ex = Assert.Throws<DomainException>(() => wallet.RequestWithdrawal(90_001, hasActiveOrder: true));
+        Assert.Equal("WITHDRAWAL_EXCEEDS_BALANCE", ex.Code);
+        Assert.Equal((90_000m, 200_000m), (wallet.EarningsBalance, wallet.DepositBalance));
+
+        var withdrawal = wallet.RequestWithdrawal(90_000, hasActiveOrder: true);
+        Assert.Equal((0m, 200_000m), (wallet.EarningsBalance, wallet.DepositBalance));
+        Assert.Equal((90_000m, 0m), (withdrawal.EarningsAmount, withdrawal.DepositAmount));
+    }
+
+    [Fact]
+    public void Rejected_withdrawal_triggers_deposit_refill_when_deposit_was_below_required_GB32()
+    {
+        var wallet = DriverWallet.Create(1);
+        wallet.CreditTopUp(150_000);
+        wallet.CreditTripEarning(10, 100_000, 10_000); // Earnings = 90,000, Deposit = 150,000
+        var withdrawal = wallet.RequestWithdrawal(90_000, hasActiveOrder: false); // takes 90k from earnings
+        Assert.Equal((0m, 150_000m), (wallet.EarningsBalance, wallet.DepositBalance));
+
+        wallet.RejectWithdrawal(withdrawal, adminId: 2, Now, requiredDeposit: 200_000);
+
+        // 90,000 returned to earnings, then 50,000 auto-refilled into deposit so Deposit reaches 200,000!
+        Assert.Equal((40_000m, 200_000m), (wallet.EarningsBalance, wallet.DepositBalance));
+        Assert.Contains(wallet.Transactions, t => t.TransactionType == WalletTransactionType.DepositRefill && t.Amount == 50_000m);
     }
 
     [Fact]
@@ -302,12 +306,15 @@ public class DriverWalletTests
     }
 
     [Fact]
-    public void Max_withdrawable_amount_subtracts_negative_deposit_debt_and_is_zero_when_frozen_5_1()
+    public void GetMaxWithdrawable_returns_wallet_total_or_earnings_when_active_order_and_zero_when_frozen_GB32()
     {
-        var wallet = WalletOwingCommission(); // earnings 90,000, deposit -10,000
-        Assert.Equal(80_000m, wallet.MaxWithdrawableAmount);
+        var wallet = DriverWallet.Create(1);
+        wallet.TopUpDeposit(200_000);
+        wallet.CreditTripEarning(10, 100_000, 10_000); // earnings 90,000, deposit 200,000, total 290,000
+        Assert.Equal(290_000m, wallet.GetMaxWithdrawable(hasActiveOrder: false));
+        Assert.Equal(90_000m, wallet.GetMaxWithdrawable(hasActiveOrder: true));
 
         typeof(DriverWallet).GetProperty("WalletStatus")!.SetValue(wallet, WalletStatus.Frozen);
-        Assert.Equal(0m, wallet.MaxWithdrawableAmount);
+        Assert.Equal(0m, wallet.GetMaxWithdrawable(hasActiveOrder: false));
     }
 }

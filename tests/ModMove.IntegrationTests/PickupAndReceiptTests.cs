@@ -33,6 +33,7 @@ internal sealed class TripSetup
         Wallet.TopUpDeposit(300_000);
         App.DriverWallets.Add(Wallet);
         App.Settings.Add(PlatformSetting.Create(SettingKeys.CommissionRate, "0.10", Now));
+        App.Settings.Add(PlatformSetting.Create(SettingKeys.RequiredDeposit, "200000", Now));
     }
 
     /// <summary>Total fee 180,000 unless <paramref name="discount"/> says otherwise.</summary>
@@ -298,6 +299,25 @@ public class ConfirmReceiptTests
         Assert.Equal(0m, s.Wallet.EarningsBalance);
         var deduction = s.Wallet.Transactions.Last();
         Assert.Equal((WalletTransactionType.CommissionDeduction, order.Id, 18_000m), (deduction.TransactionType, deduction.OrderId, deduction.Amount));
+    }
+
+    [Fact]
+    public async Task Cash_order_pushing_deposit_below_required_deposit_auto_refills_from_earnings_GB15_GB32()
+    {
+        var s = new TripSetup();
+        // Set Deposit = 200,000, Earnings = 50,000
+        typeof(DriverWallet).GetProperty("DepositBalance")!.SetValue(s.Wallet, 200_000m);
+        typeof(DriverWallet).GetProperty("EarningsBalance")!.SetValue(s.Wallet, 50_000m);
+        var order = s.Delivered(method: PaymentMethod.Cash); // 18,000 commission
+
+        await s.App.Sender.Send(new ConfirmReceiptCommand(order.Id));
+
+        // 200,000 - 18,000 = 182,000 (< 200,000), so 18,000 automatically moves from Earnings (50,000 -> 32,000) to Deposit (200,000)
+        Assert.Equal((200_000m, 32_000m), (s.Wallet.DepositBalance, s.Wallet.EarningsBalance));
+        var refill = s.Wallet.Transactions.Last();
+        Assert.Equal(
+            (WalletTransactionType.DepositRefill, 18_000m, 18_000m, 18_000m, 200_000m, WalletTransactionStatus.Completed),
+            (refill.TransactionType, refill.Amount, refill.EarningsAmount, refill.DepositAmount, refill.BalanceAfter, refill.TransactionStatus));
     }
 
     [Fact]
