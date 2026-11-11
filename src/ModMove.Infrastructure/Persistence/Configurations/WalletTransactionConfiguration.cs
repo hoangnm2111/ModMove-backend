@@ -10,6 +10,8 @@ internal sealed class WalletTransactionConfiguration : IEntityTypeConfiguration<
     {
         builder.ToTable("wallet_transactions");
         builder.Property(t => t.Amount).HasPrecision(15, 2);
+        builder.Property(t => t.EarningsAmount).HasPrecision(15, 2);
+        builder.Property(t => t.DepositAmount).HasPrecision(15, 2);
         builder.Property(t => t.BalanceAfter).HasPrecision(15, 2);
         builder.Property(t => t.ReferenceCode).HasMaxLength(50);
 

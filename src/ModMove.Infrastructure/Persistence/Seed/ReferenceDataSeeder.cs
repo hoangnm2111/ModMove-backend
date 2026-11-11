@@ -44,7 +44,7 @@ internal static class ReferenceDataSeeder
         [
             (SettingKeys.CommissionRate, "0.10"),   // GB-14
             (SettingKeys.LoadingFee, "100000"),    // UC-GST-12
-            (SettingKeys.MinCodDeposit, "200000"), // GB-16
+            (SettingKeys.RequiredDeposit, "200000"), // GB-16, GB-32
             (SettingKeys.MatchingRadiusKm, "5"),   // DECISIONS B5
         ];
         // Time limits (PayOS session, matching timeout, auto-complete, complaint window) are fixed

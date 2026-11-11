@@ -37,5 +37,9 @@ internal sealed class OrderSettlement(IPlatformSettings settings, IDriverWalletR
             // The driver collected the cash; the platform's commission comes out of the deposit (GB-15).
             wallet.DeductCommissionFromDeposit(order.Id, commission);
         }
+
+        // GB-15, GB-32: a deposit left below REQUIRED_DEPOSIT is refilled from earnings in the same transaction.
+        var requiredDeposit = await settings.GetDecimalAsync(SettingKeys.RequiredDeposit, cancellationToken);
+        wallet.RefillDepositFromEarnings(requiredDeposit);
     }
 }

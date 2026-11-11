@@ -13,6 +13,8 @@ internal sealed class RequestWithdrawalCommandHandler(
     IUserRepository users,
     IDriverProfileRepository driverProfiles,
     IDriverWalletRepository wallets,
+    IShippingOrderRepository orders,
+    IPlatformSettings settings,
     IUnitOfWork unitOfWork) : ICommandHandler<RequestWithdrawalCommand, WithdrawalCreatedResponse>
 {
     public async Task<WithdrawalCreatedResponse> Handle(
@@ -35,25 +37,29 @@ internal sealed class RequestWithdrawalCommandHandler(
             || string.IsNullOrWhiteSpace(profile.BankAccountHolder))
         {
             throw new DomainException(
-                "Add a bank account before requesting an earnings withdrawal.",
+                "Add a bank account before requesting a withdrawal.",
                 "BANK_ACCOUNT_REQUIRED");
         }
 
         var wallet = await wallets.GetByDriverProfileIdWithTransactionsAsync(profile.Id, cancellationToken)
             ?? throw new NotFoundException(nameof(DriverWallet), profile.Id);
 
-        var debtBefore = Math.Max(0m, -wallet.DepositBalance);
-        var withdrawal = wallet.RequestWithdrawal(request.Amount);
+        // GB-32: while the driver has an active order only EarningsBalance can be withdrawn.
+        var hasActiveOrder = await orders.GetActiveOrderIdForDriverAsync(profile.Id, cancellationToken) is not null;
+        var withdrawal = wallet.RequestWithdrawal(request.Amount, hasActiveOrder);
+        var requiredDeposit = await settings.GetDecimalAsync(SettingKeys.RequiredDeposit, cancellationToken);
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         return new WithdrawalCreatedResponse(
             withdrawal.Id,
             withdrawal.Amount,
-            debtBefore,
+            withdrawal.EarningsAmount,
+            withdrawal.DepositAmount,
             wallet.EarningsBalance,
             wallet.DepositBalance,
+            wallet.WalletTotal,
+            wallet.DepositBalance < requiredDeposit,
             withdrawal.TransactionStatus.ToString());
     }
 }
-
