@@ -16,6 +16,11 @@ public sealed class LookupsController : ApiControllerBase
     public Task<IReadOnlyList<ContentResponse>> ComplaintReasons(CancellationToken cancellationToken) =>
         Sender.Send(new GetPublicContentQuery(PublicContentCategories.ComplaintReason), cancellationToken);
 
+    /// <summary>Banks for <c>payoutAccount.bankCode</c> (code = BIN).</summary>
+    [HttpGet("banks")]
+    public Task<IReadOnlyList<ContentResponse>> Banks(CancellationToken cancellationToken) =>
+        Sender.Send(new GetPublicContentQuery(PublicContentCategories.Bank), cancellationToken);
+
     /// <summary>Reasons for <c>reasonCode</c> of a cancellation; OTHER needs a written reason.</summary>
     [HttpGet("cancellation-reasons")]
     public Task<IReadOnlyList<ContentResponse>> CancellationReasons(CancellationToken cancellationToken) =>

@@ -264,6 +264,7 @@ public class UserAndCouponTests
     {
         var refund = ProposedComplaint();
         refund.Approve(4, Now);
+        refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now); // R-01: payout needs an account
         return refund;
     }
 
@@ -275,7 +276,8 @@ public class UserAndCouponTests
         { "Approve", ProposedComplaint, r => r.Approve(4, Now) },
         { "RejectRefund", OpenComplaint, r => r.RejectRefund(4, Now) },
         { "MarkProcessed", ApprovedComplaint, r => r.MarkProcessed("BANK1", Now) },
-        { "MarkFailed", ApprovedComplaint, r => r.MarkFailed() },
+        { "MarkFailed", ApprovedComplaint, r => r.MarkFailed("Sai số tài khoản") },
+        { "SetPayoutAccount", OpenComplaint, r => r.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now) },
         { "Withdraw", OpenComplaint, r => r.Withdraw() },
     };
 

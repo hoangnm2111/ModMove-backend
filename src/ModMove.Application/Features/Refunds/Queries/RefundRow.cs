@@ -15,7 +15,10 @@ internal sealed class RefundRow
         r.source_type AS SourceType, r.refund_status AS RefundStatus, r.reason AS Reason, r.reason_code AS ReasonCode, r.evidence_urls AS EvidenceUrls,
         r.requested_amount AS RequestedAmount, r.proposed_amount AS ProposedAmount,
         r.info_request_note AS InfoRequestNote, r.customer_reply AS CustomerReply, r.decision_note AS DecisionReason,
-        r.decided_at AS DecidedAt, r.processed_at AS ProcessedAt, r.created_at AS CreatedAt
+        r.decided_at AS DecidedAt, r.processed_at AS ProcessedAt, r.created_at AS CreatedAt,
+        r.payout_bank_code AS PayoutBankCode, r.payout_bank_name AS PayoutBankName,
+        r.payout_account_number AS PayoutAccountNumber, r.payout_account_holder AS PayoutAccountHolder,
+        r.payout_failure_reason AS PayoutFailureReason, r.bank_reference_code AS BankReferenceCode
         """;
 
     public long Id { get; init; }
@@ -38,6 +41,21 @@ internal sealed class RefundRow
     public DateTime? DecidedAt { get; init; }
     public DateTime? ProcessedAt { get; init; }
     public DateTime CreatedAt { get; init; }
+
+    // R-01. The full number stays in this row; only PayoutAccount (masked) goes into a response.
+    public string? PayoutBankCode { get; init; }
+    public string? PayoutBankName { get; init; }
+    public string? PayoutAccountNumber { get; init; }
+    public string? PayoutAccountHolder { get; init; }
+    public string? PayoutFailureReason { get; init; }
+    public string? BankReferenceCode { get; init; }
+
+    /// <summary>The customer can still give or fix the account: none given yet and the refund is not closed.</summary>
+    public bool NeedsPayoutAccount => PayoutAccountNumber is null && RefundStatus is "Requested" or "Approved" or "Failed";
+
+    public PayoutAccountView? PayoutAccount => PayoutAccountNumber is null
+        ? null
+        : new PayoutAccountView(PayoutBankCode ?? "", PayoutBankName ?? "", PayoutAccountView.Mask(PayoutAccountNumber), PayoutAccountHolder ?? "");
 
     /// <summary>A Dispatcher's proposal is not final; the customer sees an amount once an Administrator approved it.</summary>
     public decimal? ApprovedAmount => RefundStatus is "Approved" or "Processed" ? ProposedAmount : null;

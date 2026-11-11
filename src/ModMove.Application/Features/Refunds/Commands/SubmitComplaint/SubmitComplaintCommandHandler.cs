@@ -34,6 +34,8 @@ internal sealed class SubmitComplaintCommandHandler(
             throw new ConflictException("This order already has an open complaint.");
         order.EnsureRefundFits(request.RequestedAmount, await refunds.GetClaimedTotalForOrderAsync(order.Id, cancellationToken));
 
+        await refund.SetPayoutAccountAsync(request.PayoutAccount, masterData, clock.GetUtcNow(), cancellationToken); // R-01
+
         refunds.Add(refund);
         await unitOfWork.SaveChangesAsync(cancellationToken); // a concurrent second complaint fails on RowVersion: 409
 

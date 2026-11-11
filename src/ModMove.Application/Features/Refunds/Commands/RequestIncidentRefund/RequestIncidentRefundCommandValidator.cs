@@ -11,5 +11,6 @@ internal sealed class RequestIncidentRefundCommandValidator : AbstractValidator<
         RuleFor(x => x.Reason).NotEmpty().MaximumLength(CustomerRefundRules.MaxTextLength);
         RuleFor(x => x.EvidenceUrls).ValidEvidence(storage);
         RuleFor(x => x.RequestedAmount).ValidAmount();
+        RuleFor(x => x.PayoutAccount).NotNull().ValidPayoutAccount();
     }
 }

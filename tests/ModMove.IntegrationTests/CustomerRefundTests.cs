@@ -1,5 +1,6 @@
 using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
+using ModMove.Application.Features.Refunds;
 using ModMove.Application.Features.Refunds.Commands.ReplyToInfoRequest;
 using ModMove.Application.Features.Refunds.Commands.RequestIncidentRefund;
 using ModMove.Application.Features.Refunds.Commands.SubmitComplaint;
@@ -16,7 +17,7 @@ public class CustomerRefundTests
     private const string Photo = "https://res.cloudinary.com/demo/image/upload/modmove/customers/1/a.jpg";
 
     private static SubmitComplaintCommand Complaint(ShippingOrder order, decimal amount = 100_000, IReadOnlyList<string>? photos = null) =>
-        new(order.Id, "DAMAGED_CARGO", " Hàng vỡ ", photos ?? [Photo], amount);
+        new(order.Id, "DAMAGED_CARGO", " Hàng vỡ ", photos ?? [Photo], amount, TestPayout.Valid);
 
     private static InTransitIncident AddIncident(TripSetup s, ShippingOrder order)
     {
@@ -45,6 +46,89 @@ public class CustomerRefundTests
         var sent = Assert.Single(s.App.Realtime.Sent);
         Assert.Equal("dispatchers", sent.Target);
         Assert.Equal("COMPLAINT_SUBMITTED", Assert.IsType<Notification>(sent.Payload).Type);
+    }
+
+    // ---- Payout account (R-01) ----
+
+    [Fact]
+    public async Task Complaint_keeps_the_payout_account_with_an_upper_case_holder_and_the_bank_name_from_the_list_R01()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+        var account = new PayoutAccountInput(false, "970436", "0123456789", "  nguyen   van a ");
+
+        await s.App.Sender.Send(Complaint(order) with { PayoutAccount = account });
+
+        var refund = Assert.Single(s.App.Refunds.Items);
+        Assert.True(refund.HasPayoutAccount);
+        Assert.Equal(("970436", "Vietcombank", "0123456789", "NGUYEN VAN A"),
+            (refund.PayoutBankCode, refund.PayoutBankName, refund.PayoutAccountNumber, refund.PayoutAccountHolder));
+        Assert.Equal(s.App.Time.Now, refund.PayoutInfoUpdatedAt);
+    }
+
+    [Fact]
+    public async Task Incident_refund_keeps_the_payout_account_R01()
+    {
+        var s = new TripSetup();
+        var incident = AddIncident(s, s.PickedUp());
+
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 50_000, TestPayout.Valid));
+
+        var refund = Assert.Single(s.App.Refunds.Items);
+        Assert.Equal(("970436", "Vietcombank", "0123456789", "NGUYEN VAN A"),
+            (refund.PayoutBankCode, refund.PayoutBankName, refund.PayoutAccountNumber, refund.PayoutAccountHolder));
+    }
+
+    [Fact]
+    public async Task Complaint_and_incident_refund_without_a_payout_account_are_a_400_R01()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+        var incident = AddIncident(s, order);
+
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(Complaint(order) with { PayoutAccount = null! }));
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 50_000, null!)));
+
+        Assert.Empty(s.App.Refunds.Items);
+    }
+
+    [Fact]
+    public async Task A_bank_that_is_not_in_the_BANK_list_is_a_400_R01()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+        var unknown = TestPayout.Valid with { BankCode = "999999" };
+
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(Complaint(order) with { PayoutAccount = unknown }));
+
+        Assert.Empty(s.App.Refunds.Items);
+        Assert.Equal(0, s.App.UnitOfWork.Saves);
+    }
+
+    [Fact]
+    public async Task A_bank_that_was_switched_off_is_a_400_R01()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+        s.App.MasterData.Items.Single(i => i.Category == "BANK" && i.Code == "970436").SetActive(false);
+
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(Complaint(order)));
+
+        Assert.Empty(s.App.Refunds.Items);
+    }
+
+    [Fact]
+    public async Task Reusing_the_PayOS_account_without_one_on_record_is_NO_SUGGESTED_PAYOUT_ACCOUNT_R01()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(Complaint(order) with { PayoutAccount = new PayoutAccountInput(true, null, null, null) }));
+
+        Assert.Equal("NO_SUGGESTED_PAYOUT_ACCOUNT", error.Code);
+        Assert.Empty(s.App.Refunds.Items);
     }
 
     [Fact]
@@ -126,7 +210,7 @@ public class CustomerRefundTests
         var s = new TripSetup();
         var order = s.Delivered();
 
-        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new SubmitComplaintCommand(order.Id, code, null, null, amount)));
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new SubmitComplaintCommand(order.Id, code, null, null, amount, TestPayout.Valid)));
     }
 
     [Fact]
@@ -135,7 +219,7 @@ public class CustomerRefundTests
         var s = new TripSetup();
         var order = s.Delivered();
 
-        await s.App.Sender.Send(new SubmitComplaintCommand(order.Id, "DAMAGED_CARGO", null, null, 100_000));
+        await s.App.Sender.Send(new SubmitComplaintCommand(order.Id, "DAMAGED_CARGO", null, null, 100_000, TestPayout.Valid));
 
         var refund = Assert.Single(s.App.Refunds.Items);
         Assert.Equal(("DAMAGED_CARGO", "Hàng bị hư hỏng"), (refund.ReasonCode, refund.Reason));
@@ -148,7 +232,7 @@ public class CustomerRefundTests
         var order = s.Delivered();
 
         var error = await Assert.ThrowsAsync<ValidationException>(() =>
-            s.App.Sender.Send(new SubmitComplaintCommand(order.Id, "CHANGED_PLAN", null, null, 100_000))); // a cancellation reason
+            s.App.Sender.Send(new SubmitComplaintCommand(order.Id, "CHANGED_PLAN", null, null, 100_000, TestPayout.Valid))); // a cancellation reason
 
         Assert.Contains("ReasonCode", error.Errors.Keys);
         Assert.Empty(s.App.Refunds.Items);
@@ -161,7 +245,7 @@ public class CustomerRefundTests
         var order = s.Delivered();
         s.App.MasterData.Items.Single(i => i.Code == "DAMAGED_CARGO").SetActive(false);
 
-        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new SubmitComplaintCommand(order.Id, "DAMAGED_CARGO", null, null, 100_000)));
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new SubmitComplaintCommand(order.Id, "DAMAGED_CARGO", null, null, 100_000, TestPayout.Valid)));
 
         Assert.Empty(s.App.Refunds.Items);
     }
@@ -174,7 +258,7 @@ public class CustomerRefundTests
         var s = new TripSetup();
         var order = s.Delivered();
 
-        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new SubmitComplaintCommand(order.Id, code, " ", null, 100_000)));
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new SubmitComplaintCommand(order.Id, code, " ", null, 100_000, TestPayout.Valid)));
 
         Assert.Empty(s.App.Refunds.Items);
     }
@@ -185,7 +269,7 @@ public class CustomerRefundTests
         var s = new TripSetup();
         var order = s.Delivered();
 
-        await s.App.Sender.Send(new SubmitComplaintCommand(order.Id, "OTHER", " Sai địa chỉ ", null, 100_000));
+        await s.App.Sender.Send(new SubmitComplaintCommand(order.Id, "OTHER", " Sai địa chỉ ", null, 100_000, TestPayout.Valid));
 
         var refund = Assert.Single(s.App.Refunds.Items);
         Assert.Equal(("OTHER", "Sai địa chỉ"), (refund.ReasonCode, refund.Reason));
@@ -204,7 +288,7 @@ public class CustomerRefundTests
 
     [Fact]
     public async Task Signed_out_caller_is_unauthorized() =>
-        await Assert.ThrowsAsync<UnauthorizedException>(() => new TestApp().Sender.Send(new SubmitComplaintCommand(1, "DAMAGED_CARGO", null, null, 1)));
+        await Assert.ThrowsAsync<UnauthorizedException>(() => new TestApp().Sender.Send(new SubmitComplaintCommand(1, "DAMAGED_CARGO", null, null, 1, TestPayout.Valid)));
 
     // ---- Incident refund (UC-CUS-17, 18) ----
 
@@ -215,7 +299,7 @@ public class CustomerRefundTests
         var order = s.PickedUp();
         var incident = AddIncident(s, order);
 
-        var result = await s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ 3 giờ", [Photo], 50_000));
+        var result = await s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ 3 giờ", [Photo], 50_000, TestPayout.Valid));
 
         var refund = Assert.Single(s.App.Refunds.Items);
         Assert.Equal(refund.Id, result.RefundId);
@@ -228,9 +312,9 @@ public class CustomerRefundTests
     {
         var s = new TripSetup();
         var incident = AddIncident(s, s.PickedUp());
-        await s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 50_000));
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 50_000, TestPayout.Valid));
 
-        await Assert.ThrowsAsync<ConflictException>(() => s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 50_000)));
+        await Assert.ThrowsAsync<ConflictException>(() => s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 50_000, TestPayout.Valid)));
     }
 
     [Fact]
@@ -240,7 +324,7 @@ public class CustomerRefundTests
         var incident = AddIncident(s, s.PickedUp(method: PaymentMethod.Cash));
 
         var error = await Assert.ThrowsAsync<DomainException>(() =>
-            s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 50_000)));
+            s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 50_000, TestPayout.Valid)));
 
         Assert.Equal("REFUND_NOT_ALLOWED", error.Code);
         Assert.Empty(s.App.Refunds.Items);
@@ -255,10 +339,10 @@ public class CustomerRefundTests
         var order = s.PickedUp();
         var first = AddIncident(s, order);
         var second = AddIncident(s, order);
-        await s.App.Sender.Send(new RequestIncidentRefundCommand(first.Id, "Trễ", null, 100_000));
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(first.Id, "Trễ", null, 100_000, TestPayout.Valid));
 
         var error = await Assert.ThrowsAsync<DomainException>(() =>
-            s.App.Sender.Send(new RequestIncidentRefundCommand(second.Id, "Vỡ", null, 80_001)));
+            s.App.Sender.Send(new RequestIncidentRefundCommand(second.Id, "Vỡ", null, 80_001, TestPayout.Valid)));
 
         Assert.Equal("REFUND_TOTAL_EXCEEDED", error.Code);
         Assert.Contains("80000", error.Message); // what is left to ask for
@@ -273,9 +357,9 @@ public class CustomerRefundTests
         var order = s.PickedUp();
         var first = AddIncident(s, order);
         var second = AddIncident(s, order);
-        await s.App.Sender.Send(new RequestIncidentRefundCommand(first.Id, "Trễ", null, 100_000));
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(first.Id, "Trễ", null, 100_000, TestPayout.Valid));
 
-        await s.App.Sender.Send(new RequestIncidentRefundCommand(second.Id, "Vỡ", null, 80_000));
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(second.Id, "Vỡ", null, 80_000, TestPayout.Valid));
 
         Assert.Equal(2, s.App.Refunds.Items.Count);
     }
@@ -286,7 +370,7 @@ public class CustomerRefundTests
         var s = new TripSetup();
         var order = s.Delivered();
         var incident = AddIncident(s, order);
-        await s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 150_000));
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 150_000, TestPayout.Valid));
 
         var error = await Assert.ThrowsAsync<DomainException>(() => s.App.Sender.Send(Complaint(order, 30_001)));
 
@@ -302,11 +386,12 @@ public class CustomerRefundTests
         var incident = AddIncident(s, order);
         var paid = Refund.Request(order.Id, incident.Id, RefundSourceType.Cancellation, "Hủy", null, order.TotalFee);
         paid.Approve(1, TripSetup.Now);
+        paid.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", TripSetup.Now);
         paid.MarkProcessed("BANK1", TripSetup.Now);
         s.App.Refunds.Add(paid);
 
         var error = await Assert.ThrowsAsync<DomainException>(() =>
-            s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 1)));
+            s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 1, TestPayout.Valid)));
 
         Assert.Equal("REFUND_TOTAL_EXCEEDED", error.Code);
     }
@@ -318,10 +403,10 @@ public class CustomerRefundTests
         var order = s.PickedUp();
         var first = AddIncident(s, order);
         var second = AddIncident(s, order);
-        await s.App.Sender.Send(new RequestIncidentRefundCommand(first.Id, "Trễ", null, 180_000));
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(first.Id, "Trễ", null, 180_000, TestPayout.Valid));
         s.App.Refunds.Items[0].Propose(50_000, "Một phần", 1);
 
-        await s.App.Sender.Send(new RequestIncidentRefundCommand(second.Id, "Vỡ", null, 130_000));
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(second.Id, "Vỡ", null, 130_000, TestPayout.Valid));
 
         Assert.Equal(2, s.App.Refunds.Items.Count);
     }
@@ -336,7 +421,7 @@ public class CustomerRefundTests
         var order = s.PickedUp();
         var first = AddIncident(s, order);
         var second = AddIncident(s, order);
-        await s.App.Sender.Send(new RequestIncidentRefundCommand(first.Id, "Trễ", null, 180_000));
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(first.Id, "Trễ", null, 180_000, TestPayout.Valid));
         var refund = s.App.Refunds.Items[0];
         switch (outcome)
         {
@@ -349,11 +434,11 @@ public class CustomerRefundTests
             default:
                 refund.Propose(180_000, "Đủ", 1);
                 refund.Approve(1, TripSetup.Now);
-                refund.MarkFailed();
+                refund.MarkFailed("Sai số tài khoản");
                 break;
         }
 
-        await s.App.Sender.Send(new RequestIncidentRefundCommand(second.Id, "Vỡ", null, 180_000));
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(second.Id, "Vỡ", null, 180_000, TestPayout.Valid));
 
         Assert.Equal(2, s.App.Refunds.Items.Count);
     }
@@ -365,7 +450,7 @@ public class CustomerRefundTests
         var incident = AddIncident(s, s.PickedUp(customerId: s.Other.Id));
 
         var error = await Assert.ThrowsAsync<DomainException>(() =>
-            s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 50_000)));
+            s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 50_000, TestPayout.Valid)));
 
         Assert.Equal("ORDER_NOT_YOURS", error.Code);
         Assert.Empty(s.App.Refunds.Items);
@@ -373,7 +458,7 @@ public class CustomerRefundTests
 
     [Fact]
     public async Task Unknown_incident_is_not_found() =>
-        await Assert.ThrowsAsync<NotFoundException>(() => new TripSetup().App.Sender.Send(new RequestIncidentRefundCommand(999, "x", null, 1)));
+        await Assert.ThrowsAsync<NotFoundException>(() => new TripSetup().App.Sender.Send(new RequestIncidentRefundCommand(999, "x", null, 1, TestPayout.Valid)));
 
     // ---- Reply to an information request (UC-CUS-22, DECISIONS 7.4) ----
 
@@ -473,10 +558,10 @@ public class CustomerRefundTests
     {
         var s = new TripSetup();
         var incident = AddIncident(s, s.PickedUp());
-        await s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 50_000));
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 50_000, TestPayout.Valid));
         await s.App.Sender.Send(new WithdrawRefundCommand(s.App.Refunds.Items[0].Id));
 
-        await s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 40_000));
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(incident.Id, "Trễ", null, 40_000, TestPayout.Valid));
 
         Assert.Equal(2, s.App.Refunds.Items.Count);
     }

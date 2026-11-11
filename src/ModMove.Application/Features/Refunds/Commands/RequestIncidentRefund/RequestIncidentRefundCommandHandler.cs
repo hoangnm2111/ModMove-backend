@@ -13,8 +13,10 @@ internal sealed class RequestIncidentRefundCommandHandler(
     IRepository<InTransitIncident> incidents,
     IShippingOrderRepository orders,
     IRefundRepository refunds,
+    IMasterDataRepository masterData,
     INotificationService notifications,
-    IUnitOfWork unitOfWork) : ICommandHandler<RequestIncidentRefundCommand, RefundCreatedResponse>
+    IUnitOfWork unitOfWork,
+    TimeProvider clock) : ICommandHandler<RequestIncidentRefundCommand, RefundCreatedResponse>
 {
     public async Task<RefundCreatedResponse> Handle(RequestIncidentRefundCommand request, CancellationToken cancellationToken)
     {
@@ -30,6 +32,8 @@ internal sealed class RequestIncidentRefundCommandHandler(
         if (await refunds.HasOpenRefundForIncidentAsync(incident.Id, cancellationToken))
             throw new ConflictException("This incident already has an open refund request.");
         order.EnsureRefundFits(request.RequestedAmount, await refunds.GetClaimedTotalForOrderAsync(order.Id, cancellationToken));
+
+        await refund.SetPayoutAccountAsync(request.PayoutAccount, masterData, clock.GetUtcNow(), cancellationToken); // R-01
 
         refunds.Add(refund);
         await unitOfWork.SaveChangesAsync(cancellationToken); // a concurrent second request fails on RowVersion: 409
