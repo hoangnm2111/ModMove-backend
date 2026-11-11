@@ -31,6 +31,12 @@ public enum CustomerEvent
 
     /// <summary>The System cancelled the order: not paid in time (JOB-PAY-01) or no driver found (JOB-MATCH-01).</summary>
     OrderCancelled,
+
+    /// <summary>R-01: a refund needs the customer's bank account before the Administrator can pay it.</summary>
+    RefundBankInfoRequired,
+
+    /// <summary>R-01: the Administrator's transfer failed; the customer fixes the account (UC-ADM-18 5a).</summary>
+    RefundPayoutFailed,
 }
 
 /// <summary>The same wording for every module: call <see cref="NotifyCustomerAsync"/> after SaveChangesAsync.</summary>
@@ -49,6 +55,11 @@ public static class CustomerNotifications
         [CustomerEvent.IncidentResolved] = ("INCIDENT_RESOLVED", "Sự cố đã được xử lý", "Sự cố của đơn {0} đã có kết quả."),
         [CustomerEvent.RefundDecided] = ("REFUND_DECIDED", "Kết quả hoàn tiền", "Yêu cầu hoàn tiền của đơn {0} đã có kết quả."),
         [CustomerEvent.OrderCancelled] = ("ORDER_CANCELLED", "Đơn đã bị hủy", "Đơn {0} đã bị hủy."),
+        // R-01: never put the account number in these texts (security.md 1).
+        [CustomerEvent.RefundBankInfoRequired] = ("REFUND_BANK_INFO_REQUIRED", "Cần tài khoản nhận hoàn tiền",
+            "Đơn {0} có khoản hoàn tiền. Vui lòng cung cấp tài khoản ngân hàng để nhận tiền."),
+        [CustomerEvent.RefundPayoutFailed] = ("REFUND_PAYOUT_FAILED", "Chuyển hoàn tiền thất bại",
+            "Chuyển hoàn tiền cho đơn {0} không thành công. Vui lòng kiểm tra lại tài khoản nhận."),
     };
 
     /// <summary>B17: FCM and SignalR NotificationReceived to the customer of <paramref name="order"/>; <paramref name="detail"/> is appended.</summary>

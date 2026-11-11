@@ -5,6 +5,7 @@ using ModMove.Application;
 using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
+using ModMove.Application.Features.Refunds;
 using ModMove.Application.Features.Refunds.Queries.GetMyRefundDetail;
 using ModMove.Application.Features.Refunds.Queries.GetMyRefunds;
 
@@ -22,6 +23,8 @@ public class MyRefundsQueryTests
         public string Status { get; set; } = "Requested";
         public bool Found { get; set; } = true;
         public string? DecisionReason { get; set; }
+        public string? PayoutAccountNumber { get; set; }
+        public string? PayoutFailureReason { get; set; }
         public List<(string Sql, IReadOnlyDictionary<string, object?> Parameters)> Executed { get; } = [];
 
         public Db()
@@ -37,6 +40,12 @@ public class MyRefundsQueryTests
                     ("IncidentId", typeof(long), null), ("SourceType", typeof(string), "Complaint"), ("RefundStatus", typeof(string), Status),
                     ("Reason", typeof(string), "Hàng vỡ"), ("ReasonCode", typeof(string), "DAMAGED_CARGO"),
                     ("DecisionReason", typeof(string), DecisionReason),
+                    ("PayoutBankCode", typeof(string), PayoutAccountNumber is null ? null : "970436"),
+                    ("PayoutBankName", typeof(string), PayoutAccountNumber is null ? null : "Vietcombank"),
+                    ("PayoutAccountNumber", typeof(string), PayoutAccountNumber),
+                    ("PayoutAccountHolder", typeof(string), PayoutAccountNumber is null ? null : "NGUYEN VAN A"),
+                    ("PayoutFailureReason", typeof(string), PayoutFailureReason),
+                    ("BankReferenceCode", typeof(string), "FT26293998877"),
                     ("EvidenceUrls", typeof(string), """["https://res.cloudinary.com/demo/a.jpg"]"""),
                     ("RequestedAmount", typeof(decimal), 100_000m), ("ProposedAmount", typeof(decimal), 80_000m),
                     ("InfoRequestNote", typeof(string), "Chụp thêm ảnh"), ("CustomerReply", typeof(string), null),
@@ -142,6 +151,80 @@ public class MyRefundsQueryTests
 
         Assert.DoesNotContain("proposal_reason", db.RefundsQuery().Sql);
     }
+
+    // ---- Payout account (R-01) ----
+
+    [Fact]
+    public async Task The_customer_sees_the_payout_account_masked_and_never_in_full_R01()
+    {
+        var db = new Db { Status = "Approved", PayoutAccountNumber = "0123456789" };
+
+        var detail = await db.Sender().Send(new GetMyRefundDetailQuery(4));
+        var page = await db.Sender().Send(new GetMyRefundsQuery());
+
+        Assert.Equal(new PayoutAccountView("970436", "Vietcombank", "•••• 6789", "NGUYEN VAN A"), detail.PayoutAccount);
+        Assert.False(detail.NeedsPayoutAccount);
+        Assert.False(Assert.Single(page.Items).NeedsPayoutAccount);
+        var json = System.Text.Json.JsonSerializer.Serialize(new object[] { detail, page });
+        Assert.DoesNotContain("0123456789", json);
+        Assert.DoesNotContain("012345", json);
+    }
+
+    [Theory]
+    [InlineData("Requested", null, true)]
+    [InlineData("Approved", null, true)]
+    [InlineData("Failed", null, true)]
+    [InlineData("Processed", null, false)]
+    [InlineData("Rejected", null, false)]
+    [InlineData("Withdrawn", null, false)]
+    [InlineData("Requested", "0123456789", false)]
+    [InlineData("Failed", "0123456789", false)]
+    public async Task NeedsPayoutAccount_follows_the_status_and_whether_one_was_given_R01(string status, string? account, bool expected)
+    {
+        var db = new Db { Status = status, PayoutAccountNumber = account };
+
+        var detail = await db.Sender().Send(new GetMyRefundDetailQuery(4));
+        var page = await db.Sender().Send(new GetMyRefundsQuery());
+
+        Assert.Equal(expected, detail.NeedsPayoutAccount);
+        Assert.Equal(expected, Assert.Single(page.Items).NeedsPayoutAccount);
+        Assert.Equal(account is null, detail.PayoutAccount is null);
+    }
+
+    [Theory]
+    [InlineData("Processed", "FT26293998877")]
+    [InlineData("Approved", null)]
+    [InlineData("Failed", null)]
+    public async Task The_bank_reference_shows_only_once_the_refund_is_paid_R01(string status, string? expected)
+    {
+        var detail = await new Db { Status = status, PayoutAccountNumber = "0123456789" }.Sender().Send(new GetMyRefundDetailQuery(4));
+
+        Assert.Equal(expected, detail.BankReferenceCode);
+    }
+
+    [Fact]
+    public async Task A_failed_transfer_tells_the_customer_why_R01()
+    {
+        var detail = await new Db { Status = "Failed", PayoutFailureReason = "Sai số tài khoản" }.Sender().Send(new GetMyRefundDetailQuery(4));
+
+        Assert.Equal("Sai số tài khoản", detail.PayoutFailureReason);
+        Assert.True(detail.NeedsPayoutAccount);
+    }
+
+    [Fact]
+    public async Task No_PayOS_suggestion_yet_because_the_payer_columns_wait_for_K2_R01()
+    {
+        var detail = await new Db { Status = "Requested" }.Sender().Send(new GetMyRefundDetailQuery(4));
+
+        Assert.Null(detail.SuggestedPayoutAccount);
+    }
+
+    [Theory]
+    [InlineData("0123456789", "•••• 6789")]
+    [InlineData("123456", "•••• 3456")]
+    [InlineData("1234567890123456789", "•••• 6789")]
+    public void Masking_keeps_the_last_four_digits_R01(string number, string expected) =>
+        Assert.Equal(expected, PayoutAccountView.Mask(number));
 
     [Fact]
     public async Task Someone_elses_refund_is_404() =>

@@ -3,6 +3,7 @@ using ModMove.Application.Common.Models;
 using ModMove.Application.Features.Refunds;
 using ModMove.Application.Features.Refunds.Commands.ReplyToInfoRequest;
 using ModMove.Application.Features.Refunds.Commands.RequestIncidentRefund;
+using ModMove.Application.Features.Refunds.Commands.SetRefundPayoutAccount;
 using ModMove.Application.Features.Refunds.Commands.SubmitComplaint;
 using ModMove.Application.Features.Refunds.Commands.WithdrawRefund;
 using ModMove.Application.Features.Refunds.Queries.GetMyRefundDetail;
@@ -44,6 +45,14 @@ public sealed class RefundsController : ApiControllerBase
     public async Task<IActionResult> Reply(long id, ReplyToInfoRequestRequest request, CancellationToken cancellationToken)
     {
         await Sender.Send(new ReplyToInfoRequestCommand(id, request.Reply, request.PhotoUrls), cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>Bank account to receive this refund (R-01); allowed until the refund is paid, rejected or withdrawn.</summary>
+    [HttpPut("{id:long}/payout-account")]
+    public async Task<IActionResult> SetPayoutAccount(long id, PayoutAccountInput request, CancellationToken cancellationToken)
+    {
+        await Sender.Send(new SetRefundPayoutAccountCommand(id, request), cancellationToken);
         return NoContent();
     }
 

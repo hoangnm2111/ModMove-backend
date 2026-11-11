@@ -72,6 +72,22 @@ public class MatchingAndNotificationUnitTests
         }
     }
 
+    [Theory]
+    [InlineData(CustomerEvent.RefundBankInfoRequired, "REFUND_BANK_INFO_REQUIRED")]
+    [InlineData(CustomerEvent.RefundPayoutFailed, "REFUND_PAYOUT_FAILED")]
+    public async Task Refund_payout_events_carry_the_order_code_and_never_a_bank_account_R01(CustomerEvent evt, string expectedType)
+    {
+        var service = new CapturingNotificationService();
+        var order = SampleOrder();
+
+        await service.NotifyCustomerAsync(order, evt, CancellationToken.None);
+
+        var (_, notif) = Assert.Single(service.Sent);
+        Assert.Equal(expectedType, notif.Type);
+        Assert.Contains("MM20261103999", notif.Body);
+        Assert.DoesNotMatch(@"\d{6,}", notif.Body.Replace("MM20261103999", ""));
+    }
+
     [Fact]
     public async Task NotifyNewMatchingOrderAsync_formats_distance_with_invariant_culture_and_populates_data()
     {

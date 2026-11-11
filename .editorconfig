@@ -1,0 +1,6 @@
+# Same rule as .gitattributes (eol=lf). Without it, dotnet format on Windows expects CRLF and
+# reports files that are fine on the Linux CI.
+root = true
+
+[*]
+end_of_line = lf

@@ -108,6 +108,7 @@ public class RefundDomainTests
     public void Manual_payout_only_allowed_when_Approved_and_cannot_be_processed_twice_GB27()
     {
         var refund = Refund.Request(10, null, RefundSourceType.Cancellation, "Hủy đơn", null, 180_000m);
+        refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now);
 
         // Edge case: cannot payout while still Requested
         Assert.Throws<DomainException>(() => refund.MarkProcessed("FT000", Now));
@@ -122,6 +123,140 @@ public class RefundDomainTests
 
         // Edge case: cannot payout twice
         Assert.Throws<DomainException>(() => refund.MarkProcessed("FT999", payoutTime.AddMinutes(1)));
+    }
+
+    // ==========================================
+    // 2b. Payout account (R-01)
+    // ==========================================
+
+    private static Refund ApprovedCancellationRefund()
+    {
+        var refund = Refund.Request(10, null, RefundSourceType.Cancellation, "Hủy đơn", null, 180_000m);
+        refund.Approve(adminId: 99, Now);
+        return refund;
+    }
+
+    [Theory]
+    [InlineData(RefundStatus.Requested)]
+    [InlineData(RefundStatus.Approved)]
+    [InlineData(RefundStatus.Failed)]
+    public void SetPayoutAccount_is_allowed_while_Requested_Approved_or_Failed_R01(RefundStatus status)
+    {
+        var refund = Refund.Request(10, null, RefundSourceType.Cancellation, "Hủy đơn", null, 180_000m);
+        if (status != RefundStatus.Requested) refund.Approve(99, Now);
+        if (status == RefundStatus.Failed) refund.MarkFailed("Sai số tài khoản");
+        var versionBefore = refund.RowVersion;
+
+        refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now);
+
+        Assert.Equal("970436", refund.PayoutBankCode);
+        Assert.Equal("Vietcombank", refund.PayoutBankName);
+        Assert.Equal("0123456789", refund.PayoutAccountNumber);
+        Assert.Equal("NGUYEN VAN A", refund.PayoutAccountHolder);
+        Assert.Equal(Now, refund.PayoutInfoUpdatedAt);
+        Assert.Equal(versionBefore + 1, refund.RowVersion);
+    }
+
+    [Theory]
+    [InlineData(RefundStatus.Processed)]
+    [InlineData(RefundStatus.Rejected)]
+    [InlineData(RefundStatus.Withdrawn)]
+    public void SetPayoutAccount_on_a_closed_refund_is_REFUND_PAYOUT_LOCKED(RefundStatus status)
+    {
+        var refund = Refund.Request(10, null, RefundSourceType.Complaint, "Hỏng", null, 100_000m);
+        switch (status)
+        {
+            case RefundStatus.Withdrawn:
+                refund.Withdraw();
+                break;
+            case RefundStatus.Rejected:
+                refund.RejectRefund(99, Now);
+                break;
+            default:
+                refund.Propose(100_000m, "Đủ", 7);
+                refund.Approve(99, Now);
+                refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now);
+                refund.MarkProcessed("FT1", Now);
+                break;
+        }
+
+        var ex = Assert.Throws<DomainException>(() =>
+            refund.SetPayoutAccount("970415", "VietinBank", "9876543210", "TRAN VAN B", Now));
+        Assert.Equal("REFUND_PAYOUT_LOCKED", ex.Code);
+    }
+
+    [Fact]
+    public void SetPayoutAccount_on_a_failed_refund_returns_it_to_Approved_R01()
+    {
+        var refund = ApprovedCancellationRefund();
+        refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now);
+        refund.MarkFailed("Sai số tài khoản");
+
+        refund.SetPayoutAccount("970436", "Vietcombank", "0123456780", "NGUYEN VAN A", Now.AddHours(1));
+
+        Assert.Equal(RefundStatus.Approved, refund.RefundStatus);
+        Assert.Null(refund.PayoutFailureReason);
+    }
+
+    [Fact]
+    public void SetPayoutAccount_with_the_same_account_on_a_failed_refund_is_REFUND_PAYOUT_UNCHANGED_R01()
+    {
+        var refund = ApprovedCancellationRefund();
+        refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now);
+        refund.MarkFailed("Sai số tài khoản");
+        var versionBefore = refund.RowVersion;
+
+        var ex = Assert.Throws<DomainException>(() =>
+            refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now.AddHours(1)));
+
+        Assert.Equal("REFUND_PAYOUT_UNCHANGED", ex.Code);
+        Assert.Equal(RefundStatus.Failed, refund.RefundStatus);
+        Assert.Equal("Sai số tài khoản", refund.PayoutFailureReason);
+        Assert.Equal(versionBefore, refund.RowVersion);
+    }
+
+    [Fact]
+    public void SetPayoutAccount_with_the_same_account_is_fine_while_the_refund_is_not_Failed_R01()
+    {
+        var refund = ApprovedCancellationRefund();
+        refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now);
+
+        refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now.AddHours(1));
+
+        Assert.Equal(RefundStatus.Approved, refund.RefundStatus);
+    }
+
+    [Fact]
+    public void MarkProcessed_without_a_payout_account_is_REFUND_BANK_ACCOUNT_REQUIRED()
+    {
+        var refund = ApprovedCancellationRefund();
+
+        var ex = Assert.Throws<DomainException>(() => refund.MarkProcessed("FT1", Now));
+
+        Assert.Equal("REFUND_BANK_ACCOUNT_REQUIRED", ex.Code);
+        Assert.Equal(RefundStatus.Approved, refund.RefundStatus);
+    }
+
+    [Fact]
+    public void MarkFailed_keeps_the_reason()
+    {
+        var refund = ApprovedCancellationRefund();
+
+        refund.MarkFailed("Tài khoản không tồn tại");
+
+        Assert.Equal(RefundStatus.Failed, refund.RefundStatus);
+        Assert.Equal("Tài khoản không tồn tại", refund.PayoutFailureReason);
+    }
+
+    [Fact]
+    public void HasPayoutAccount_is_false_until_set()
+    {
+        var refund = Refund.Request(10, null, RefundSourceType.Cancellation, "Hủy đơn", null, 180_000m);
+        Assert.False(refund.HasPayoutAccount);
+
+        refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now);
+
+        Assert.True(refund.HasPayoutAccount);
     }
 
     // ==========================================

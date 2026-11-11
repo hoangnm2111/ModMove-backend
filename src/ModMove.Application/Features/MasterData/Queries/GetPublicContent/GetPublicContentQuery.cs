@@ -29,4 +29,7 @@ public static class PublicContentCategories
     public const string CargoType = "CARGO_TYPE";
     public const string ComplaintReason = "COMPLAINT_REASON";
     public const string CancellationReason = "CANCELLATION_REASON";
+
+    /// <summary>R-01: the banks a customer picks to receive a refund; code = 6-digit BIN.</summary>
+    public const string Bank = "BANK";
 }
