@@ -22,7 +22,7 @@ internal sealed class UpdatePlatformSettingsCommandHandler(
         var requested = new Dictionary<string, decimal>();
         if (request.CommissionRate is { } rate) requested[SettingKeys.CommissionRate] = rate;
         if (request.LoadingFee is { } loadingFee) requested[SettingKeys.LoadingFee] = loadingFee;
-        if (request.MinCodDeposit is { } minDeposit) requested[SettingKeys.MinCodDeposit] = minDeposit;
+        if (request.RequiredDeposit is { } requiredDeposit) requested[SettingKeys.RequiredDeposit] = requiredDeposit;
         if (request.MatchingRadiusKm is { } radius) requested[SettingKeys.MatchingRadiusKm] = radius;
 
         var rows = (await settings.GetByKeysAsync([.. requested.Keys], cancellationToken))

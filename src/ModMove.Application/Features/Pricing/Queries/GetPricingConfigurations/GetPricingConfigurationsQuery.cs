@@ -45,5 +45,5 @@ public sealed record VehicleTypePricingResponse
 public sealed record PlatformSettingsResponse(
     decimal CommissionRate,
     decimal LoadingFee,
-    decimal MinCodDeposit,
+    decimal RequiredDeposit,
     decimal MatchingRadiusKm);
