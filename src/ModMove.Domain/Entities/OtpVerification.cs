@@ -20,6 +20,12 @@ public sealed class OtpVerification : BaseCreatedEntity, IAggregateRoot
     /// <summary>Wrong guesses against the current code; at the limit the code is dead (brute-force guard).</summary>
     public int FailedAttempts { get; private set; }
 
+    // A-02: what a Register code will create; the account is saved only once the email is verified.
+    public string? FullName { get; private set; }
+    public string? PhoneNumber { get; private set; }
+    public string? PasswordHash { get; private set; }
+    public UserRole? Role { get; private set; }
+
     public static OtpVerification Issue(string email, OtpPurpose purpose, string codeHash, DateTimeOffset now) =>
         new()
         {
@@ -63,4 +69,26 @@ public sealed class OtpVerification : BaseCreatedEntity, IAggregateRoot
     public void RegisterFailedAttempt() => FailedAttempts++;
 
     public void MarkVerified(DateTimeOffset now) => VerifiedAt = now;
+
+    /// <summary>Registering again replaces the held details: the latest registration wins (A-02).</summary>
+    public void HoldRegistration(string fullName, string phoneNumber, string passwordHash, UserRole role)
+    {
+        FullName = fullName;
+        PhoneNumber = phoneNumber;
+        PasswordHash = passwordHash;
+        Role = role;
+    }
+
+    /// <summary>The code proved the mailbox: build the verified account, use up the code and forget the held details.</summary>
+    public User CompleteRegistration(DateTimeOffset now)
+    {
+        if (FullName is null || PhoneNumber is null || PasswordHash is null || Role is null)
+            throw new InvalidOperationException("No registration is waiting for this code.");
+
+        var user = User.Create(FullName, PhoneNumber, Email, PasswordHash, Role.Value, emailVerified: true);
+        MarkVerified(now);
+        FullName = PhoneNumber = PasswordHash = null;
+        Role = null;
+        return user;
+    }
 }
