@@ -265,6 +265,9 @@ internal sealed class InMemoryIncidents : IIncidentRepository
                 && i.Id != excludeIncidentId
                 && i.ResolutionStatus is IncidentResolutionStatus.Open or IncidentResolutionStatus.InProgress)
             .ToList());
+
+    public Task<bool> HasOpenReportedByAsync(long orderId, long reporterUserId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Any(i => i.OrderId == orderId && i.ReportedBy == reporterUserId && i.IsOpen));
 }
 
 internal sealed class InMemoryCoupons : ICouponRepository

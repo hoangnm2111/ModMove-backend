@@ -32,6 +32,60 @@ public class IncidentResolutionTests
     }
 
     [Fact]
+    public async Task StartHandling_tells_the_driver_and_the_customer_once_8_3()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit();
+        var incident = s.Incident(order);
+
+        await s.App.Sender.Send(new StartIncidentHandlingCommand(incident.Id));
+        await s.App.Sender.Send(new StartIncidentHandlingCommand(incident.Id)); // same Dispatcher again: nothing new to say
+
+        var toCustomer = Assert.Single(s.SentTo(s.Customer));
+        Assert.Equal("INCIDENT_IN_PROGRESS", toCustomer.Type);
+        Assert.Equal(incident.Id.ToString(), toCustomer.Data!["incidentId"]);
+        Assert.Equal(order.Id.ToString(), toCustomer.Data["orderId"]);
+
+        var toDriver = Assert.Single(s.SentTo(s.Driver));
+        Assert.Equal("INCIDENT_IN_PROGRESS", toDriver.Type);
+        Assert.Equal(incident.Id.ToString(), toDriver.Data!["incidentId"]);
+    }
+
+    [Fact]
+    public async Task StartHandling_a_customer_incident_keeps_the_customers_words_from_the_driver_8_3()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit();
+        var incident = InTransitIncident.Report(order.Id, s.Customer.Id, IncidentType.Other, "Tài xế lái ẩu", null, null, null);
+        s.App.Incidents.Add(incident);
+
+        await s.App.Sender.Send(new StartIncidentHandlingCommand(incident.Id));
+
+        var toDriver = Assert.Single(s.SentTo(s.Driver));
+        Assert.Equal("INCIDENT_IN_PROGRESS", toDriver.Type);
+        Assert.DoesNotContain("lái ẩu", toDriver.Body);
+        Assert.Single(s.SentTo(s.Customer), n => n.Type == "INCIDENT_IN_PROGRESS");
+    }
+
+    [Fact]
+    public async Task StartHandling_an_incident_left_by_the_previous_driver_tells_that_driver_not_the_new_one_8_3()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit();
+        var first = s.Incident(order);
+        var leftOpen = s.Incident(order, IncidentType.Other);
+        var (newDriverUser, newProfile, _) = s.ReplacementDriver();
+        order.ReassignDriver(newProfile.Id, s.Dispatcher.Id, "Đổi xe");
+        first.Resolve(IncidentDecision.ReassignDriver, "Đổi xe", s.Dispatcher.Id, DispatcherSetup.Now);
+
+        await s.App.Sender.Send(new StartIncidentHandlingCommand(leftOpen.Id));
+
+        Assert.Single(s.SentTo(s.Driver), n => n.Type == "INCIDENT_IN_PROGRESS");
+        Assert.DoesNotContain(s.SentTo(newDriverUser), n => n.Type == "INCIDENT_IN_PROGRESS");
+        Assert.Single(s.SentTo(s.Customer), n => n.Type == "INCIDENT_IN_PROGRESS");
+    }
+
+    [Fact]
     public async Task StartHandling_AlreadyHandledByAnotherDispatcher_Throws409Conflict()
     {
         var s = new DispatcherSetup();

@@ -114,6 +114,61 @@ public class CancelOrderTests
     }
 
     [Fact]
+    public async Task Cancelling_closes_the_drivers_open_incident_so_it_does_not_wait_in_the_queue_7_6()
+    {
+        var s = Build();
+        var order = AddOrder(s, s.Customer.Id);
+        order.Accept(s.Profile.Id, s.Driver.Id, Now);
+        var open = InTransitIncident.Report(order.Id, s.Driver.Id, IncidentType.Other, "Không liên lạc được khách", null, null, null);
+        var handled = InTransitIncident.Report(order.Id, s.Driver.Id, IncidentType.Other, "Kẹt xe", null, null, null);
+        s.App.Incidents.Add(open);
+        s.App.Incidents.Add(handled);
+        handled.StartHandling(dispatcherId: 99);
+
+        await s.App.Sender.Send(Cancel(order));
+
+        Assert.All([open, handled], i => Assert.Equal(IncidentResolutionStatus.Cancelled, i.ResolutionStatus));
+        Assert.Null(open.HandledBy);
+        Assert.Equal(Now, open.ResolvedAt);
+        Assert.Contains("Khách đã hủy đơn", open.ResolutionNote);
+        Assert.Equal(1, s.App.UnitOfWork.Saves);
+    }
+
+    [Fact]
+    public async Task Cancelling_withdraws_a_pending_incident_refund_the_full_cancellation_refund_replaces_7_6()
+    {
+        var s = Build();
+        var order = AddOrder(s, s.Customer.Id, PaymentMethod.PayOS);
+        order.MarkPaid(Now);
+        order.Accept(s.Profile.Id, s.Driver.Id, Now);
+        var incident = InTransitIncident.Report(order.Id, s.Driver.Id, IncidentType.Other, "Kẹt xe", null, null, null);
+        s.App.Incidents.Add(incident);
+        var incidentRefund = order.RequestIncidentRefund(s.Customer.Id, incident.Id, "Trễ giờ", null, 50_000);
+        s.App.Refunds.Add(incidentRefund);
+
+        await s.App.Sender.Send(Cancel(order));
+
+        Assert.Equal(RefundStatus.Withdrawn, incidentRefund.RefundStatus);
+        var cancellation = Assert.Single(s.App.Refunds.Items, r => r.SourceType == RefundSourceType.Cancellation);
+        Assert.Equal(order.TotalFee, cancellation.RequestedAmount);
+        Assert.Equal(IncidentResolutionStatus.Cancelled, incident.ResolutionStatus);
+    }
+
+    [Fact]
+    public async Task Cancelling_closes_the_customers_own_open_incident_too_7_6()
+    {
+        var s = Build();
+        var order = AddOrder(s, s.Customer.Id);
+        order.Accept(s.Profile.Id, s.Driver.Id, Now); // e.g. back at Accepted after a reassignment
+        var own = InTransitIncident.Report(order.Id, s.Customer.Id, IncidentType.DamagedCargo, "Hàng móp", null, null, null);
+        s.App.Incidents.Add(own);
+
+        await s.App.Sender.Send(Cancel(order));
+
+        Assert.Equal(IncidentResolutionStatus.Cancelled, own.ResolutionStatus);
+    }
+
+    [Fact]
     public async Task The_driver_is_told_even_when_the_customer_disconnects_right_after_the_save()
     {
         var s = Build();

@@ -17,6 +17,8 @@ internal sealed class GetMyIncidentsQueryHandler(ISqlConnectionFactory connectio
         FROM in_transit_incidents i
         JOIN shipping_orders o ON o.id = i.order_id
         WHERE o.customer_id = @CustomerId
+          AND (@OrderId IS NULL OR i.order_id = @OrderId)
+          AND (@Status IS NULL OR i.resolution_status = @Status)
         """;
 
     private const string CountSql = $"SELECT COUNT(1) {From}";
@@ -37,7 +39,14 @@ internal sealed class GetMyIncidentsQueryHandler(ISqlConnectionFactory connectio
         using var connection = connectionFactory.CreateConnection();
         await CustomerAccess.EnsureActiveAsync(connection, customerId, cancellationToken);
 
-        var parameters = new { CustomerId = customerId, request.PageSize, Offset = (request.Page - 1) * request.PageSize };
+        var parameters = new
+        {
+            CustomerId = customerId,
+            request.OrderId,
+            Status = request.Status?.ToString(),
+            request.PageSize,
+            Offset = (request.Page - 1) * request.PageSize,
+        };
         var total = await connection.ExecuteScalarAsync<int>(new CommandDefinition(CountSql, parameters, cancellationToken: cancellationToken));
         var rows = await connection.QueryAsync<Row>(new CommandDefinition(ItemsSql, parameters, cancellationToken: cancellationToken));
 

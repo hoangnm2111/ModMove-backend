@@ -3,6 +3,7 @@ using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
+using ModMove.Application.Features.Incidents;
 using ModMove.Domain.Entities;
 
 namespace ModMove.Application.Features.Orders.Commands.ReviewPickupEvidence;
@@ -11,6 +12,7 @@ internal sealed class ReviewPickupEvidenceCommandHandler(
     ICurrentUserService currentUser,
     IUserRepository users,
     IShippingOrderRepository orders,
+    IIncidentRepository incidents,
     IDriverProfileRepository driverProfiles,
     INotificationService notifications,
     IUnitOfWork unitOfWork,
@@ -24,14 +26,21 @@ internal sealed class ReviewPickupEvidenceCommandHandler(
 
         // ORDER_NOT_YOURS and "nothing waiting for review" come from the entity.
         var reason = request.Reason?.Trim();
+        var driverUserId = await driverProfiles.DriverUserIdAsync(order, cancellationToken);
         if (request.Approve)
+        {
+            order.EnsureCustomer(customer.Id); // ORDER_NOT_YOURS before saying anything about the order's incidents
+            // 7.6: approving starts the trip, so it waits for the driver's open incident; rejecting does not move the order on.
+            await IncidentGuard.EnsureDriverHasNoOpenIncidentAsync(incidents, order.Id, driverUserId, cancellationToken);
             order.ApprovePickupEvidence(customer.Id, clock.GetUtcNow());
+        }
         else
+        {
             order.RejectPickupEvidence(reason!, customer.Id);
+        }
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var driverUserId = await driverProfiles.DriverUserIdAsync(order, cancellationToken);
         if (request.Approve)
         {
             await notifications.PublishOrderStatusAsync(order, driverUserId, cancellationToken); // now InTransit
