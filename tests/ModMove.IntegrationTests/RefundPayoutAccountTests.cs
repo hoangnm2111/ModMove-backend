@@ -263,6 +263,46 @@ public class RefundPayoutAccountTests
     }
 
     [Fact]
+    public async Task Reusing_the_PayOS_account_copies_the_latest_paid_payer_and_normalizes_holder_R01()
+    {
+        var s = new TripSetup();
+        var refund = CancellationRefund(s);
+        var older = PaymentTransaction.ForOrderViaPayOs(refund.OrderId, 180_000m, 1001L, "https://pay.test/1", TripSetup.Now);
+        older.MarkPaid(TripSetup.Now.AddMinutes(1));
+        older.RecordPayer("970415", "9999999999", "OLD PAYER");
+        var newer = PaymentTransaction.ForOrderViaPayOs(refund.OrderId, 180_000m, 1002L, "https://pay.test/2", TripSetup.Now);
+        newer.MarkPaid(TripSetup.Now.AddMinutes(2));
+        newer.RecordPayer("970436", "0011001234567", "  Nguyễn   Đức   Hòa  ");
+        var pending = PaymentTransaction.ForOrderViaPayOs(refund.OrderId, 180_000m, 1003L, "https://pay.test/3", TripSetup.Now);
+        pending.RecordPayer("970415", "8888888888", "PENDING PAYER");
+        s.App.Payments.Add(older);
+        s.App.Payments.Add(newer);
+        s.App.Payments.Add(pending);
+
+        await s.App.Sender.Send(new SetRefundPayoutAccountCommand(refund.Id, new PayoutAccountInput(true, null, null, null)));
+
+        Assert.Equal(("970436", "Vietcombank", "0011001234567", "NGUYEN DUC HOA"),
+            (refund.PayoutBankCode, refund.PayoutBankName, refund.PayoutAccountNumber, refund.PayoutAccountHolder));
+    }
+
+    [Fact]
+    public async Task Reusing_the_PayOS_account_whose_BIN_is_not_in_active_BANK_list_is_NO_SUGGESTED_PAYOUT_ACCOUNT()
+    {
+        var s = new TripSetup();
+        var refund = CancellationRefund(s);
+        var tx = PaymentTransaction.ForOrderViaPayOs(refund.OrderId, 180_000m, 1001L, "https://pay.test/1", TripSetup.Now);
+        tx.MarkPaid(TripSetup.Now.AddMinutes(1));
+        tx.RecordPayer("999999", "0011001234567", "NGUYEN VAN A");
+        s.App.Payments.Add(tx);
+
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(new SetRefundPayoutAccountCommand(refund.Id, new PayoutAccountInput(true, null, null, null))));
+
+        Assert.Equal("NO_SUGGESTED_PAYOUT_ACCOUNT", error.Code);
+        Assert.False(refund.HasPayoutAccount);
+    }
+
+    [Fact]
     public void Banks_lookup_is_a_public_GET_of_the_BANK_category_H4()
     {
         var action = typeof(ModMove.WebApi.Controllers.Public.LookupsController).GetMethod(nameof(ModMove.WebApi.Controllers.Public.LookupsController.Banks))!;
