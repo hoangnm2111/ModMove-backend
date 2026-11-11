@@ -16,5 +16,5 @@ public sealed record RegisterCommand(string FullName, string PhoneNumber, string
     public static RegisterCommand From(RegisterRequest r, UserRole role) => new(r.FullName, r.PhoneNumber, r.Email, r.Password, role);
 }
 
-/// <summary>The account exists but cannot sign in until the email OTP is verified (D1).</summary>
-public sealed record RegisterResponse(long UserId, string Email);
+/// <summary>No account yet: it is saved once the email OTP is verified (A-02, D1).</summary>
+public sealed record RegisterResponse(string Email);
