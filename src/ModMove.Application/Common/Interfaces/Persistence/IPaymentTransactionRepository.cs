@@ -16,5 +16,8 @@ public interface IPaymentTransactionRepository : IRepository<PaymentTransaction>
 
     /// <summary>Finds the PayOS session for a webhook by its unique <c>orderCode</c>.</summary>
     Task<PaymentTransaction?> GetByPayOsOrderCodeAsync(long payosOrderCode, CancellationToken cancellationToken = default);
+
+    /// <summary>R-01: the order's latest <c>Paid</c> PayOS transaction that kept the payer's bank and account number; the account to offer as the refund account.</summary>
+    Task<PaymentTransaction?> GetLatestPaidWithPayerAsync(long orderId, CancellationToken cancellationToken = default);
 }
 

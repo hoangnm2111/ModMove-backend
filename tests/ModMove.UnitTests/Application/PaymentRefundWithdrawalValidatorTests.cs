@@ -3,6 +3,7 @@ using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Features.Payments.Commands.CreateOrderPayment;
 using ModMove.Application.Features.Payments.Commands.ProcessPayOsWebhook;
 using ModMove.Application.Features.Refunds.Commands.ApproveRefund;
+using ModMove.Application.Features.Refunds.Commands.MarkRefundPayoutFailed;
 using ModMove.Application.Features.Refunds.Commands.ProcessRefundPayout;
 using ModMove.Application.Features.Refunds.Commands.RejectRefund;
 using ModMove.Application.Features.Refunds.Queries.GetAdminRefunds;
@@ -188,6 +189,37 @@ public class PaymentRefundWithdrawalValidatorTests
 
         validator.TestValidate(new ProcessRefundPayoutCommand(1, new string('X', 51)))
             .ShouldHaveValidationErrorFor(x => x.BankReferenceCode);
+    }
+
+    [Fact]
+    public void MarkRefundPayoutFailed_validator_happy_path()
+    {
+        var validator = new MarkRefundPayoutFailedCommandValidator();
+
+        validator.TestValidate(new MarkRefundPayoutFailedCommand(1, "Sai số tài khoản")).ShouldNotHaveAnyValidationErrors();
+        validator.TestValidate(new MarkRefundPayoutFailedCommand(1, new string('X', 1000))).ShouldNotHaveAnyValidationErrors();
+    }
+
+    [Theory]
+    [InlineData(0, "Sai số", nameof(MarkRefundPayoutFailedCommand.RefundId))]
+    [InlineData(-1, "Sai số", nameof(MarkRefundPayoutFailedCommand.RefundId))]
+    [InlineData(1, "", nameof(MarkRefundPayoutFailedCommand.Reason))]
+    [InlineData(1, "   ", nameof(MarkRefundPayoutFailedCommand.Reason))]
+    public void MarkRefundPayoutFailed_validator_edge_cases_fail(long refundId, string reason, string expectedField)
+    {
+        var validator = new MarkRefundPayoutFailedCommandValidator();
+
+        validator.TestValidate(new MarkRefundPayoutFailedCommand(refundId, reason))
+            .ShouldHaveValidationErrorFor(expectedField);
+    }
+
+    [Fact]
+    public void MarkRefundPayoutFailed_validator_reason_exceeding_1000_chars_fails()
+    {
+        var validator = new MarkRefundPayoutFailedCommandValidator();
+
+        validator.TestValidate(new MarkRefundPayoutFailedCommand(1, new string('X', 1001)))
+            .ShouldHaveValidationErrorFor(x => x.Reason);
     }
 
     // ==========================================

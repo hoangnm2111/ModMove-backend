@@ -21,6 +21,9 @@ internal sealed class GetAdminRefundDetailQueryHandler(ISqlConnectionFactory con
                r.decision_note AS DecisionNote, r.info_request_note AS InfoRequestNote, r.customer_reply AS CustomerReply,
                r.bank_reference_code AS BankReferenceCode,
                r.decided_at AS DecidedAt, r.processed_at AS ProcessedAt, r.created_at AS CreatedAt,
+               r.payout_bank_code AS PayoutBankCode, r.payout_bank_name AS PayoutBankName,
+               r.payout_account_number AS PayoutAccountNumber, r.payout_account_holder AS PayoutAccountHolder,
+               r.payout_info_updated_at AS PayoutInfoUpdatedAt, r.payout_failure_reason AS PayoutFailureReason,
                cust.id AS CustomerId, cust.full_name AS CustomerName, cust.phone_number AS CustomerPhone, cust.email AS CustomerEmail,
                dp.id AS DriverProfileId, drv.full_name AS DriverName, drv.phone_number AS DriverPhone, v.license_plate AS LicensePlate
         FROM refunds r
@@ -41,6 +44,15 @@ internal sealed class GetAdminRefundDetailQueryHandler(ISqlConnectionFactory con
             new CommandDefinition(Sql, new { request.RefundId }, cancellationToken: cancellationToken))
             ?? throw new NotFoundException(nameof(Refund), request.RefundId);
 
+        var payoutAccount = row.PayoutAccountNumber is null
+            ? null
+            : new AdminPayoutAccount(
+                row.PayoutBankCode ?? "",
+                row.PayoutBankName ?? "",
+                row.PayoutAccountNumber,
+                row.PayoutAccountHolder ?? "",
+                SqlHelpers.ToUtc(row.PayoutInfoUpdatedAt));
+
         return new AdminRefundDetailResponse(
             row.Id, row.OrderId, row.OrderCode, row.OrderStatus,
             row.OrderTotalFee, row.PaymentMethod, row.PaymentStatus,
@@ -52,7 +64,8 @@ internal sealed class GetAdminRefundDetailQueryHandler(ISqlConnectionFactory con
             row.BankReferenceCode,
             SqlHelpers.ToUtc(row.DecidedAt), SqlHelpers.ToUtc(row.ProcessedAt), SqlHelpers.ToUtc(row.CreatedAt),
             row.CustomerId, row.CustomerName, row.CustomerPhone, row.CustomerEmail,
-            row.DriverProfileId, row.DriverName, row.DriverPhone, row.LicensePlate);
+            row.DriverProfileId, row.DriverName, row.DriverPhone, row.LicensePlate,
+            payoutAccount, row.PayoutAccountNumber is not null, row.PayoutFailureReason);
     }
 
     private sealed class Row
@@ -84,6 +97,12 @@ internal sealed class GetAdminRefundDetailQueryHandler(ISqlConnectionFactory con
         public DateTime? DecidedAt { get; init; }
         public DateTime? ProcessedAt { get; init; }
         public DateTime CreatedAt { get; init; }
+        public string? PayoutBankCode { get; init; }
+        public string? PayoutBankName { get; init; }
+        public string? PayoutAccountNumber { get; init; }
+        public string? PayoutAccountHolder { get; init; }
+        public DateTime? PayoutInfoUpdatedAt { get; init; }
+        public string? PayoutFailureReason { get; init; }
         public long CustomerId { get; init; }
         public string CustomerName { get; init; } = "";
         public string CustomerPhone { get; init; } = "";

@@ -1,11 +1,17 @@
+using System.Reflection;
 using FluentValidation;
+using Microsoft.AspNetCore.Mvc;
 using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Features.Orders.Commands.ConfirmReceipt;
+using ModMove.Application.Features.Refunds;
 using ModMove.Application.Features.Refunds.Commands.ApproveRefund;
+using ModMove.Application.Features.Refunds.Commands.MarkRefundPayoutFailed;
 using ModMove.Application.Features.Refunds.Commands.ProcessRefundPayout;
 using ModMove.Application.Features.Refunds.Commands.RejectRefund;
+using ModMove.Application.Features.Refunds.Commands.SetRefundPayoutAccount;
 using ModMove.Application.Features.Refunds.Queries.GetAdminRefunds;
+using ModMove.WebApi.Controllers.Admin;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 using ModMove.Domain.Exceptions;
@@ -180,11 +186,159 @@ public class AdminRefundsTests
         s.App.Refunds.Add(refund);
 
         await s.App.Sender.Send(new ApproveRefundCommand(refund.Id));
+        var savesBeforePayout = s.App.UnitOfWork.Saves;
+        var sentBeforePayout = s.App.Realtime.Sent.Count;
         var error = await Assert.ThrowsAsync<DomainException>(() =>
             s.App.Sender.Send(new ProcessRefundPayoutCommand(refund.Id, "FT111")));
 
         Assert.Equal("REFUND_BANK_ACCOUNT_REQUIRED", error.Code);
         Assert.Equal(RefundStatus.Approved, refund.RefundStatus);
+        Assert.Equal(savesBeforePayout, s.App.UnitOfWork.Saves);
+        Assert.Equal(sentBeforePayout, s.App.Realtime.Sent.Count);
+
+        // Once the customer supplies an account, the Administrator can pay it out.
+        refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now.AddMinutes(5));
+        await s.App.Sender.Send(new ProcessRefundPayoutCommand(refund.Id, "FT111"));
+
+        Assert.Equal(RefundStatus.Processed, refund.RefundStatus);
+        Assert.Equal("FT111", refund.BankReferenceCode);
+    }
+
+    [Fact]
+    public async Task Payout_on_a_Failed_refund_before_customer_fixes_account_is_refused_R01()
+    {
+        var s = Build();
+        var refund = Refund.Request(s.Order.Id, null, RefundSourceType.Cancellation, "Khách hủy", null, 180_000m);
+        refund.Approve(s.Admin.Id, Now);
+        refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now);
+        refund.MarkFailed("Sai tên chủ tài khoản");
+        s.App.Refunds.Add(refund);
+
+        await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(new ProcessRefundPayoutCommand(refund.Id, "FT111")));
+
+        Assert.Equal(RefundStatus.Failed, refund.RefundStatus);
+        Assert.Equal(0, s.App.UnitOfWork.Saves);
+        Assert.Empty(s.App.Realtime.Sent);
+    }
+
+    // ---- Payout failed (K6, UC-ADM-18 5a, R-01) ----
+
+    [Fact]
+    public async Task Admin_marks_approved_refund_payout_failed_and_notifies_customer_R01()
+    {
+        var s = Build();
+        var refund = Refund.Request(s.Order.Id, null, RefundSourceType.Cancellation, "Khách hủy", null, 180_000m);
+        refund.Approve(s.Admin.Id, Now);
+        refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now);
+        s.App.Refunds.Add(refund);
+        var beforeVersion = refund.RowVersion;
+
+        await s.App.Sender.Send(new MarkRefundPayoutFailedCommand(refund.Id, "  Sai tên chủ tài khoản  "));
+
+        Assert.Equal(RefundStatus.Failed, refund.RefundStatus);
+        Assert.Equal("Sai tên chủ tài khoản", refund.PayoutFailureReason);
+        Assert.Equal(beforeVersion + 1, refund.RowVersion);
+        Assert.Equal(1, s.App.UnitOfWork.Saves);
+
+        var signalR = Assert.Single(s.App.Realtime.Sent, x => x.EventName == RealtimeEvents.NotificationReceived);
+        Assert.Equal(("user", s.Customer.Id.ToString()), (signalR.Target, signalR.Id));
+        var payload = Assert.IsType<Notification>(signalR.Payload);
+        Assert.Equal("REFUND_PAYOUT_FAILED", payload.Type);
+        Assert.Equal(s.Order.Id.ToString(), payload.Data!["orderId"]);
+        Assert.DoesNotContain("0123456789", payload.Body);
+        Assert.DoesNotContain("Sai tên chủ tài khoản", payload.Body);
+
+        var push = Assert.Single(s.App.Push.Sent);
+        Assert.Equal("REFUND_PAYOUT_FAILED", push.Data!["type"]);
+    }
+
+    [Fact]
+    public async Task Full_R01_lifecycle_payout_failed_then_customer_updates_account_then_admin_pays_out()
+    {
+        var s = Build();
+        var refund = Refund.Request(s.Order.Id, null, RefundSourceType.Cancellation, "Khách hủy", null, 180_000m);
+        refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now);
+        s.App.Refunds.Add(refund);
+
+        // 1. Admin approves
+        await s.App.Sender.Send(new ApproveRefundCommand(refund.Id));
+        Assert.Equal(RefundStatus.Approved, refund.RefundStatus);
+
+        // 2. Transfer fails -> Admin records payout-failed
+        await s.App.Sender.Send(new MarkRefundPayoutFailedCommand(refund.Id, "Tài khoản không tồn tại"));
+        Assert.Equal(RefundStatus.Failed, refund.RefundStatus);
+
+        // 3. Customer signs in and provides a different valid account -> refund returns to Approved
+        var customerApp = TestApp.SignedInAs(s.Customer);
+        customerApp.Orders.Add(s.Order);
+        customerApp.Refunds.Add(refund);
+        await customerApp.Sender.Send(new SetRefundPayoutAccountCommand(
+            refund.Id, new PayoutAccountInput(false, "970415", "9876543210", "NGUYEN VAN A")));
+
+        Assert.Equal(RefundStatus.Approved, refund.RefundStatus);
+        Assert.Null(refund.PayoutFailureReason);
+
+        // 4. Admin retries manual payout -> Processed
+        await s.App.Sender.Send(new ProcessRefundPayoutCommand(refund.Id, "FT26293000111"));
+        Assert.Equal(RefundStatus.Processed, refund.RefundStatus);
+        Assert.Equal("FT26293000111", refund.BankReferenceCode);
+    }
+
+    [Theory]
+    [InlineData(RefundStatus.Requested)]
+    [InlineData(RefundStatus.Processed)]
+    [InlineData(RefundStatus.Rejected)]
+    [InlineData(RefundStatus.Failed)]
+    public async Task Payout_failed_on_non_approved_refund_is_refused_R01(RefundStatus status)
+    {
+        var s = Build();
+        var refund = Refund.Request(s.Order.Id, null, RefundSourceType.Cancellation, "Khách hủy", null, 180_000m);
+        if (status is RefundStatus.Processed or RefundStatus.Failed)
+        {
+            refund.Approve(s.Admin.Id, Now);
+            refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now);
+            if (status == RefundStatus.Processed)
+                refund.MarkProcessed("FT1", Now);
+            else
+                refund.MarkFailed("Lỗi cũ");
+        }
+        else if (status == RefundStatus.Rejected)
+        {
+            refund.RejectRefund(s.Admin.Id, Now);
+        }
+        s.App.Refunds.Add(refund);
+
+        await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(new MarkRefundPayoutFailedCommand(refund.Id, "Lỗi chuyển khoản")));
+
+        Assert.Equal(status, refund.RefundStatus);
+        Assert.Equal(0, s.App.UnitOfWork.Saves);
+        Assert.Empty(s.App.Realtime.Sent);
+    }
+
+    [Fact]
+    public async Task Payout_failed_concurrent_save_throws_ConflictException_409_R01()
+    {
+        var s = Build();
+        var refund = Refund.Request(s.Order.Id, null, RefundSourceType.Cancellation, "Khách hủy", null, 180_000m);
+        refund.Approve(s.Admin.Id, Now);
+        s.App.Refunds.Add(refund);
+        s.App.UnitOfWork.ThrowConflictOnSave = true;
+
+        await Assert.ThrowsAsync<ConflictException>(() =>
+            s.App.Sender.Send(new MarkRefundPayoutFailedCommand(refund.Id, "Lỗi chuyển khoản")));
+
+        Assert.Empty(s.App.Realtime.Sent);
+    }
+
+    [Fact]
+    public void Payout_failed_endpoint_is_POST_on_Admin_RefundsController()
+    {
+        var action = typeof(RefundsController).GetMethod(nameof(RefundsController.PayoutFailed))!;
+
+        Assert.Equal("{id:long}/payout-failed", Assert.Single(action.GetCustomAttributes<HttpPostAttribute>()).Template);
+        Assert.Equal("ModMove.WebApi.Controllers.Admin", typeof(RefundsController).Namespace);
     }
 
     [Fact]
@@ -249,8 +403,9 @@ public class AdminRefundsTests
         var err1 = await Assert.ThrowsAsync<ForbiddenAccessException>(() => s.App.Sender.Send(new ApproveRefundCommand(refund.Id)));
         var err2 = await Assert.ThrowsAsync<ForbiddenAccessException>(() => s.App.Sender.Send(new RejectRefundCommand(refund.Id)));
         var err3 = await Assert.ThrowsAsync<ForbiddenAccessException>(() => s.App.Sender.Send(new ProcessRefundPayoutCommand(refund.Id, "FT1")));
+        var err4 = await Assert.ThrowsAsync<ForbiddenAccessException>(() => s.App.Sender.Send(new MarkRefundPayoutFailedCommand(refund.Id, "Lỗi")));
 
-        Assert.Equal(("ACCOUNT_INACTIVE", "ACCOUNT_INACTIVE", "ACCOUNT_INACTIVE"), (err1.Code, err2.Code, err3.Code));
+        Assert.Equal(("ACCOUNT_INACTIVE", "ACCOUNT_INACTIVE", "ACCOUNT_INACTIVE", "ACCOUNT_INACTIVE"), (err1.Code, err2.Code, err3.Code, err4.Code));
     }
 
     [Fact]
@@ -261,6 +416,7 @@ public class AdminRefundsTests
         await Assert.ThrowsAsync<NotFoundException>(() => s.App.Sender.Send(new ApproveRefundCommand(999)));
         await Assert.ThrowsAsync<NotFoundException>(() => s.App.Sender.Send(new RejectRefundCommand(999)));
         await Assert.ThrowsAsync<NotFoundException>(() => s.App.Sender.Send(new ProcessRefundPayoutCommand(999, "FT1")));
+        await Assert.ThrowsAsync<NotFoundException>(() => s.App.Sender.Send(new MarkRefundPayoutFailedCommand(999, "Lỗi")));
     }
 
     [Fact]
@@ -278,6 +434,10 @@ public class AdminRefundsTests
         await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new ProcessRefundPayoutCommand(1, "")));
         await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new ProcessRefundPayoutCommand(1, "   ")));
         await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new ProcessRefundPayoutCommand(1, tooLongRef)));
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new MarkRefundPayoutFailedCommand(0, "Lỗi")));
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new MarkRefundPayoutFailedCommand(1, "")));
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new MarkRefundPayoutFailedCommand(1, "   ")));
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new MarkRefundPayoutFailedCommand(1, tooLongNote)));
 
         var queryValidator = new GetAdminRefundsQueryValidator();
         Assert.False((await queryValidator.ValidateAsync(new GetAdminRefundsQuery(Page: 0))).IsValid);

@@ -18,6 +18,17 @@ internal sealed class GetMyRefundDetailQueryHandler(ISqlConnectionFactory connec
           AND r.id = @RefundId
         """;
 
+    private const string SuggestionSql = """
+        SELECT p.payer_bank_bin AS BankCode, b.name AS BankName,
+               p.payer_account_number AS AccountNumber, p.payer_account_name AS AccountHolder
+        FROM payment_transactions p
+        JOIN master_data_items b ON b.category = 'BANK' AND b.code = p.payer_bank_bin AND b.is_active = 1
+        WHERE p.order_id = @OrderId AND p.payment_method = 'PayOS' AND p.transaction_status = 'Paid'
+          AND p.payer_account_number IS NOT NULL
+        ORDER BY p.paid_at DESC, p.id DESC
+        LIMIT 1
+        """;
+
     public async Task<MyRefundDetailResponse> Handle(GetMyRefundDetailQuery request, CancellationToken cancellationToken)
     {
         var customerId = currentUser.RequireUserId();
@@ -37,9 +48,38 @@ internal sealed class GetMyRefundDetailQueryHandler(ISqlConnectionFactory connec
             r.ProcessedAt is { } processed ? CustomerAccess.Utc(processed) : null,
             r.PayoutAccount, r.NeedsPayoutAccount, r.PayoutFailureReason,
             r.RefundStatus == "Processed" ? r.BankReferenceCode : null,
-            // shortcut: waits for K2. The payer's account (payment_transactions.payer_*) is not stored yet. When it is, a
-            // second parameterised query reads the latest Paid transaction of the order joined to the BANK list, and the
-            // masked result goes here only while NeedsPayoutAccount.
-            SuggestedPayoutAccount: null);
+            r.NeedsPayoutAccount ? await ReadSuggestionAsync(connection, r.OrderId, cancellationToken) : null);
+    }
+
+    /// <summary>
+    /// Q3: the account the customer paid from through PayOS, offered to confirm. Read only while the refund still needs an
+    /// account, joined to the BANK list so a bank that is not offered is not suggested, and returned masked: the client
+    /// never gets the full number and never sends it back (the server copies it again on confirm).
+    /// </summary>
+    private static async Task<PayoutAccountView?> ReadSuggestionAsync(
+        System.Data.IDbConnection connection, long orderId, CancellationToken cancellationToken)
+    {
+        var payer = await connection.QueryFirstOrDefaultAsync<PayerRow>(
+            new CommandDefinition(SuggestionSql, new { OrderId = orderId }, cancellationToken: cancellationToken));
+        if (payer is null)
+            return null;
+
+        // The same checks the server runs when the customer confirms, so a suggestion is never one that confirm would refuse.
+        var holder = PayoutAccountResolver.NormalizePayerName(payer.AccountHolder);
+        if (payer.AccountNumber is not { } number || !IsValidNumber(number) || holder.Length < 2)
+            return null;
+
+        return new PayoutAccountView(payer.BankCode, payer.BankName, PayoutAccountView.Mask(number), holder);
+    }
+
+    private static bool IsValidNumber(string number) =>
+        number.Length is >= 6 and <= 19 && number.All(c => c is >= '0' and <= '9');
+
+    private sealed class PayerRow
+    {
+        public string BankCode { get; init; } = "";
+        public string BankName { get; init; } = "";
+        public string? AccountNumber { get; init; }
+        public string? AccountHolder { get; init; }
     }
 }
