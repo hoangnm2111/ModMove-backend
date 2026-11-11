@@ -156,14 +156,14 @@ public static class DriverNotifications
             return;
 
         decimal radiusKm = 5m;
-        decimal minCodDeposit = 200_000m;
+        decimal requiredDeposit = 200_000m;
         decimal commissionRate = 0.10m;
         try
         {
             radiusKm = await settings.GetDecimalAsync(SettingKeys.MatchingRadiusKm, cancellationToken);
+            requiredDeposit = await settings.GetDecimalAsync(SettingKeys.RequiredDeposit, cancellationToken);
             if (order.PaymentMethod == PaymentMethod.Cash)
             {
-                minCodDeposit = await settings.GetDecimalAsync(SettingKeys.MinCodDeposit, cancellationToken);
                 commissionRate = await settings.GetDecimalAsync(SettingKeys.CommissionRate, cancellationToken);
             }
         }
@@ -198,12 +198,12 @@ public static class DriverNotifications
             if (await orders.GetActiveOrderIdForDriverAsync(profile.Id, cancellationToken) is not null)
                 continue;
 
-            if (order.PaymentMethod == PaymentMethod.Cash)
-            {
-                var wallet = await wallets.GetByDriverProfileIdAsync(profile.Id, cancellationToken);
-                if (wallet is null || !wallet.CanReceiveCod(minCodDeposit, orderCommission))
-                    continue;
-            }
+            var wallet = await wallets.GetByDriverProfileIdAsync(profile.Id, cancellationToken);
+            var walletEligible = order.PaymentMethod == PaymentMethod.Cash
+                ? wallet is not null && wallet.CanReceiveCod(requiredDeposit, orderCommission)
+                : wallet is not null && wallet.CanReceiveOrders(requiredDeposit);
+            if (!walletEligible)
+                continue;
 
             var roundedDistance = Math.Round((decimal)distKm, 2, MidpointRounding.AwayFromZero);
             await notifications.NotifyNewMatchingOrderAsync(profile.UserId, order, roundedDistance, cancellationToken);
@@ -298,7 +298,7 @@ public static class DriverNotifications
             new Notification(
                 WithdrawalDecidedType,
                 "Yêu cầu rút tiền bị từ chối",
-                $"Yêu cầu rút {amount:N0} VND đã bị từ chối và số tiền đã được hoàn lại vào ví thu nhập.{reasonText}",
+                $"Yêu cầu rút {amount:N0} VND đã bị từ chối và số tiền đã được hoàn lại vào ví.{reasonText}",
                 data),
             cancellationToken);
     }
