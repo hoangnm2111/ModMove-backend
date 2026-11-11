@@ -68,6 +68,24 @@ public class IncidentResolutionTests
     }
 
     [Fact]
+    public async Task StartHandling_an_incident_left_by_the_previous_driver_tells_that_driver_not_the_new_one_8_3()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit();
+        var first = s.Incident(order);
+        var leftOpen = s.Incident(order, IncidentType.Other);
+        var (newDriverUser, newProfile, _) = s.ReplacementDriver();
+        order.ReassignDriver(newProfile.Id, s.Dispatcher.Id, "Đổi xe");
+        first.Resolve(IncidentDecision.ReassignDriver, "Đổi xe", s.Dispatcher.Id, DispatcherSetup.Now);
+
+        await s.App.Sender.Send(new StartIncidentHandlingCommand(leftOpen.Id));
+
+        Assert.Single(s.SentTo(s.Driver), n => n.Type == "INCIDENT_IN_PROGRESS");
+        Assert.DoesNotContain(s.SentTo(newDriverUser), n => n.Type == "INCIDENT_IN_PROGRESS");
+        Assert.Single(s.SentTo(s.Customer), n => n.Type == "INCIDENT_IN_PROGRESS");
+    }
+
+    [Fact]
     public async Task StartHandling_AlreadyHandledByAnotherDispatcher_Throws409Conflict()
     {
         var s = new DispatcherSetup();

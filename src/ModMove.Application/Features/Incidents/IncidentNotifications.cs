@@ -12,7 +12,7 @@ namespace ModMove.Application.Features.Incidents;
 internal static class IncidentNotifications
 {
     /// <summary>
-    /// DECISIONS 8.3: a Dispatcher took over the incident; the customer and the driver now holding the order are told.
+    /// DECISIONS 8.3: a Dispatcher took over the incident; the customer and the driver it concerns (<paramref name="driverUserId"/>) are told.
     /// The driver's text is the same for every incident, so a customer's report is never repeated to the driver.
     /// </summary>
     public static async Task NotifyHandlingStartedAsync(

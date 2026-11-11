@@ -40,9 +40,16 @@ internal sealed class CancelOrderCommandHandler(
         if (refundOwed)
             refunds.Add(Refund.Request(order.Id, null, RefundSourceType.Cancellation, reason, null, refundAmount, choice.Code));
 
-        // 7.6: an incident the driver reported on the Accepted order has nothing left to decide; close it with the order.
+        // 7.6: a cancelled order leaves nothing for a Dispatcher to decide, so every open incident on it (the driver's, or the
+        // customer's own after a reassignment) closes with it, and an incident refund still Requested is withdrawn: the
+        // cancellation refund above already gives back everything that was paid.
         foreach (var incident in await incidents.GetOpenForOrderAsync(order.Id, excludeIncidentId: 0, cancellationToken))
             incident.CloseBecauseOrderCancelled("Khách đã hủy đơn.", now);
+        foreach (var open in await refunds.GetOpenForOrderAsync(order.Id, cancellationToken))
+        {
+            if (open is { SourceType: RefundSourceType.Incident, RefundStatus: RefundStatus.Requested })
+                open.Withdraw();
+        }
 
         if (payments is not null)
         {

@@ -130,6 +130,19 @@ public class ReviewPickupEvidenceTests
     }
 
     [Fact]
+    public async Task Another_customers_order_is_refused_before_the_incident_check_C10()
+    {
+        var s = new TripSetup();
+        var order = s.PickedUp(customerId: s.Other.Id);
+        s.App.Incidents.Add(InTransitIncident.Report(order.Id, s.Driver.Id, IncidentType.DamagedCargo, "Hàng vỡ khi bốc", null, null, null));
+
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(new ReviewPickupEvidenceCommand(order.Id, Approve: true, Reason: null)));
+
+        Assert.Equal("ORDER_NOT_YOURS", error.Code);
+    }
+
+    [Fact]
     public async Task Customers_own_open_incident_does_not_hold_the_approval_7_6()
     {
         var s = new TripSetup();

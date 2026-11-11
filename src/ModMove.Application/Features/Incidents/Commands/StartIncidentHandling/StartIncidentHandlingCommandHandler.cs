@@ -35,7 +35,11 @@ internal sealed class StartIncidentHandlingCommandHandler(
 
         var order = await orders.GetByIdAsync(incident.OrderId, cancellationToken)
             ?? throw new NotFoundException(nameof(ShippingOrder), incident.OrderId);
-        var driverUserId = await driverProfiles.DriverUserIdAsync(order, cancellationToken);
+        // The driver it concerns: whoever reported a driver's incident (even after the order moved to another driver);
+        // for a customer's incident, the driver now holding the order.
+        var driverUserId = incident.ReportedBy == order.CustomerId
+            ? await driverProfiles.DriverUserIdAsync(order, cancellationToken)
+            : incident.ReportedBy;
         await IncidentNotifications.NotifyHandlingStartedAsync(notifications, order, driverUserId, incident, cancellationToken);
     }
 }
