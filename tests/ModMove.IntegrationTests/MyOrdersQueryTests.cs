@@ -276,6 +276,26 @@ public class MyOrdersQueryTests
     }
 
     [Fact]
+    public async Task Detail_points_at_the_incident_that_holds_the_trip_7_6()
+    {
+        var db = new Db();
+        db.Orders.Columns.Add("PendingDriverIncidentId", typeof(long));
+        db.Orders.Rows[0]["PendingDriverIncidentId"] = 42L;
+
+        var order = await db.Sender().Send(new GetMyOrderDetailQuery(1));
+
+        Assert.Equal(42L, order.PendingDriverIncidentId);
+        // Only an Open or InProgress incident reported by the driver who now holds the order counts (not the customer's own).
+        var (sql, _) = db.OrdersQuery();
+        Assert.Contains("i.reported_by = dp.user_id", sql);
+        Assert.Contains("i.resolution_status IN ('Open', 'InProgress')", sql);
+    }
+
+    [Fact]
+    public async Task Detail_has_no_holding_incident_by_default() =>
+        Assert.Null((await new Db().Sender().Send(new GetMyOrderDetailQuery(1))).PendingDriverIncidentId);
+
+    [Fact]
     public async Task Detail_has_no_photos_section_before_pickup()
     {
         var order = await new Db().Sender().Send(new GetMyOrderDetailQuery(1));

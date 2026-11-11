@@ -21,7 +21,12 @@ internal sealed class GetMyOrderDetailQueryHandler(
                o.discount_amount AS DiscountAmount, o.total_fee AS TotalFee, o.payment_method AS PaymentMethod,
                o.payer_role AS PayerRole, o.payment_status AS PaymentStatus, o.created_at AS CreatedAt,
                du.full_name AS DriverName, du.phone_number AS DriverPhone, v.license_plate AS LicensePlate,
-               cp.discount_code AS CouponCode
+               cp.discount_code AS CouponCode,
+               (SELECT i.id FROM in_transit_incidents i
+                WHERE i.order_id = o.id AND i.reported_by = dp.user_id
+                  AND i.resolution_status IN ('Open', 'InProgress')
+                ORDER BY i.id DESC
+                LIMIT 1) AS PendingDriverIncidentId
         FROM shipping_orders o
         JOIN vehicle_types vt ON vt.id = o.vehicle_type_id
         LEFT JOIN driver_profiles dp ON dp.id = o.driver_profile_id
@@ -95,7 +100,7 @@ internal sealed class GetMyOrderDetailQueryHandler(
                 p.DeliveryCompletionTime is { } delivered ? CustomerAccess.Utc(delivered) : null),
             history.Select(h => new StatusHistoryResponse(h.FromStatus, h.ToStatus, h.ChangedByRole, h.Note, CustomerAccess.Utc(h.ChangedAt))).ToList(),
             // A cancelled order cannot be paid any more, even while its last link is still alive.
-            o.CouponCode, pay is null || o.OrderStatus == "Cancelled" ? null : ToPayment(pay));
+            o.CouponCode, pay is null || o.OrderStatus == "Cancelled" ? null : ToPayment(pay), o.PendingDriverIncidentId);
     }
 
     private PaymentResponse ToPayment(PaymentRow row)
@@ -132,6 +137,7 @@ internal sealed class GetMyOrderDetailQueryHandler(
         public string? DriverPhone { get; init; }
         public string? LicensePlate { get; init; }
         public string? CouponCode { get; init; }
+        public long? PendingDriverIncidentId { get; init; }
     }
 
     private sealed class CargoRow
