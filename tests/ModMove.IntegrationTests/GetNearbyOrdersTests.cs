@@ -17,13 +17,13 @@ public class GetNearbyOrdersTests
 
     private static TestApp CreateApp(
         decimal matchingRadiusKm = 5m,
-        decimal minCodDeposit = 200_000m,
+        decimal requiredDeposit = 200_000m,
         decimal commissionRate = 0.10m)
     {
         var driver = User.Create("Tai", "0900000003", "tai@x.vn", "h", UserRole.Driver, emailVerified: true);
         var app = TestApp.SignedInAs(driver);
         app.Settings.Add(PlatformSetting.Create(SettingKeys.MatchingRadiusKm, matchingRadiusKm.ToString(System.Globalization.CultureInfo.InvariantCulture), Now));
-        app.Settings.Add(PlatformSetting.Create(SettingKeys.MinCodDeposit, minCodDeposit.ToString(System.Globalization.CultureInfo.InvariantCulture), Now));
+        app.Settings.Add(PlatformSetting.Create(SettingKeys.RequiredDeposit, requiredDeposit.ToString(System.Globalization.CultureInfo.InvariantCulture), Now));
         app.Settings.Add(PlatformSetting.Create(SettingKeys.CommissionRate, commissionRate.ToString(System.Globalization.CultureInfo.InvariantCulture), Now));
         return app;
     }
@@ -289,9 +289,9 @@ public class GetNearbyOrdersTests
     }
 
     [Fact]
-    public async Task Hides_cash_orders_when_deposit_below_min_cod_deposit_200k_but_keeps_paid_payos_GB16()
+    public async Task Hides_all_orders_when_deposit_below_required_deposit_200k_GB16()
     {
-        var app = CreateApp(minCodDeposit: 200_000m);
+        var app = CreateApp(requiredDeposit: 200_000m);
         app.Sql.Results.Enqueue(DriverRow(depositBalance: 199_999m));
 
         var orders = OrdersTable();
@@ -307,15 +307,14 @@ public class GetNearbyOrdersTests
 
         var result = await app.Sender.Send(new GetNearbyOrdersQuery());
 
-        var single = Assert.Single(result);
-        Assert.Equal(602L, single.OrderId);
+        Assert.Empty(result);
     }
 
     [Fact]
     public async Task Hides_cash_order_when_order_commission_exceeds_deposit_balance_GB16()
     {
-        var app = CreateApp(minCodDeposit: 200_000m, commissionRate: 0.10m);
-        // Deposit is 220,000 (>= 200k min deposit, but < 250k commission of order 701)
+        var app = CreateApp(requiredDeposit: 200_000m, commissionRate: 0.10m);
+        // Deposit is 220,000 (>= 200k required deposit, but < 250k commission of order 701)
         app.Sql.Results.Enqueue(DriverRow(depositBalance: 220_000m));
 
         var orders = OrdersTable();
@@ -332,10 +331,10 @@ public class GetNearbyOrdersTests
     }
 
     [Fact]
-    public async Task Hides_cash_orders_when_wallet_is_locked_GB16()
+    public async Task Hides_all_orders_when_wallet_is_not_active_GB16()
     {
         var app = CreateApp();
-        app.Sql.Results.Enqueue(DriverRow(walletStatus: "Locked", depositBalance: 500_000m));
+        app.Sql.Results.Enqueue(DriverRow(walletStatus: "Frozen", depositBalance: 500_000m));
 
         var orders = OrdersTable();
         AddCandidate(orders, orderId: 801L, paymentMethod: "Cash", totalFee: 300_000m);
@@ -350,8 +349,7 @@ public class GetNearbyOrdersTests
 
         var result = await app.Sender.Send(new GetNearbyOrdersQuery());
 
-        var single = Assert.Single(result);
-        Assert.Equal(802L, single.OrderId);
+        Assert.Empty(result);
     }
 
     [Fact]

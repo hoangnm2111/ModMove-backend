@@ -33,18 +33,17 @@ public class DriverWalletAndEarningsTests
 
         var wallet = DriverWallet.Create(profile.Id);
         app.DriverWallets.Add(wallet);
-        app.Settings.Add(PlatformSetting.Create(SettingKeys.MinCodDeposit, "200000", TestApp.Start));
+        app.Settings.Add(PlatformSetting.Create(SettingKeys.RequiredDeposit, "200000", TestApp.Start));
 
         return new Setup(app, driver, profile, wallet);
     }
 
     [Fact]
-    public async Task Driver_links_bank_account_and_requests_withdrawal_paying_deposit_debt_first_DRV22_5_1()
+    public async Task Driver_links_bank_account_and_requests_withdrawal_from_earnings_first_then_deposit_DRV22_GB32()
     {
         var s = Build(approved: true, linkBank: false);
         s.Wallet.CreditTripEarning(orderId: 10, fare: 200_000m, commission: 20_000m); // +180,000 earnings
-        s.Wallet.TopUpDeposit(50_000m);
-        s.Wallet.DeductCommissionFromDeposit(orderId: 11, commission: 80_000m); // -30,000 deposit debt
+        s.Wallet.TopUpDeposit(200_000m); // +200,000 deposit (WalletTotal = 380,000)
 
         // 1. Without a bank account -> 422 BANK_ACCOUNT_REQUIRED
         var noBank = await Assert.ThrowsAsync<DomainException>(() =>
@@ -56,13 +55,18 @@ public class DriverWalletAndEarningsTests
         Assert.Equal(("Vietcombank", "0071008888888", "NGUYEN VAN TAI"),
             (s.Profile.BankName, s.Profile.BankAccountNumber, s.Profile.BankAccountHolder));
 
-        // 3. Request 100,000 withdrawal -> 30,000 debt paid first, 50,000 earnings left, 0 deposit
-        var res = await s.App.Sender.Send(new RequestWithdrawalCommand(100_000m));
+        // 3. Request 250,000 withdrawal -> 180,000 from earnings first + 70,000 from deposit
+        var res = await s.App.Sender.Send(new RequestWithdrawalCommand(250_000m));
 
         Assert.True(res.TransactionId > 0);
-        Assert.Equal((100_000m, 30_000m, 50_000m, 0m, "Pending"),
-            (res.Amount, res.DebtDeducted, res.EarningsBalanceAfter, res.DepositBalanceAfter, res.TransactionStatus));
-        Assert.Contains(s.Wallet.Transactions, t => t.TransactionType == WalletTransactionType.CommissionDebtPaid && t.Amount == 30_000m);
+        Assert.Equal((250_000m, 180_000m, 70_000m, 0m, 130_000m, 130_000m, true, "Pending"),
+            (res.Amount, res.EarningsDeducted, res.DepositDeducted, res.EarningsBalanceAfter,
+             res.DepositBalanceAfter, res.WalletTotalAfter, res.DepositBelowRequired, res.TransactionStatus));
+        Assert.Contains(s.Wallet.Transactions, t =>
+            t.TransactionType == WalletTransactionType.Withdrawal
+            && t.Amount == 250_000m
+            && t.EarningsAmount == 180_000m
+            && t.DepositAmount == 70_000m);
 
         // 4. Second request while one is still Pending -> 422 WITHDRAWAL_ALREADY_PENDING (GB-32)
         var duplicatePending = await Assert.ThrowsAsync<DomainException>(() =>
@@ -91,7 +95,7 @@ public class DriverWalletAndEarningsTests
     {
         var s = Build(approved: true, linkBank: true);
 
-        // 1. GetDriverWalletQuery (earnings 300k, deposit -25k -> maxWithdrawable 275k, canReceiveCod false)
+        // 1. GetDriverWalletQuery (earnings 300k, deposit -25k -> walletTotal 275k, missingDeposit 225k, maxWithdrawable 275k, canReceiveOrders false)
         s.App.Sql.Results.Enqueue(ContextTable(s.Profile.Id));
         var walletTable = new DataTable();
         walletTable.Columns.Add("WalletId", typeof(long));
@@ -99,13 +103,14 @@ public class DriverWalletAndEarningsTests
         walletTable.Columns.Add("DepositBalance", typeof(decimal));
         walletTable.Columns.Add("EarningsBalance", typeof(decimal));
         walletTable.Columns.Add("PendingWithdrawalAmount", typeof(decimal));
-        walletTable.Rows.Add(1L, "Active", -25_000m, 300_000m, 50_000m);
+        walletTable.Columns.Add("ActiveOrderId", typeof(long));
+        walletTable.Rows.Add(1L, "Active", -25_000m, 300_000m, 50_000m, DBNull.Value);
         s.App.Sql.Results.Enqueue(walletTable);
 
         var overview = await s.App.Sender.Send(new GetDriverWalletQuery());
-        Assert.Equal((25_000m, 275_000m, 200_000m, false, true, 50_000m),
-            (overview.CommissionDebt, overview.MaxWithdrawableAmount, overview.MinCodDeposit,
-             overview.CanReceiveCod, overview.HasPendingWithdrawal, overview.PendingWithdrawalAmount));
+        Assert.Equal((275_000m, 225_000m, 275_000m, 200_000m, false, false, true, 50_000m),
+            (overview.WalletTotal, overview.MissingDepositAmount, overview.MaxWithdrawableAmount, overview.RequiredDeposit,
+             overview.CanReceiveOrders, overview.HasActiveOrder, overview.HasPendingWithdrawal, overview.PendingWithdrawalAmount));
         Assert.Equal("0071009999999", overview.BankAccount!.BankAccountNumber);
 
         // 2. GetDriverWalletTransactionsQuery
@@ -115,6 +120,8 @@ public class DriverWalletAndEarningsTests
         txTable.Columns.Add("Id", typeof(long));
         txTable.Columns.Add("TransactionType", typeof(string));
         txTable.Columns.Add("Amount", typeof(decimal));
+        txTable.Columns.Add("EarningsAmount", typeof(decimal));
+        txTable.Columns.Add("DepositAmount", typeof(decimal));
         txTable.Columns.Add("BalanceAfter", typeof(decimal));
         txTable.Columns.Add("TransactionStatus", typeof(string));
         txTable.Columns.Add("OrderId", typeof(long));
@@ -122,12 +129,13 @@ public class DriverWalletAndEarningsTests
         txTable.Columns.Add("ReferenceCode", typeof(string));
         txTable.Columns.Add("ProcessedAt", typeof(DateTime));
         txTable.Columns.Add("CreatedAt", typeof(DateTime));
-        txTable.Rows.Add(101L, "TripEarning", 180_000m, 300_000m, "Completed", 9L, "MM20261108009", null, DBNull.Value, TestApp.Start.UtcDateTime);
+        txTable.Rows.Add(101L, "TripEarning", 180_000m, 180_000m, 0m, 300_000m, "Completed", 9L, "MM20261108009", null, DBNull.Value, TestApp.Start.UtcDateTime);
         s.App.Sql.Results.Enqueue(txTable);
 
         var txs = await s.App.Sender.Send(new GetDriverWalletTransactionsQuery(Type: WalletTransactionType.TripEarning));
         var txItem = Assert.Single(txs.Items);
-        Assert.Equal(("TripEarning", "MM20261108009", 180_000m), (txItem.TransactionType, txItem.OrderCode, txItem.Amount));
+        Assert.Equal(("TripEarning", "MM20261108009", 180_000m, 180_000m, 0m),
+            (txItem.TransactionType, txItem.OrderCode, txItem.Amount, txItem.EarningsAmount, txItem.DepositAmount));
 
         // 3. GetDriverWithdrawalsQuery
         s.App.Sql.Results.Enqueue(ContextTable(s.Profile.Id));
@@ -135,17 +143,20 @@ public class DriverWalletAndEarningsTests
         var wdTable = new DataTable();
         wdTable.Columns.Add("TransactionId", typeof(long));
         wdTable.Columns.Add("Amount", typeof(decimal));
+        wdTable.Columns.Add("EarningsAmount", typeof(decimal));
+        wdTable.Columns.Add("DepositAmount", typeof(decimal));
         wdTable.Columns.Add("BalanceAfter", typeof(decimal));
         wdTable.Columns.Add("TransactionStatus", typeof(string));
         wdTable.Columns.Add("ReferenceCode", typeof(string));
         wdTable.Columns.Add("ProcessedAt", typeof(DateTime));
         wdTable.Columns.Add("CreatedAt", typeof(DateTime));
-        wdTable.Rows.Add(202L, 50_000m, 250_000m, "Completed", "FT999", TestApp.Start.UtcDateTime, TestApp.Start.UtcDateTime);
+        wdTable.Rows.Add(202L, 50_000m, 30_000m, 20_000m, 250_000m, "Completed", "FT999", TestApp.Start.UtcDateTime, TestApp.Start.UtcDateTime);
         s.App.Sql.Results.Enqueue(wdTable);
 
         var wds = await s.App.Sender.Send(new GetDriverWithdrawalsQuery(Status: WalletTransactionStatus.Completed));
         var wdItem = Assert.Single(wds.Items);
-        Assert.Equal(("FT999", "Vietcombank"), (wdItem.ReferenceCode, wdItem.BankName));
+        Assert.Equal(("FT999", "Vietcombank", 30_000m, 20_000m),
+            (wdItem.ReferenceCode, wdItem.BankName, wdItem.EarningsAmount, wdItem.DepositAmount));
 
         // 4. GetDriverEarningsQuery (Today in Vietnam UTC+7)
         s.App.Sql.Results.Enqueue(ContextTable(s.Profile.Id));
