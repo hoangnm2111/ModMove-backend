@@ -16,7 +16,7 @@ internal sealed class GetDriverWithdrawalsQueryHandler(
         FROM wallet_transactions wt
         JOIN driver_wallets w ON w.id = wt.wallet_id
         WHERE w.driver_profile_id = @DriverProfileId
-          AND wt.transaction_type = 'WithdrawEarnings'
+          AND wt.transaction_type = 'Withdrawal'
           AND (@Status IS NULL OR wt.transaction_status = @Status)
         """;
 
@@ -25,6 +25,8 @@ internal sealed class GetDriverWithdrawalsQueryHandler(
     private const string ItemsSql = $"""
         SELECT wt.id AS TransactionId,
                wt.amount AS Amount,
+               wt.earnings_amount AS EarningsAmount,
+               wt.deposit_amount AS DepositAmount,
                wt.balance_after AS BalanceAfter,
                wt.transaction_status AS TransactionStatus,
                wt.reference_code AS ReferenceCode,
@@ -61,6 +63,8 @@ internal sealed class GetDriverWithdrawalsQueryHandler(
         var items = rows.Select(r => new DriverWithdrawalResponse(
             r.TransactionId,
             r.Amount,
+            r.EarningsAmount,
+            r.DepositAmount,
             r.BalanceAfter,
             r.TransactionStatus,
             context.BankName,
@@ -77,6 +81,8 @@ internal sealed class GetDriverWithdrawalsQueryHandler(
     {
         public long TransactionId { get; init; }
         public decimal Amount { get; init; }
+        public decimal EarningsAmount { get; init; }
+        public decimal DepositAmount { get; init; }
         public decimal BalanceAfter { get; init; }
         public string TransactionStatus { get; init; } = "";
         public string? ReferenceCode { get; init; }

@@ -27,6 +27,8 @@ internal sealed class GetDriverWalletTransactionsQueryHandler(
         SELECT wt.id AS Id,
                wt.transaction_type AS TransactionType,
                wt.amount AS Amount,
+               wt.earnings_amount AS EarningsAmount,
+               wt.deposit_amount AS DepositAmount,
                wt.balance_after AS BalanceAfter,
                wt.transaction_status AS TransactionStatus,
                wt.order_id AS OrderId,
@@ -67,6 +69,8 @@ internal sealed class GetDriverWalletTransactionsQueryHandler(
             r.Id,
             r.TransactionType,
             r.Amount,
+            r.EarningsAmount,
+            r.DepositAmount,
             r.BalanceAfter,
             r.TransactionStatus,
             r.OrderId,
@@ -83,6 +87,8 @@ internal sealed class GetDriverWalletTransactionsQueryHandler(
         public long Id { get; init; }
         public string TransactionType { get; init; } = "";
         public decimal Amount { get; init; }
+        public decimal EarningsAmount { get; init; }
+        public decimal DepositAmount { get; init; }
         public decimal BalanceAfter { get; init; }
         public string TransactionStatus { get; init; } = "";
         public long? OrderId { get; init; }

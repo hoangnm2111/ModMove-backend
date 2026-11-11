@@ -20,6 +20,8 @@ public sealed record AdminWithdrawalSummary(
     string DriverName,
     string DriverPhone,
     decimal Amount,
+    decimal EarningsAmount,
+    decimal DepositAmount,
     decimal BalanceAfter,
     string TransactionStatus,
     string? BankName,

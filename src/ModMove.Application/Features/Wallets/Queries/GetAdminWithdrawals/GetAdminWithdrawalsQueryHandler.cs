@@ -18,7 +18,7 @@ internal sealed class GetAdminWithdrawalsQueryHandler(
     {
         _ = currentUser.UserId ?? throw new UnauthorizedException();
 
-        var conditions = new List<string> { "wt.transaction_type = 'WithdrawEarnings'" };
+        var conditions = new List<string> { "wt.transaction_type = 'Withdrawal'" };
         var parameters = new DynamicParameters();
 
         if (!string.IsNullOrWhiteSpace(request.Status)
@@ -58,6 +58,8 @@ internal sealed class GetAdminWithdrawalsQueryHandler(
                 u.full_name AS DriverName,
                 u.phone_number AS DriverPhone,
                 wt.amount AS Amount,
+                wt.earnings_amount AS EarningsAmount,
+                wt.deposit_amount AS DepositAmount,
                 wt.balance_after AS BalanceAfter,
                 wt.transaction_status AS TransactionStatus,
                 dp.bank_name AS BankName,
@@ -96,7 +98,8 @@ internal sealed class GetAdminWithdrawalsQueryHandler(
 
         var items = rows.Select(r => new AdminWithdrawalSummary(
             r.TransactionId, r.WalletId, r.DriverProfileId, r.DriverUserId,
-            r.DriverName, r.DriverPhone, r.Amount, r.BalanceAfter, r.TransactionStatus,
+            r.DriverName, r.DriverPhone, r.Amount, r.EarningsAmount, r.DepositAmount,
+            r.BalanceAfter, r.TransactionStatus,
             r.BankName, r.BankAccountNumber, r.BankAccountHolder,
             r.ReferenceCode, r.ProcessedBy,
             SqlHelpers.ToUtc(r.ProcessedAt), SqlHelpers.ToUtc(r.CreatedAt))).ToList();
@@ -113,6 +116,8 @@ internal sealed class GetAdminWithdrawalsQueryHandler(
         public string DriverName { get; init; } = "";
         public string DriverPhone { get; init; } = "";
         public decimal Amount { get; init; }
+        public decimal EarningsAmount { get; init; }
+        public decimal DepositAmount { get; init; }
         public decimal BalanceAfter { get; init; }
         public string TransactionStatus { get; init; } = "";
         public string? BankName { get; init; }
