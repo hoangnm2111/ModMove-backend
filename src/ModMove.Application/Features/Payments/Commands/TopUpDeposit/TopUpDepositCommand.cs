@@ -5,7 +5,7 @@ namespace ModMove.Application.Features.Payments.Commands.TopUpDeposit;
 
 /// <summary>
 /// UC-DRV-21, DECISIONS 5.2, GB-13: creates a 10-minute PayOS payment link/QR for a driver to top up their deposit wallet
-/// (minimum 50,000 VND). Calling again replaces any still-Pending deposit top-up session. Only the signed PayOS webhook
+/// (any amount above 0, at least the missing deposit while it is below REQUIRED_DEPOSIT). Calling again replaces any still-Pending deposit top-up session. Only the signed PayOS webhook
 /// ever credits <c>DriverWallet.DepositBalance</c>.
 /// </summary>
 public sealed record TopUpDepositCommand(
