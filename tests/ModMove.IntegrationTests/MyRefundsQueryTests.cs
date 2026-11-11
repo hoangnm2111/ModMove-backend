@@ -25,6 +25,10 @@ public class MyRefundsQueryTests
         public string? DecisionReason { get; set; }
         public string? PayoutAccountNumber { get; set; }
         public string? PayoutFailureReason { get; set; }
+        public string? PayerBankCode { get; set; } = "970436";
+        public string? PayerBankName { get; set; } = "Vietcombank";
+        public string? PayerAccountNumber { get; set; }
+        public string? PayerAccountName { get; set; } = "NGUYEN VAN A";
         public List<(string Sql, IReadOnlyDictionary<string, object?> Parameters)> Executed { get; } = [];
 
         public Db()
@@ -35,6 +39,17 @@ public class MyRefundsQueryTests
                 Executed.Add((text, parameters));
                 if (text.Contains("FROM users"))
                     return Table(("AccountStatus", typeof(string), AccountStatus));
+                if (text.Contains("FROM payment_transactions"))
+                {
+                    var payer = Table(
+                        ("BankCode", typeof(string), PayerBankCode),
+                        ("BankName", typeof(string), PayerBankName),
+                        ("AccountNumber", typeof(string), PayerAccountNumber),
+                        ("AccountHolder", typeof(string), PayerAccountName));
+                    if (PayerAccountNumber is null)
+                        payer.Rows.Clear();
+                    return payer;
+                }
                 var row = Table(
                     ("Id", typeof(long), 4L), ("OrderId", typeof(long), 1L), ("OrderCode", typeof(string), "MM20261020001"),
                     ("IncidentId", typeof(long), null), ("SourceType", typeof(string), "Complaint"), ("RefundStatus", typeof(string), Status),
@@ -212,9 +227,63 @@ public class MyRefundsQueryTests
     }
 
     [Fact]
-    public async Task No_PayOS_suggestion_yet_because_the_payer_columns_wait_for_K2_R01()
+    public async Task PayOS_suggestion_is_returned_masked_and_normalized_when_refund_needs_an_account_R01()
     {
-        var detail = await new Db { Status = "Requested" }.Sender().Send(new GetMyRefundDetailQuery(4));
+        var db = new Db
+        {
+            Status = "Requested",
+            PayerAccountNumber = "0011001234567",
+            PayerAccountName = "Nguyễn   Văn Á",
+        };
+
+        var detail = await db.Sender().Send(new GetMyRefundDetailQuery(4));
+
+        Assert.Equal(new PayoutAccountView("970436", "Vietcombank", "•••• 4567", "NGUYEN VAN A"), detail.SuggestedPayoutAccount);
+        var suggestionQuery = Assert.Single(db.Executed, e => e.Sql.Contains("FROM payment_transactions"));
+        Assert.Equal(1L, suggestionQuery.Parameters["OrderId"]);
+        Assert.Contains("b.category = 'BANK'", suggestionQuery.Sql);
+        Assert.Contains("b.is_active = 1", suggestionQuery.Sql);
+        Assert.Contains("p.transaction_status = 'Paid'", suggestionQuery.Sql);
+        var json = System.Text.Json.JsonSerializer.Serialize(detail);
+        Assert.DoesNotContain("0011001234567", json);
+        Assert.DoesNotContain("001100", json);
+    }
+
+    [Theory]
+    [InlineData("Requested", "0123456789")]
+    [InlineData("Processed", null)]
+    [InlineData("Rejected", null)]
+    [InlineData("Withdrawn", null)]
+    public async Task PayOS_suggestion_is_omitted_and_not_queried_once_account_is_set_or_closed_R01(string status, string? account)
+    {
+        var db = new Db
+        {
+            Status = status,
+            PayoutAccountNumber = account,
+            PayerAccountNumber = "0011001234567",
+        };
+
+        var detail = await db.Sender().Send(new GetMyRefundDetailQuery(4));
+
+        Assert.Null(detail.SuggestedPayoutAccount);
+        Assert.DoesNotContain(db.Executed, e => e.Sql.Contains("FROM payment_transactions"));
+    }
+
+    [Theory]
+    [InlineData("12345", "NGUYEN VAN A")]
+    [InlineData("123456abc", "NGUYEN VAN A")]
+    [InlineData("0123456789", "1")]
+    [InlineData("0123456789", null)]
+    public async Task PayOS_suggestion_ignores_unusable_payer_numbers_or_names_R01(string number, string? name)
+    {
+        var db = new Db
+        {
+            Status = "Requested",
+            PayerAccountNumber = number,
+            PayerAccountName = name,
+        };
+
+        var detail = await db.Sender().Send(new GetMyRefundDetailQuery(4));
 
         Assert.Null(detail.SuggestedPayoutAccount);
     }

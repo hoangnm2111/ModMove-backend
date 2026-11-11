@@ -132,6 +132,23 @@ public class CustomerRefundTests
     }
 
     [Fact]
+    public async Task Complaint_can_reuse_the_PayOS_payer_account_on_record_R01()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+        var tx = PaymentTransaction.ForOrderViaPayOs(order.Id, order.TotalFee, 2001L, "https://pay.test/1", TripSetup.Now);
+        tx.MarkPaid(TripSetup.Now.AddMinutes(1));
+        tx.RecordPayer("970436", "0011001234567", "Trần Thị Bình");
+        s.App.Payments.Add(tx);
+
+        await s.App.Sender.Send(Complaint(order) with { PayoutAccount = new PayoutAccountInput(true, null, null, null) });
+
+        var refund = Assert.Single(s.App.Refunds.Items);
+        Assert.Equal(("970436", "Vietcombank", "0011001234567", "TRAN THI BINH"),
+            (refund.PayoutBankCode, refund.PayoutBankName, refund.PayoutAccountNumber, refund.PayoutAccountHolder));
+    }
+
+    [Fact]
     public async Task One_open_complaint_per_order_B9()
     {
         var s = new TripSetup();

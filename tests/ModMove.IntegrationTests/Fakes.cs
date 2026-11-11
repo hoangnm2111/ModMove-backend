@@ -585,6 +585,14 @@ internal sealed class InMemoryPaymentTransactions : IPaymentTransactionRepositor
     public Task<PaymentTransaction?> GetByPayOsOrderCodeAsync(long payosOrderCode, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(p => p.PayosOrderCode == payosOrderCode));
 
+    public Task<PaymentTransaction?> GetLatestPaidWithPayerAsync(long orderId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items
+            .Where(p => p.OrderId == orderId && p.PaymentMethod == PaymentMethod.PayOS
+                && p.TransactionStatus == PaymentTransactionStatus.Paid && p.HasPayerAccount)
+            .OrderByDescending(p => p.PaidAt)
+            .ThenByDescending(p => p.Id)
+            .FirstOrDefault());
+
     public Task<PaymentTransaction?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(p => p.Id == id));
 

@@ -14,6 +14,7 @@ internal sealed class SubmitComplaintCommandHandler(
     IShippingOrderRepository orders,
     IRefundRepository refunds,
     IMasterDataRepository masterData,
+    IPaymentTransactionRepository payments,
     INotificationService notifications,
     IUnitOfWork unitOfWork,
     TimeProvider clock) : ICommandHandler<SubmitComplaintCommand, RefundCreatedResponse>
@@ -34,7 +35,7 @@ internal sealed class SubmitComplaintCommandHandler(
             throw new ConflictException("This order already has an open complaint.");
         order.EnsureRefundFits(request.RequestedAmount, await refunds.GetClaimedTotalForOrderAsync(order.Id, cancellationToken));
 
-        await refund.SetPayoutAccountAsync(request.PayoutAccount, masterData, clock.GetUtcNow(), cancellationToken); // R-01
+        await refund.SetPayoutAccountAsync(request.PayoutAccount, masterData, payments, clock.GetUtcNow(), cancellationToken); // R-01
 
         refunds.Add(refund);
         await unitOfWork.SaveChangesAsync(cancellationToken); // a concurrent second complaint fails on RowVersion: 409
