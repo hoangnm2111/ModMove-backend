@@ -143,6 +143,8 @@ internal sealed class InMemoryMasterData : IMasterDataRepository
         MasterDataItem.Create("COMPLAINT_REASON", "OTHER", "Khác"),
         MasterDataItem.Create("CANCELLATION_REASON", "CHANGED_PLAN", "Thay đổi kế hoạch"),
         MasterDataItem.Create("CANCELLATION_REASON", "OTHER", "Khác"),
+        MasterDataItem.Create("BANK", "970436", "Vietcombank"), // R-01: code = BIN
+        MasterDataItem.Create("BANK", "970415", "VietinBank"),
     ];
 
     public Task<MasterDataItem?> GetActiveAsync(string category, string code, CancellationToken cancellationToken = default) =>

@@ -44,6 +44,18 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
     public DateTimeOffset? DecidedAt { get; private set; }
     public DateTimeOffset? ProcessedAt { get; private set; }
 
+    // R-01: where the Administrator sends the money. A snapshot on this refund, not on the user.
+    public string? PayoutBankCode { get; private set; }      // master data BANK code = 6-digit BIN
+    public string? PayoutBankName { get; private set; }      // name at the time it was given
+    public string? PayoutAccountNumber { get; private set; }
+    public string? PayoutAccountHolder { get; private set; } // upper case, no accents
+    public DateTimeOffset? PayoutInfoUpdatedAt { get; private set; }
+
+    /// <summary>Why the Administrator's last transfer failed; cleared when the customer fixes the account.</summary>
+    public string? PayoutFailureReason { get; private set; }
+
+    public bool HasPayoutAccount => PayoutAccountNumber is not null;
+
     /// <summary>Optimistic lock: of a customer withdrawing and an Administrator deciding at once, the later save is a 409.</summary>
     public int RowVersion { get; private set; }
 
@@ -134,16 +146,43 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
     public void MarkProcessed(string bankReferenceCode, DateTimeOffset now)
     {
         EnsureStatus(RefundStatus.Approved);
+        if (!HasPayoutAccount)
+            throw new DomainException("The customer has not given a bank account to receive this refund.", "REFUND_BANK_ACCOUNT_REQUIRED");
+
         RefundStatus = RefundStatus.Processed;
         BankReferenceCode = bankReferenceCode;
         ProcessedAt = now;
         RowVersion++;
     }
 
-    public void MarkFailed()
+    /// <summary>R-01: the Administrator's transfer failed; the customer fixes the account (<see cref="SetPayoutAccount"/>).</summary>
+    public void MarkFailed(string reason)
     {
         EnsureStatus(RefundStatus.Approved);
         RefundStatus = RefundStatus.Failed;
+        PayoutFailureReason = reason;
+        RowVersion++;
+    }
+
+    /// <summary>R-01: Requested/Approved/Failed; Failed goes back to Approved so the Admin can pay again (UC-ADM-18 5a).</summary>
+    public void SetPayoutAccount(string bankCode, string bankName, string accountNumber, string accountHolder, DateTimeOffset now)
+    {
+        if (RefundStatus is RefundStatus.Processed or RefundStatus.Rejected or RefundStatus.Withdrawn)
+            throw new DomainException("This refund is closed; its payout account can no longer change.", "REFUND_PAYOUT_LOCKED");
+
+        // The same account again would send a refund the bank just refused back to the Administrator, over and over.
+        if (RefundStatus == RefundStatus.Failed
+            && (PayoutBankCode, PayoutAccountNumber, PayoutAccountHolder) == (bankCode, accountNumber, accountHolder))
+            throw new DomainException("The transfer failed with this account; give a different one.", "REFUND_PAYOUT_UNCHANGED");
+
+        (PayoutBankCode, PayoutBankName, PayoutAccountNumber, PayoutAccountHolder) = (bankCode, bankName, accountNumber, accountHolder);
+        PayoutInfoUpdatedAt = now;
+        if (RefundStatus == RefundStatus.Failed)
+        {
+            RefundStatus = RefundStatus.Approved;
+            PayoutFailureReason = null;
+        }
+
         RowVersion++;
     }
 

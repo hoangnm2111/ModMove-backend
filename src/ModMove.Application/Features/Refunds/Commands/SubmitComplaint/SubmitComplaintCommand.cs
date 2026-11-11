@@ -7,7 +7,9 @@ namespace ModMove.Application.Features.Refunds.Commands.SubmitComplaint;
 /// delivery (DECISIONS 7.3). One open complaint per order; the amount is more than 0 and at most the order total (B9).
 /// Photo URLs come from POST api/customer/uploads. <see cref="ReasonCode"/> comes from api/public/lookups/complaint-reasons;
 /// <see cref="Reason"/> is required for OTHER.
+/// R-01: <see cref="PayoutAccount"/> is where the money goes if the refund is paid.
 /// </summary>
 public sealed record SubmitComplaintCommand(
-    long OrderId, string ReasonCode, string? Reason, IReadOnlyList<string>? EvidenceUrls, decimal RequestedAmount)
+    long OrderId, string ReasonCode, string? Reason, IReadOnlyList<string>? EvidenceUrls, decimal RequestedAmount,
+    PayoutAccountInput PayoutAccount)
     : ICommand<RefundCreatedResponse>;

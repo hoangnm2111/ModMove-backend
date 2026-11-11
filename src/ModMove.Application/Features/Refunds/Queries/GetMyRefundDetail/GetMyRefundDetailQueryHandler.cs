@@ -34,6 +34,12 @@ internal sealed class GetMyRefundDetailQueryHandler(ISqlConnectionFactory connec
             r.RequestedAmount, r.ApprovedAmount, r.DecisionReason, r.InfoRequestNote, r.CustomerReply, r.WaitingForReply,
             CustomerAccess.Utc(r.CreatedAt),
             r.DecidedAt is { } decided ? CustomerAccess.Utc(decided) : null,
-            r.ProcessedAt is { } processed ? CustomerAccess.Utc(processed) : null);
+            r.ProcessedAt is { } processed ? CustomerAccess.Utc(processed) : null,
+            r.PayoutAccount, r.NeedsPayoutAccount, r.PayoutFailureReason,
+            r.RefundStatus == "Processed" ? r.BankReferenceCode : null,
+            // shortcut: waits for K2. The payer's account (payment_transactions.payer_*) is not stored yet. When it is, a
+            // second parameterised query reads the latest Paid transaction of the order joined to the BANK list, and the
+            // masked result goes here only while NeedsPayoutAccount.
+            SuggestedPayoutAccount: null);
     }
 }
