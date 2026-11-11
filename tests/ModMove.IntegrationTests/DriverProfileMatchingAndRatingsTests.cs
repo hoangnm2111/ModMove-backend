@@ -80,7 +80,7 @@ public class DriverProfileMatchingAndRatingsTests
         var driver = User.Create("Nguyễn Văn Tài", "0912000001", "driver@x.vn", "h:x", UserRole.Driver, emailVerified: true);
         var app = TestApp.SignedInAs(driver);
         app.Settings.Add(PlatformSetting.Create(SettingKeys.MatchingRadiusKm, "5", TestApp.Start));
-        app.Settings.Add(PlatformSetting.Create(SettingKeys.MinCodDeposit, "200000", TestApp.Start));
+        app.Settings.Add(PlatformSetting.Create(SettingKeys.RequiredDeposit, "200000", TestApp.Start));
         app.Settings.Add(PlatformSetting.Create(SettingKeys.CommissionRate, "0.10", TestApp.Start));
 
         // 1. Eligible candidate order -> CanAccept = true, DistanceToPickupKm & MatchingExpiresAt calculated

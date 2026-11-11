@@ -15,6 +15,19 @@ public sealed class WalletTransaction : BaseAuditableEntity
 
     public WalletTransactionType TransactionType { get; private set; }
     public decimal Amount { get; private set; }
+
+    /// <summary>
+    /// The part of <see cref="Amount"/> that moved on EarningsBalance. Withdrawal: taken from earnings first (GB-32), and
+    /// handed back to earnings if rejected. DepositRefill: taken from earnings.
+    /// </summary>
+    public decimal EarningsAmount { get; private set; }
+
+    /// <summary>
+    /// The part of <see cref="Amount"/> that moved on DepositBalance. Withdrawal: the remainder taken from the deposit, handed back
+    /// to the deposit if rejected. DepositRefill: added to the deposit. TopUpDeposit / CommissionDeduction: the whole amount.
+    /// </summary>
+    public decimal DepositAmount { get; private set; }
+
     public decimal BalanceAfter { get; private set; }
     public WalletTransactionStatus TransactionStatus { get; private set; }
 
@@ -25,13 +38,16 @@ public sealed class WalletTransaction : BaseAuditableEntity
     public DateTimeOffset? ProcessedAt { get; private set; }
 
     internal static WalletTransaction Create(
-        long walletId, WalletTransactionType type, long? orderId, decimal amount, decimal balanceAfter, WalletTransactionStatus status) =>
+        long walletId, WalletTransactionType type, long? orderId, decimal amount, decimal balanceAfter, WalletTransactionStatus status,
+        decimal earningsAmount = 0m, decimal depositAmount = 0m) =>
         new()
         {
             WalletId = walletId,
             TransactionType = type,
             OrderId = orderId,
             Amount = amount,
+            EarningsAmount = earningsAmount,
+            DepositAmount = depositAmount,
             BalanceAfter = balanceAfter,
             TransactionStatus = status,
         };

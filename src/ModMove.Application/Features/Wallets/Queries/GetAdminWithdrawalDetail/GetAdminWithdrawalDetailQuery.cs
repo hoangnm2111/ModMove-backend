@@ -16,6 +16,8 @@ public sealed record AdminWithdrawalDetailResponse(
     string DriverPhone,
     string DriverEmail,
     decimal Amount,
+    decimal EarningsAmount,
+    decimal DepositAmount,
     decimal BalanceAfter,
     decimal CurrentEarningsBalance,
     decimal CurrentDepositBalance,

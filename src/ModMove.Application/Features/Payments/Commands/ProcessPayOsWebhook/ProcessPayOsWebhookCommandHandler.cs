@@ -121,7 +121,10 @@ internal sealed class ProcessPayOsWebhookCommandHandler(
             var wallet = await wallets.GetByIdAsync(walletId, cancellationToken)
                 ?? throw new NotFoundException(nameof(DriverWallet), walletId);
 
-            wallet.TopUpDeposit(transaction.Amount);
+            // The money is already received: credit it, then keep GB-32 (a deposit still short is refilled from earnings).
+            wallet.CreditTopUp(transaction.Amount);
+            if (wallet.EarningsBalance > 0 && settings is not null)
+                wallet.RefillDepositFromEarnings(await settings.GetDecimalAsync(SettingKeys.RequiredDeposit, cancellationToken));
 
             foreach (var other in await payments.GetPendingPayOsForWalletAsync(wallet.Id, cancellationToken))
             {

@@ -22,6 +22,8 @@ internal sealed class GetAdminWithdrawalDetailQueryHandler(
             u.phone_number AS DriverPhone,
             u.email AS DriverEmail,
             wt.amount AS Amount,
+            wt.earnings_amount AS EarningsAmount,
+            wt.deposit_amount AS DepositAmount,
             wt.balance_after AS BalanceAfter,
             w.earnings_balance AS CurrentEarningsBalance,
             w.deposit_balance AS CurrentDepositBalance,
@@ -41,7 +43,7 @@ internal sealed class GetAdminWithdrawalDetailQueryHandler(
         INNER JOIN users u ON u.id = dp.user_id
         LEFT JOIN users admin_user ON admin_user.id = wt.processed_by
         WHERE wt.id = @TransactionId
-          AND wt.transaction_type = 'WithdrawEarnings';
+          AND wt.transaction_type = 'Withdrawal';
         """;
 
     public async Task<AdminWithdrawalDetailResponse> Handle(GetAdminWithdrawalDetailQuery request, CancellationToken cancellationToken)
@@ -56,7 +58,7 @@ internal sealed class GetAdminWithdrawalDetailQueryHandler(
         return new AdminWithdrawalDetailResponse(
             row.TransactionId, row.WalletId, row.DriverProfileId, row.DriverUserId,
             row.DriverName, row.DriverPhone, row.DriverEmail,
-            row.Amount, row.BalanceAfter,
+            row.Amount, row.EarningsAmount, row.DepositAmount, row.BalanceAfter,
             row.CurrentEarningsBalance, row.CurrentDepositBalance, row.WalletStatus,
             row.TransactionStatus,
             row.BankName, row.BankAccountNumber, row.BankAccountHolder,
@@ -74,6 +76,8 @@ internal sealed class GetAdminWithdrawalDetailQueryHandler(
         public string DriverPhone { get; init; } = "";
         public string DriverEmail { get; init; } = "";
         public decimal Amount { get; init; }
+        public decimal EarningsAmount { get; init; }
+        public decimal DepositAmount { get; init; }
         public decimal BalanceAfter { get; init; }
         public decimal CurrentEarningsBalance { get; init; }
         public decimal CurrentDepositBalance { get; init; }

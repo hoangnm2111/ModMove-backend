@@ -13,6 +13,8 @@ public sealed record GetDriverWithdrawalsQuery(
 public sealed record DriverWithdrawalResponse(
     long TransactionId,
     decimal Amount,
+    decimal EarningsAmount,
+    decimal DepositAmount,
     decimal BalanceAfter,
     string TransactionStatus,
     string? BankName,

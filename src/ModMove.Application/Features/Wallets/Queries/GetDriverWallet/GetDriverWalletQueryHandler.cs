@@ -23,9 +23,16 @@ internal sealed class GetDriverWalletQueryHandler(
                    SELECT SUM(wt.amount)
                    FROM wallet_transactions wt
                    WHERE wt.wallet_id = w.id
-                     AND wt.transaction_type = 'WithdrawEarnings'
+                     AND wt.transaction_type = 'Withdrawal'
                      AND wt.transaction_status = 'Pending'
-               ), 0) AS PendingWithdrawalAmount
+               ), 0) AS PendingWithdrawalAmount,
+               (
+                   SELECT ao.id
+                   FROM shipping_orders ao
+                   WHERE ao.driver_profile_id = w.driver_profile_id
+                     AND ao.order_status IN ('Accepted', 'Arrived', 'PickedUp', 'InTransit')
+                   LIMIT 1
+               ) AS ActiveOrderId
         FROM driver_wallets w
         WHERE w.driver_profile_id = @DriverProfileId
         """;
@@ -42,13 +49,17 @@ internal sealed class GetDriverWalletQueryHandler(
             new CommandDefinition(Sql, new { DriverProfileId = driverProfileId }, cancellationToken: cancellationToken))
             ?? throw new NotFoundException(nameof(DriverWallet), driverProfileId);
 
-        var minCodDeposit = await settings.GetDecimalAsync(SettingKeys.MinCodDeposit, cancellationToken);
+        var requiredDeposit = await settings.GetDecimalAsync(SettingKeys.RequiredDeposit, cancellationToken);
         var walletActive = row.WalletStatus == nameof(WalletStatus.Active);
-        var debt = Math.Max(0m, -row.DepositBalance);
+        var walletTotal = row.DepositBalance + row.EarningsBalance;
+        var missingDeposit = Math.Max(0m, requiredDeposit - row.DepositBalance);
+        var hasActiveOrder = row.ActiveOrderId is not null;
 
-        // DECISIONS 5.1, TEAM-PLAN 87: maxWithdrawable = max(0, earningsBalance + min(depositBalance, 0)) when Active.
-        var maxWithdrawable = walletActive ? Math.Max(0m, row.EarningsBalance - debt) : 0m;
-        var canReceiveCod = walletActive && row.DepositBalance >= minCodDeposit;
+        // UC-DRV-20, GB-32: maxWithdrawable is WalletTotal when no active order, or min(EarningsBalance, WalletTotal) when hasActiveOrder.
+        var maxWithdrawable = walletActive
+            ? (hasActiveOrder ? Math.Max(0m, Math.Min(row.EarningsBalance, walletTotal)) : Math.Max(0m, walletTotal))
+            : 0m;
+        var canReceiveOrders = walletActive && row.DepositBalance >= requiredDeposit;
 
         var bankAccount = !string.IsNullOrWhiteSpace(context.BankAccountNumber)
             ? new DriverBankAccountResponse(
@@ -62,10 +73,12 @@ internal sealed class GetDriverWalletQueryHandler(
             row.WalletStatus,
             row.DepositBalance,
             row.EarningsBalance,
-            debt,
+            walletTotal,
+            missingDeposit,
             maxWithdrawable,
-            minCodDeposit,
-            canReceiveCod,
+            requiredDeposit,
+            canReceiveOrders,
+            hasActiveOrder,
             row.PendingWithdrawalAmount > 0,
             row.PendingWithdrawalAmount,
             bankAccount);
@@ -78,6 +91,7 @@ internal sealed class GetDriverWalletQueryHandler(
         public decimal DepositBalance { get; init; }
         public decimal EarningsBalance { get; init; }
         public decimal PendingWithdrawalAmount { get; init; }
+        public long? ActiveOrderId { get; init; }
     }
 }
 

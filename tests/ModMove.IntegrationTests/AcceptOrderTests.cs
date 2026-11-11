@@ -40,7 +40,7 @@ public class AcceptOrderTests
 
             App = TestApp.SignedInAs(Driver, Customer);
             App.Settings.Add(PlatformSetting.Create(SettingKeys.MatchingRadiusKm, "5", Now));
-            App.Settings.Add(PlatformSetting.Create(SettingKeys.MinCodDeposit, "200000", Now));
+            App.Settings.Add(PlatformSetting.Create(SettingKeys.RequiredDeposit, "200000", Now));
             App.Settings.Add(PlatformSetting.Create(SettingKeys.CommissionRate, "0.10", Now));
 
             Profile = DriverProfile.Create(Driver.Id, "001", "B2-001", "front.jpg", "back.jpg");
@@ -57,8 +57,8 @@ public class AcceptOrderTests
             App.DriverProfiles.Add(Profile);
 
             Wallet = DriverWallet.Create(Profile.Id);
-            if (depositBalance >= 50_000m)
-                Wallet.TopUpDeposit(depositBalance);
+            if (depositBalance > 0m)
+                Wallet.CreditTopUp(depositBalance);
             App.DriverWallets.Add(Wallet);
         }
 
@@ -134,15 +134,21 @@ public class AcceptOrderTests
     }
 
     [Fact]
-    public async Task Eligible_driver_with_zero_deposit_can_still_accept_paid_payos_order_GB16_GB31()
+    public async Task Paid_payos_order_requires_required_deposit_200k_but_not_order_commission_GB16_GB31()
     {
-        var s = new Setup(depositBalance: 0m);
-        var order = s.AddOrder(PaymentMethod.PayOS, paid: true);
+        var belowRequired = new Setup(depositBalance: 199_999m);
+        var blockedOrder = belowRequired.AddOrder(PaymentMethod.PayOS, paid: true);
+        var ex = await Assert.ThrowsAsync<DomainException>(() => belowRequired.App.Sender.Send(new AcceptOrderCommand(blockedOrder.Id)));
+        Assert.Equal("DRIVER_NOT_ELIGIBLE", ex.Code);
 
-        await s.App.Sender.Send(new AcceptOrderCommand(order.Id));
+        // At 200,000 VND deposit, a paid PayOS order with 250,000 VND commission can still be accepted
+        var atRequired = new Setup(depositBalance: 200_000m);
+        var order = atRequired.AddOrder(PaymentMethod.PayOS, paid: true, distanceFee: 2_500_000m);
+
+        await atRequired.App.Sender.Send(new AcceptOrderCommand(order.Id));
 
         Assert.Equal(OrderStatus.Accepted, order.OrderStatus);
-        Assert.Equal(s.Profile.Id, order.DriverProfileId);
+        Assert.Equal(atRequired.Profile.Id, order.DriverProfileId);
     }
 
     [Fact]

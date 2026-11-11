@@ -22,7 +22,7 @@ public class GetReplacementDriversTests
     {
         var settings = new InMemoryPlatformSettings();
         settings.Add(PlatformSetting.Create(SettingKeys.MatchingRadiusKm, "5", Now));
-        settings.Add(PlatformSetting.Create(SettingKeys.MinCodDeposit, "200000", Now));
+        settings.Add(PlatformSetting.Create(SettingKeys.RequiredDeposit, "200000", Now));
         settings.Add(PlatformSetting.Create(SettingKeys.CommissionRate, "0.10", Now));
 
         return new ServiceCollection()
@@ -109,7 +109,7 @@ public class GetReplacementDriversTests
         sql.Results.Enqueue(ctx);
 
         var candidates = CandidateDriversTable();
-        candidates.Rows.Add(2L, 20L, "Tài Ở Điểm Lấy", "0900000002", "29A-00002", 1L, "Xe tải 500kg", 21.0290m, 105.8545m, Now.UtcDateTime, "Active", 0m);
+        candidates.Rows.Add(2L, 20L, "Tài Ở Điểm Lấy", "0900000002", "29A-00002", 1L, "Xe tải 500kg", 21.0290m, 105.8545m, Now.UtcDateTime, "Active", 200_000m);
         sql.Results.Enqueue(candidates);
 
         var result = await SenderWith(sql).Send(new GetReplacementDriversQuery(10));

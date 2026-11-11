@@ -138,7 +138,7 @@ internal sealed class GetNearbyOrderDetailQueryHandler(
             throw new DomainException("The matching window for this order has expired.", "ORDER_NOT_AVAILABLE");
 
         var radiusKm = (double)await settings.GetDecimalAsync(SettingKeys.MatchingRadiusKm, cancellationToken);
-        var minCodDeposit = await settings.GetDecimalAsync(SettingKeys.MinCodDeposit, cancellationToken);
+        var requiredDeposit = await settings.GetDecimalAsync(SettingKeys.RequiredDeposit, cancellationToken);
         var commissionRate = await settings.GetDecimalAsync(SettingKeys.CommissionRate, cancellationToken);
 
         var commission = Math.Round(commissionRate * order.TotalFee, 0, MidpointRounding.AwayFromZero);
@@ -152,7 +152,7 @@ internal sealed class GetNearbyOrderDetailQueryHandler(
             roundedDistanceKm = Math.Round((decimal)rawDistanceKm.Value, 2, MidpointRounding.AwayFromZero);
         }
 
-        var ineligibleReason = EvaluateEligibility(driver, order, now, isCash, commission, minCodDeposit, radiusKm, rawDistanceKm);
+        var ineligibleReason = EvaluateEligibility(driver, order, now, isCash, commission, requiredDeposit, radiusKm, rawDistanceKm);
 
         return new NearbyOrderDetailResponse(
             order.OrderId,
@@ -198,7 +198,7 @@ internal sealed class GetNearbyOrderDetailQueryHandler(
         DateTimeOffset now,
         bool isCash,
         decimal commission,
-        decimal minCodDeposit,
+        decimal requiredDeposit,
         double radiusKm,
         double? rawDistanceKm)
     {
@@ -221,9 +221,9 @@ internal sealed class GetNearbyOrderDetailQueryHandler(
         if (distKm > radiusKm)
             return "OUT_OF_RADIUS";
 
-        if (isCash && (driver.WalletStatus != nameof(WalletStatus.Active)
-                       || driver.DepositBalance < minCodDeposit
-                       || driver.DepositBalance < commission))
+        if (driver.WalletStatus != nameof(WalletStatus.Active)
+            || driver.DepositBalance < requiredDeposit
+            || (isCash && driver.DepositBalance < commission))
         {
             return "INSUFFICIENT_DEPOSIT";
         }

@@ -18,6 +18,7 @@ internal sealed class TopUpDepositCommandHandler(
     IDriverWalletRepository wallets,
     IPaymentTransactionRepository payments,
     IPaymentGateway gateway,
+    IPlatformSettings settings,
     IUnitOfWork unitOfWork,
     TimeProvider clock) : ICommandHandler<TopUpDepositCommand, TopUpDepositResponse>
 {
@@ -33,7 +34,9 @@ internal sealed class TopUpDepositCommandHandler(
         var wallet = await wallets.GetByDriverProfileIdAsync(profile.Id, cancellationToken)
             ?? throw new NotFoundException(nameof(DriverWallet), profile.Id);
 
-        wallet.EnsureCanTopUpDeposit(request.Amount);
+        // UC-DRV-21, GB-32: the missing deposit is the suggested amount and the minimum; a larger top-up is allowed.
+        var requiredDeposit = await settings.GetDecimalAsync(SettingKeys.RequiredDeposit, cancellationToken);
+        wallet.EnsureCanTopUpDeposit(request.Amount, requiredDeposit);
 
         var now = clock.GetUtcNow();
         var payosOrderCode = CreateOrderPaymentCommandHandler.NewPayOsOrderCode(now);

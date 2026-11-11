@@ -82,10 +82,10 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 
 **Phase 2**
 - [x] Thanh toán đơn hàng PayOS (CUS-27): tạo lại mã khi hết 10 phút (3.1), `CreateOrderPayment` nhận `platform` (`Web` | `App`) và chọn `returnUrl` từ cấu hình `PayOS:ReturnUrls:*`, client không gửi URL (3.1), webhook `POST api/webhooks/payos` (sai chữ ký → từ chối, gọi trùng → idempotent, đối soát số tiền), `ShippingOrder.MarkPaid(now)` và cộng ví cọc khi webhook báo thành công
-- [x] Tạo link nạp cọc ví tài xế qua PayOS (DRV-21 ≥ 50.000đ)
-- [x] Matching (DRV-08..10, B5): đơn PayOS chỉ hiện khi đã trả; GB-08/09; đơn tiền mặt cần ví cọc ≥ `MIN_COD_DEPOSIT` và ≥ hoa hồng của đơn (GB-16: `DriverWallet.CanReceiveCod(minDeposit, order.CommissionFor(rate))`, dùng cả khi đổi tài xế); ẩn tài xế mất GPS từ 5 phút trở lên (6.4)
-- [ ] Trips (DRV-11..16, 18, 19): không có hủy từ tài xế (6.1); không có người nhận thì vẫn giao và gửi POD (2.7)
-- [ ] Ví (DRV-17, 20..23): thu COD, rút tiền không tối thiểu (5.1), thu nhập = `DriverEarning`; số rút tối đa hiển thị = `earningsBalance + min(depositBalance, 0)`, `DriverWallet.RequestWithdrawal` tự trừ nợ ví cọc trước (5.1)
+- [x] Tạo link nạp cọc ví tài xế qua PayOS (DRV-21: số tiền nguyên > 0, tối thiểu phần thiếu dưới `REQUIRED_DEPOSIT`)
+- [x] Matching (DRV-08..10, B5): đơn PayOS chỉ hiện khi đã trả; GB-08/09; mọi đơn cần ví cọc ≥ `REQUIRED_DEPOSIT` (`DriverWallet.CanReceiveOrders`), đơn tiền mặt cần thêm ≥ hoa hồng của đơn (`DriverWallet.CanReceiveCod`, dùng cả khi đổi tài xế); ẩn tài xế mất GPS từ 5 phút trở lên (6.4)
+- [x] Trips (DRV-11..16, 18, 19): không có hủy từ tài xế (6.1); không có người nhận thì vẫn giao và gửi POD (2.7)
+- [x] Ví (DRV-17, 20..23): thu COD, rút tiền không tối thiểu, tối đa = `WalletTotal` (chỉ `EarningsBalance` khi đang có đơn chạy), ưu tiên trừ thu nhập trước rồi ví cọc (lưu `EarningsAmount`, `DepositAmount` để hoàn đúng nguồn khi Admin từ chối); tự bù cọc (`DepositRefill`) khi ví cọc < `REQUIRED_DEPOSIT`; thu nhập = `DriverEarning` (GB-32)
 - [x] Admin duyệt hoàn tiền (cả hoàn tiền do hủy không qua Dispatcher, 3.3) và chi trả tay (`RefundsController`: `GET`, `approve`, `reject`, `payout`); truyền lý do cho khách vào tham số `note` của `Refund.Approve`/`RejectRefund` (CUS-23); trước khi duyệt gọi `order.EnsureRefundFits(0, await refunds.GetClaimedTotalForOrderAsync(order.Id))` để tổng hoàn của đơn không vượt `total_fee` (B9); gửi `CustomerEvent.RefundDecided` (8.3)
 - [x] Admin duyệt rút tiền tài xế (ADM-24)
 

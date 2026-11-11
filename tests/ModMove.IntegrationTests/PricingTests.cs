@@ -23,8 +23,14 @@ internal sealed class InMemoryPlatformSettings : IPlatformSettingRepository, IPl
         Task.FromResult<IReadOnlyList<PlatformSetting>>(Items.Where(s => keys.Contains(s.SettingKey)).ToList());
 
     // The query side reads the same rows, parsed like production (invariant culture).
-    public Task<decimal> GetDecimalAsync(string key, CancellationToken cancellationToken) =>
-        Task.FromResult(decimal.Parse(Items.Single(s => s.SettingKey == key).SettingValue, NumberStyles.Number, CultureInfo.InvariantCulture));
+    public Task<decimal> GetDecimalAsync(string key, CancellationToken cancellationToken)
+    {
+        var item = Items.SingleOrDefault(s => s.SettingKey == key);
+        if (item is null && key == SettingKeys.RequiredDeposit)
+            return Task.FromResult(200_000m);
+
+        return Task.FromResult(decimal.Parse(Items.Single(s => s.SettingKey == key).SettingValue, NumberStyles.Number, CultureInfo.InvariantCulture));
+    }
 
     public Task<PlatformSetting?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(s => s.Id == id));
@@ -57,7 +63,7 @@ public class PricingTests
             VehicleTypes.Add(vanType);
 
             // Same values the seed writes.
-            foreach (var (key, value) in new[] { ("COMMISSION_RATE", "0.10"), ("LOADING_FEE", "100000"), ("MIN_COD_DEPOSIT", "200000"), ("MATCHING_RADIUS_KM", "5") })
+            foreach (var (key, value) in new[] { ("COMMISSION_RATE", "0.10"), ("LOADING_FEE", "100000"), ("REQUIRED_DEPOSIT", "200000"), ("MATCHING_RADIUS_KM", "5") })
                 Settings.Add(PlatformSetting.Create(key, value, TestApp.Start));
 
             Sender = new ServiceCollection()
@@ -103,7 +109,7 @@ public class PricingTests
         Assert.False(response.VehicleTypes[1].IsActive); // a disabled type still shows, so it can be re-enabled
         Assert.Equal(0.10m, response.Settings.CommissionRate);
         Assert.Equal(100_000m, response.Settings.LoadingFee);
-        Assert.Equal(200_000m, response.Settings.MinCodDeposit);
+        Assert.Equal(200_000m, response.Settings.RequiredDeposit);
         Assert.Equal(5m, response.Settings.MatchingRadiusKm);
     }
 
@@ -196,7 +202,7 @@ public class PricingTests
         Assert.Equal("0.15", app.Setting("COMMISSION_RATE"));
         Assert.Equal("150000", app.Setting("LOADING_FEE"));
         Assert.Equal("7.5", app.Setting("MATCHING_RADIUS_KM"));
-        Assert.Equal("200000", app.Setting("MIN_COD_DEPOSIT")); // null = untouched
+        Assert.Equal("200000", app.Setting("REQUIRED_DEPOSIT")); // null = untouched
         Assert.Equal(1, app.UnitOfWork.Saves);
     }
 
@@ -247,7 +253,7 @@ public class PricingTests
         await app.Sender.Send(new UpdatePlatformSettingsCommand(null, 150_000m, 250_000m, 8m));
 
         Assert.Equal("150000", app.Setting("LOADING_FEE"));
-        Assert.Equal("250000", app.Setting("MIN_COD_DEPOSIT"));
+        Assert.Equal("250000", app.Setting("REQUIRED_DEPOSIT"));
         Assert.Equal("8", app.Setting("MATCHING_RADIUS_KM"));
     }
 

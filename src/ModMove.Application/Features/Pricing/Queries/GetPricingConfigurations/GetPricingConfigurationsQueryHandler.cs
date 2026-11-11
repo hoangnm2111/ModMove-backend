@@ -30,7 +30,7 @@ internal sealed class GetPricingConfigurationsQueryHandler(ISqlConnectionFactory
         var settings = new PlatformSettingsResponse(
             await platformSettings.GetDecimalAsync(SettingKeys.CommissionRate, cancellationToken),
             await platformSettings.GetDecimalAsync(SettingKeys.LoadingFee, cancellationToken),
-            await platformSettings.GetDecimalAsync(SettingKeys.MinCodDeposit, cancellationToken),
+            await platformSettings.GetDecimalAsync(SettingKeys.RequiredDeposit, cancellationToken),
             await platformSettings.GetDecimalAsync(SettingKeys.MatchingRadiusKm, cancellationToken));
 
         return new PricingConfigurationResponse(vehicleTypes, settings);
