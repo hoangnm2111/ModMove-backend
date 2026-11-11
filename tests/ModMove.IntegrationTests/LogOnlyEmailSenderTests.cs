@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using ModMove.Application.Features.Auth.Commands.ForgotPassword;
 using ModMove.Application.Features.Auth.Commands.Register;
+using ModMove.Application.Features.Auth.Commands.VerifyEmail;
 using ModMove.Infrastructure.ExternalServices.Email;
 
 namespace ModMove.IntegrationTests;
@@ -33,6 +34,7 @@ public class LogOnlyEmailSenderTests
     {
         var app = new TestApp();
         await app.Sender.Send(RegisterCommand.From(Valid, Domain.Enums.UserRole.Customer));
+        await app.Sender.Send(new VerifyEmailCommand(Valid.Email, app.Email.LastCode(), Valid.Password)); // the account exists only once verified
         await app.Sender.Send(new ForgotPasswordCommand(Valid.Email));
 
         var line = await LogOf(app.Email.Sent[^1]);
