@@ -97,6 +97,13 @@ internal static class ReferenceDataSeeder
             if (!await db.Set<MasterDataItem>().AnyAsync(m => m.Category == r.Category && m.Code == r.Code, ct))
                 db.Add(MasterDataItem.Create(r.Category, r.Code, r.Name));
         }
+
+        // R-01: banks for the refund payout account (code = BIN). Same rule: never overwrite what the Administrator changed.
+        foreach (var (bin, name) in BankSeedData.Banks)
+        {
+            if (!await db.Set<MasterDataItem>().AnyAsync(m => m.Category == BankSeedData.Category && m.Code == bin, ct))
+                db.Add(MasterDataItem.Create(BankSeedData.Category, bin, name));
+        }
     }
 
     private static async Task SeedCouponsAsync(ApplicationDbContext db, DateTimeOffset now, CancellationToken ct)
