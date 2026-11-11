@@ -40,5 +40,16 @@ public sealed record AdminRefundDetailResponse(
     long? DriverProfileId,
     string? DriverName,
     string? DriverPhone,
-    string? LicensePlate);
+    string? LicensePlate,
+    AdminPayoutAccount? PayoutAccount,
+    bool HasPayoutAccount,
+    string? PayoutFailureReason);
+
+/// <summary>R-01: full bank account shown to the Administrator to make the manual transfer (Q7).</summary>
+public sealed record AdminPayoutAccount(
+    string BankCode,
+    string BankName,
+    string AccountNumber,
+    string AccountHolder,
+    DateTimeOffset? InfoUpdatedAt);
 
