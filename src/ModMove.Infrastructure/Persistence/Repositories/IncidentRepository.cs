@@ -14,5 +14,12 @@ public sealed class IncidentRepository(ApplicationDbContext dbContext)
                 && i.Id != excludeIncidentId
                 && (i.ResolutionStatus == IncidentResolutionStatus.Open || i.ResolutionStatus == IncidentResolutionStatus.InProgress))
             .ToListAsync(cancellationToken);
+
+    public Task<bool> HasOpenReportedByAsync(long orderId, long reporterUserId, CancellationToken cancellationToken = default) =>
+        Set.AnyAsync(
+            i => i.OrderId == orderId
+                && i.ReportedBy == reporterUserId
+                && (i.ResolutionStatus == IncidentResolutionStatus.Open || i.ResolutionStatus == IncidentResolutionStatus.InProgress),
+            cancellationToken);
 }
 

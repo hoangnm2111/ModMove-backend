@@ -8,5 +8,7 @@ internal sealed class GetMyIncidentsQueryValidator : AbstractValidator<GetMyInci
     {
         RuleFor(x => x.Page).InclusiveBetween(1, 10_000);
         RuleFor(x => x.PageSize).InclusiveBetween(1, 50);
+        RuleFor(x => x.OrderId).GreaterThan(0).When(x => x.OrderId is not null);
+        RuleFor(x => x.Status).IsInEnum();
     }
 }

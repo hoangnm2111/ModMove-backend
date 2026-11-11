@@ -148,6 +148,7 @@ public class MyIncidentsQueryTests
         public FakeSql Sql { get; } = new();
         public string AccountStatus { get; set; } = "Active";
         public long ReportedBy { get; set; } = CustomerId;
+        public string? PhotoUrls { get; set; }
         public List<(string Sql, IReadOnlyDictionary<string, object?> Parameters)> Executed { get; } = [];
 
         public Db()
@@ -161,7 +162,7 @@ public class MyIncidentsQueryTests
                 return Table(
                     ("Id", typeof(long), 5L), ("OrderId", typeof(long), 1L), ("OrderCode", typeof(string), "MM20261020001"),
                     ("IncidentType", typeof(string), "VehicleBreakdown"), ("Description", typeof(string), "Xe hỏng"),
-                    ("PhotoUrls", typeof(string), null), ("ReportedBy", typeof(long), ReportedBy),
+                    ("PhotoUrls", typeof(string), PhotoUrls), ("ReportedBy", typeof(long), ReportedBy),
                     ("ResolutionStatus", typeof(string), "Resolved"), ("ResolutionDecision", typeof(string), "ReassignDriver"),
                     ("ResolutionNote", typeof(string), "Đã đổi tài xế"), ("ResolvedAt", typeof(DateTime), new DateTime(2026, 10, 20, 10, 0, 0)),
                     ("CreatedAt", typeof(DateTime), new DateTime(2026, 10, 20, 9, 0, 0)));
@@ -203,6 +204,54 @@ public class MyIncidentsQueryTests
         Assert.Empty(item.PhotoUrls);
         Assert.Equal(new DateTimeOffset(2026, 10, 20, 10, 0, 0, TimeSpan.Zero), item.ResolvedAt);
     }
+
+    [Fact]
+    public async Task Customer_sees_the_drivers_own_words_and_photos_8_3()
+    {
+        var db = new Db { ReportedBy = 99, PhotoUrls = """["https://res.cloudinary.com/demo/x.jpg"]""" };
+
+        var item = (await db.Sender().Send(new GetMyIncidentsQuery())).Items.Single();
+
+        Assert.False(item.ReportedByYou);
+        Assert.Equal("Xe hỏng", item.Description);
+        Assert.Equal(["https://res.cloudinary.com/demo/x.jpg"], item.PhotoUrls);
+    }
+
+    [Fact]
+    public async Task Filters_by_order_and_status_as_parameters()
+    {
+        var db = new Db();
+
+        await db.Sender().Send(new GetMyIncidentsQuery(OrderId: 12, Status: IncidentResolutionStatus.InProgress));
+
+        var (sql, parameters) = db.Executed.Last(e => e.Sql.Contains("FROM in_transit_incidents"));
+        Assert.Contains("(@OrderId IS NULL OR i.order_id = @OrderId)", sql);
+        Assert.Contains("(@Status IS NULL OR i.resolution_status = @Status)", sql);
+        Assert.Equal(12L, parameters["OrderId"]);
+        Assert.Equal("InProgress", parameters["Status"]);
+    }
+
+    [Fact]
+    public async Task Without_filters_both_are_null()
+    {
+        var db = new Db();
+
+        await db.Sender().Send(new GetMyIncidentsQuery());
+
+        var (_, parameters) = db.Executed.Last(e => e.Sql.Contains("FROM in_transit_incidents"));
+        // Dapper sends a null parameter as DBNull.
+        Assert.IsType<DBNull>(parameters["OrderId"]);
+        Assert.IsType<DBNull>(parameters["Status"]);
+    }
+
+    [Fact]
+    public async Task Order_id_must_be_positive() =>
+        await Assert.ThrowsAsync<ValidationException>(() => new Db().Sender().Send(new GetMyIncidentsQuery(OrderId: 0)));
+
+    [Fact]
+    public async Task Unknown_status_is_refused() =>
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            new Db().Sender().Send(new GetMyIncidentsQuery(Status: (IncidentResolutionStatus)42)));
 
     [Fact]
     public async Task Marks_the_incidents_the_customer_reported() =>

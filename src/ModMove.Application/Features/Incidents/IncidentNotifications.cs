@@ -11,6 +11,33 @@ namespace ModMove.Application.Features.Incidents;
 /// </summary>
 internal static class IncidentNotifications
 {
+    /// <summary>
+    /// DECISIONS 8.3: a Dispatcher took over the incident; the customer and the driver now holding the order are told.
+    /// The driver's text is the same for every incident, so a customer's report is never repeated to the driver.
+    /// </summary>
+    public static async Task NotifyHandlingStartedAsync(
+        INotificationService notifications, ShippingOrder order, long? driverUserId,
+        InTransitIncident incident, CancellationToken cancellationToken)
+    {
+        var incidentId = incident.Id.ToString(CultureInfo.InvariantCulture);
+        await notifications.NotifyCustomerAsync(
+            order, CustomerEvent.IncidentInProgress, cancellationToken, null, ("incidentId", incidentId));
+
+        if (driverUserId is not { } userId)
+            return;
+
+        var (type, title, template) = DriverNotifications.GetTemplate(DriverEvent.IncidentInProgress);
+        var data = new Dictionary<string, string>
+        {
+            ["orderId"] = order.Id.ToString(CultureInfo.InvariantCulture),
+            ["incidentId"] = incidentId,
+        };
+        await notifications.NotifyAsync(
+            userId,
+            new Notification(type, title, string.Format(CultureInfo.InvariantCulture, template, order.OrderCode), data),
+            cancellationToken);
+    }
+
     public static async Task NotifyContinueTripAsync(
         INotificationService notifications, ShippingOrder order, long? driverUserId,
         InTransitIncident incident, string reason, CancellationToken cancellationToken)

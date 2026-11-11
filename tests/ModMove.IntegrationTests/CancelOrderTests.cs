@@ -114,6 +114,27 @@ public class CancelOrderTests
     }
 
     [Fact]
+    public async Task Cancelling_closes_the_drivers_open_incident_so_it_does_not_wait_in_the_queue_7_6()
+    {
+        var s = Build();
+        var order = AddOrder(s, s.Customer.Id);
+        order.Accept(s.Profile.Id, s.Driver.Id, Now);
+        var open = InTransitIncident.Report(order.Id, s.Driver.Id, IncidentType.Other, "Không liên lạc được khách", null, null, null);
+        var handled = InTransitIncident.Report(order.Id, s.Driver.Id, IncidentType.Other, "Kẹt xe", null, null, null);
+        s.App.Incidents.Add(open);
+        s.App.Incidents.Add(handled);
+        handled.StartHandling(dispatcherId: 99);
+
+        await s.App.Sender.Send(Cancel(order));
+
+        Assert.All([open, handled], i => Assert.Equal(IncidentResolutionStatus.Cancelled, i.ResolutionStatus));
+        Assert.Null(open.HandledBy);
+        Assert.Equal(Now, open.ResolvedAt);
+        Assert.Contains("Khách đã hủy đơn", open.ResolutionNote);
+        Assert.Equal(1, s.App.UnitOfWork.Saves);
+    }
+
+    [Fact]
     public async Task The_driver_is_told_even_when_the_customer_disconnects_right_after_the_save()
     {
         var s = Build();

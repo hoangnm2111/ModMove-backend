@@ -34,6 +34,9 @@ public enum DriverEvent
     /// <summary>A Dispatcher resolved or decided an incident on the driver's order.</summary>
     IncidentDecided,
 
+    /// <summary>A Dispatcher took over an incident on the driver's order (start); the text never carries the customer's words.</summary>
+    IncidentInProgress,
+
     /// <summary>The customer rated the completed trip.</summary>
     RatingReceived,
 
@@ -59,6 +62,7 @@ public static class DriverNotifications
     public const string OrderCompletedType = "ORDER_COMPLETED";
     public const string IncidentReportedType = "INCIDENT_REPORTED";
     public const string IncidentDecidedType = "INCIDENT_DECIDED";
+    public const string IncidentInProgressType = "INCIDENT_IN_PROGRESS";
     public const string RatingReceivedType = "RATING_RECEIVED";
     public const string ApplicationApprovedType = "DRIVER_APPLICATION_APPROVED";
     public const string ApplicationRejectedType = "DRIVER_APPLICATION_REJECTED";
@@ -94,6 +98,10 @@ public static class DriverNotifications
             IncidentDecidedType,
             "Quyết định xử lý sự cố",
             "Sự cố của đơn {0} đã có quyết định từ điều phối viên."),
+        [DriverEvent.IncidentInProgress] = (
+            IncidentInProgressType,
+            "Điều phối viên đã tiếp nhận sự cố",
+            "Sự cố trên đơn {0} đang được xử lý."),
         [DriverEvent.RatingReceived] = (
             RatingReceivedType,
             "Đánh giá mới",

@@ -26,6 +26,9 @@ public enum CustomerEvent
     /// <summary>A Dispatcher decided an incident on the order (Dispatcher).</summary>
     IncidentResolved,
 
+    /// <summary>A Dispatcher took over an incident on the order (Dispatcher, start).</summary>
+    IncidentInProgress,
+
     /// <summary>A refund was approved, rejected or paid out (Administrator).</summary>
     RefundDecided,
 
@@ -53,6 +56,7 @@ public static class CustomerNotifications
         [CustomerEvent.OrderCompleted] = ("ORDER_COMPLETED", "Đơn đã hoàn thành",
             $"Đơn {{0}} đã hoàn thành. Bạn có thể đánh giá tài xế trong {BusinessRules.RatingWindow.TotalHours:0} giờ."),
         [CustomerEvent.IncidentResolved] = ("INCIDENT_RESOLVED", "Sự cố đã được xử lý", "Sự cố của đơn {0} đã có kết quả."),
+        [CustomerEvent.IncidentInProgress] = ("INCIDENT_IN_PROGRESS", "Sự cố đang được xử lý", "Điều phối viên đã tiếp nhận sự cố của đơn {0}."),
         [CustomerEvent.RefundDecided] = ("REFUND_DECIDED", "Kết quả hoàn tiền", "Yêu cầu hoàn tiền của đơn {0} đã có kết quả."),
         [CustomerEvent.OrderCancelled] = ("ORDER_CANCELLED", "Đơn đã bị hủy", "Đơn {0} đã bị hủy."),
         // R-01: never put the account number in these texts (security.md 1).
@@ -62,17 +66,22 @@ public static class CustomerNotifications
             "Chuyển hoàn tiền cho đơn {0} không thành công. Vui lòng kiểm tra lại tài khoản nhận."),
     };
 
-    /// <summary>B17: FCM and SignalR NotificationReceived to the customer of <paramref name="order"/>; <paramref name="detail"/> is appended.</summary>
+    /// <summary>
+    /// B17: FCM and SignalR NotificationReceived to the customer of <paramref name="order"/>; <paramref name="detail"/> is
+    /// appended to the body and <paramref name="extra"/> goes into the data next to <c>orderId</c>.
+    /// </summary>
     public static Task NotifyCustomerAsync(
         this INotificationService notifications, ShippingOrder order, CustomerEvent customerEvent,
-        CancellationToken cancellationToken, string? detail = null)
+        CancellationToken cancellationToken, string? detail = null, params (string Key, string Value)[] extra)
     {
         var (type, title, body) = Texts[customerEvent];
         var text = string.Format(CultureInfo.InvariantCulture, body, order.OrderCode);
         if (!string.IsNullOrWhiteSpace(detail))
             text += " " + detail.Trim();
 
-        return notifications.NotifyAsync(order.CustomerId, new Notification(type, title, text,
-            new Dictionary<string, string> { ["orderId"] = order.Id.ToString(CultureInfo.InvariantCulture) }), cancellationToken);
+        var data = new Dictionary<string, string> { ["orderId"] = order.Id.ToString(CultureInfo.InvariantCulture) };
+        foreach (var (key, value) in extra)
+            data[key] = value;
+        return notifications.NotifyAsync(order.CustomerId, new Notification(type, title, text, data), cancellationToken);
     }
 }
