@@ -336,6 +336,33 @@ public class IncidentResolutionTests
     }
 
     [Fact]
+    public async Task CancelOrderByIncident_WithRefund_AsksTheCustomerForABankAccount_R01()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit(PaymentMethod.PayOS);
+        var incident = s.Incident(order, IncidentType.VehicleBreakdown);
+
+        await s.App.Sender.Send(new CancelOrderByIncidentCommand(
+            incident.Id, "Xe hỏng nặng", Refund: true, CargoDisposition.ReturnToPickup));
+
+        var ask = Assert.Single(s.SentTo(s.Customer), n => n.Type == "REFUND_BANK_INFO_REQUIRED");
+        Assert.Equal(order.Id.ToString(), ask.Data!["orderId"]);
+    }
+
+    [Fact]
+    public async Task CancelOrderByIncident_WithoutRefund_DoesNotAskForABankAccount_R01()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit(PaymentMethod.PayOS);
+        var incident = s.Incident(order, IncidentType.VehicleBreakdown);
+
+        await s.App.Sender.Send(new CancelOrderByIncidentCommand(
+            incident.Id, "Hàng cấm", Refund: false, CargoDisposition.ReturnToPickup));
+
+        Assert.DoesNotContain(s.SentTo(s.Customer), n => n.Type == "REFUND_BANK_INFO_REQUIRED");
+    }
+
+    [Fact]
     public async Task CancelOrderByIncident_WhenPriorRefundCoveredEntireTotal_CancelsOrderWithoutCreatingNewRefund()
     {
         var s = new DispatcherSetup();

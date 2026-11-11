@@ -22,6 +22,7 @@ internal sealed class CancelUnmatchedOrdersCommandHandler(
         var pendingOrders = await orders.GetPendingAsync(cancellationToken);
 
         var cancelledOrders = new List<ShippingOrder>();
+        var owingRefund = new HashSet<ShippingOrder>();
         foreach (var order in pendingOrders)
         {
             if (!order.IsMatchingExpired(now))
@@ -41,6 +42,7 @@ internal sealed class CancelUnmatchedOrdersCommandHandler(
                     TimeoutReason,
                     evidenceUrls: null,
                     order.TotalFee));
+                owingRefund.Add(order);
             }
 
             cancelledOrders.Add(order);
@@ -55,6 +57,10 @@ internal sealed class CancelUnmatchedOrdersCommandHandler(
         {
             await notifications.PublishOrderStatusAsync(order, driverUserId: null, cancellationToken);
             await notifications.NotifyCustomerAsync(order, CustomerEvent.OrderCancelled, cancellationToken, TimeoutReason);
+
+            // R-01: the refund is owed; the money has nowhere to go until the customer gives a bank account.
+            if (owingRefund.Contains(order))
+                await notifications.NotifyCustomerAsync(order, CustomerEvent.RefundBankInfoRequired, cancellationToken);
         }
 
         return cancelledOrders.Count;
