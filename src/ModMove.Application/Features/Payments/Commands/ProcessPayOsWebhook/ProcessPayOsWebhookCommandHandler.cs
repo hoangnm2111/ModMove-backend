@@ -143,7 +143,7 @@ internal sealed class ProcessPayOsWebhookCommandHandler(
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         // R-01: a late or double payment is owed back; the money has nowhere to go until the customer gives a bank account.
-        if (refundOrder is not null && notifications is not null)
+        if (refundOrder is not null && refunds is not null && notifications is not null)
             await notifications.NotifyCustomerAsync(refundOrder, CustomerEvent.RefundBankInfoRequired, cancellationToken);
 
         // DECISIONS 6.4, 8.3: PayOS orders enter the matching pool only once PaidAt is set.
