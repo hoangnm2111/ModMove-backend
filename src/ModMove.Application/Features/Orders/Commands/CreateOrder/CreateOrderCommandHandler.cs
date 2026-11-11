@@ -2,8 +2,10 @@ using ModMove.Application.Common;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
+using ModMove.Application.Common.Notifications;
 using ModMove.Application.Features.MasterData.Queries.GetPublicContent;
 using ModMove.Domain.Entities;
+using ModMove.Domain.Enums;
 
 namespace ModMove.Application.Features.Orders.Commands.CreateOrder;
 
@@ -14,7 +16,11 @@ internal sealed class CreateOrderCommandHandler(
     OrderPricing pricing,
     IMasterDataRepository masterData,
     IUnitOfWork unitOfWork,
-    TimeProvider clock) : ICommandHandler<CreateOrderCommand, CreateOrderResponse>
+    TimeProvider clock,
+    INotificationService? notifications = null,
+    IDriverProfileRepository? driverProfiles = null,
+    IDriverWalletRepository? wallets = null,
+    IPlatformSettings? settings = null) : ICommandHandler<CreateOrderCommand, CreateOrderResponse>
 {
     public async Task<CreateOrderResponse> Handle(CreateOrderCommand request, CancellationToken cancellationToken)
     {
@@ -51,6 +57,18 @@ internal sealed class CreateOrderCommandHandler(
         trip.Coupon?.MarkUsed(); // B11: counted with the order, in the same save
         orders.Add(order);
         await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // DECISIONS 6.4, 8.3: Cash orders enter the matching pool immediately on creation;
+        // PayOS orders wait for ProcessPayOsWebhookCommandHandler once PaidAt is set.
+        if (order.PaymentMethod == PaymentMethod.Cash
+            && notifications is not null
+            && driverProfiles is not null
+            && wallets is not null
+            && settings is not null)
+        {
+            await notifications.NotifyNearbyDriversOfNewOrderAsync(
+                order, driverProfiles, wallets, orders, settings, now, cancellationToken);
+        }
 
         return new CreateOrderResponse(order.Id, order.OrderCode, order.TotalFee);
     }

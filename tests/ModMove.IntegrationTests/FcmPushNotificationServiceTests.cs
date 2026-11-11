@@ -63,7 +63,12 @@ public class FcmPushNotificationServiceTests
 
             return new HttpResponseMessage(SendStatus)
             {
-                Content = new StringContent("""{"name":"projects/modmove-test/messages/1001"}""", Encoding.UTF8, "application/json"),
+                Content = new StringContent(
+                    SendStatus == HttpStatusCode.OK
+                        ? """{"name":"projects/modmove-test/messages/1001"}"""
+                        : """{"error":{"code":400,"message":"The registration token is not a valid FCM registration token","status":"INVALID_ARGUMENT"}}""",
+                    Encoding.UTF8,
+                    "application/json"),
             };
         }
     }
@@ -148,8 +153,38 @@ public class FcmPushNotificationServiceTests
         using var http = new HttpClient(handler);
         var service = new FcmPushNotificationService(http, options, new MutableTime(Now));
 
-        await Assert.ThrowsAsync<HttpRequestException>(() =>
+        var ex = await Assert.ThrowsAsync<HttpRequestException>(() =>
             service.SendAsync("bad-token", "T", "B", null, CancellationToken.None));
+        Assert.Contains("INVALID_ARGUMENT", ex.Message);
+        Assert.DoesNotContain("bad-token", ex.Message);
+    }
+
+    [Fact]
+    public async Task FcmAccessTokenCache_shares_oauth_token_across_transient_service_instances()
+    {
+        using var rsa = RSA.Create(2048);
+        var options = new FirebaseOptions
+        {
+            ProjectId = "modmove-test",
+            ClientEmail = "firebase-adminsdk@modmove-test.iam.gserviceaccount.com",
+            PrivateKey = rsa.ExportPkcs8PrivateKeyPem(),
+            Endpoint = "https://fcm.example.test",
+            TokenEndpoint = "https://oauth2.example.test/token",
+        };
+
+        var handler = new FakeFcmHandler();
+        using var http = new HttpClient(handler);
+        var clock = new MutableTime(Now);
+        var sharedCache = new FcmAccessTokenCache();
+
+        var instance1 = new FcmPushNotificationService(http, options, clock, sharedCache);
+        var instance2 = new FcmPushNotificationService(http, options, clock, sharedCache);
+
+        await instance1.SendAsync("token-1", "T1", "B1", null, CancellationToken.None);
+        await instance2.SendAsync("token-2", "T2", "B2", null, CancellationToken.None);
+
+        Assert.Equal(1, handler.TokenCalls);
+        Assert.Equal(2, handler.SendCalls);
     }
 
     [Fact]

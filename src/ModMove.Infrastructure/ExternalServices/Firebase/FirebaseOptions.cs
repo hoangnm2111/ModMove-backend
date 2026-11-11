@@ -42,9 +42,10 @@ public sealed class FirebaseOptions
 
         if (string.IsNullOrWhiteSpace(credentialsJson) && !string.IsNullOrWhiteSpace(credentialsPath))
         {
-            if (!File.Exists(credentialsPath))
+            var resolvedPath = ResolveCredentialsPath(credentialsPath);
+            if (resolvedPath is null)
                 throw new InvalidOperationException($"Firebase:CredentialsPath file was not found: '{credentialsPath}'.");
-            credentialsJson = File.ReadAllText(credentialsPath);
+            credentialsJson = File.ReadAllText(resolvedPath);
         }
 
         if (!string.IsNullOrWhiteSpace(credentialsJson))
@@ -81,6 +82,21 @@ public sealed class FirebaseOptions
             Endpoint = endpoint,
             TokenEndpoint = tokenEndpoint,
         };
+    }
+
+    private static string? ResolveCredentialsPath(string credentialsPath)
+    {
+        if (File.Exists(credentialsPath))
+            return credentialsPath;
+
+        if (!Path.IsPathRooted(credentialsPath))
+        {
+            var baseDirCandidate = Path.Combine(AppContext.BaseDirectory, credentialsPath);
+            if (File.Exists(baseDirCandidate))
+                return baseDirCandidate;
+        }
+
+        return null;
     }
 }
 

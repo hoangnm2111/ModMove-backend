@@ -168,6 +168,7 @@ public static class DependencyInjection
         else
         {
             services.AddSingleton(firebase);
+            services.AddSingleton<FcmAccessTokenCache>();
             services.AddHttpClient<IPushNotificationService, FcmPushNotificationService>().RemoveAllLoggers();
         }
 

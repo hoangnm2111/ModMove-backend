@@ -8,6 +8,18 @@ using ModMove.Application.Common.Interfaces;
 namespace ModMove.Infrastructure.ExternalServices.Firebase;
 
 /// <summary>
+/// Process-wide cache for the Google OAuth2 bearer token used by <see cref="FcmPushNotificationService"/>.
+/// Because <c>AddHttpClient&lt;IPushNotificationService, FcmPushNotificationService&gt;</c> creates a transient
+/// client per scope, storing the token in a singleton avoids repeating the OAuth2 token exchange on every push.
+/// </summary>
+public sealed class FcmAccessTokenCache
+{
+    internal SemaphoreSlim Lock { get; } = new(1, 1);
+    internal string? AccessToken { get; set; }
+    internal DateTimeOffset ExpiresAt { get; set; } = DateTimeOffset.MinValue;
+}
+
+/// <summary>
 /// Firebase Cloud Messaging HTTP v1 adapter (<c>POST /v1/projects/{projectId}/messages:send</c>) (DECISIONS B17, 8.3, 9.2).
 /// Signs a Google OAuth2 service-account JWT assertion with RS256 and caches the resulting bearer token until 5 minutes
 /// before expiry. Device tokens and private keys are never written to logs.
@@ -15,16 +27,15 @@ namespace ModMove.Infrastructure.ExternalServices.Firebase;
 public sealed class FcmPushNotificationService(
     HttpClient http,
     FirebaseOptions options,
-    TimeProvider clock) : IPushNotificationService
+    TimeProvider clock,
+    FcmAccessTokenCache? tokenCache = null) : IPushNotificationService
 {
     private const string MessagingScope = "https://www.googleapis.com/auth/firebase.messaging";
     private const string JwtBearerGrantType = "urn:ietf:params:oauth:grant-type:jwt-bearer";
     private static readonly TimeSpan TokenRefreshMargin = TimeSpan.FromMinutes(5);
     private static readonly string EncodedHeader = Base64UrlEncode("""{"alg":"RS256","typ":"JWT"}""");
 
-    private readonly SemaphoreSlim _tokenLock = new(1, 1);
-    private string? _cachedAccessToken;
-    private DateTimeOffset _tokenExpiresAt = DateTimeOffset.MinValue;
+    private readonly FcmAccessTokenCache _cache = tokenCache ?? new FcmAccessTokenCache();
 
     public async Task SendAsync(
         string deviceToken,
@@ -58,8 +69,9 @@ public sealed class FcmPushNotificationService(
         using var response = await http.SendAsync(request, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
+            var errorSummary = await ReadErrorSummaryAsync(response, cancellationToken);
             throw new HttpRequestException(
-                $"FCM HTTP v1 send failed with status {(int)response.StatusCode} ({response.StatusCode}).",
+                $"FCM HTTP v1 send failed with status {(int)response.StatusCode} ({response.StatusCode}).{errorSummary}",
                 inner: null,
                 statusCode: response.StatusCode);
         }
@@ -68,15 +80,15 @@ public sealed class FcmPushNotificationService(
     private async Task<string> GetAccessTokenAsync(CancellationToken cancellationToken)
     {
         var now = clock.GetUtcNow();
-        if (_cachedAccessToken is not null && now + TokenRefreshMargin < _tokenExpiresAt)
-            return _cachedAccessToken;
+        if (_cache.AccessToken is not null && now + TokenRefreshMargin < _cache.ExpiresAt)
+            return _cache.AccessToken;
 
-        await _tokenLock.WaitAsync(cancellationToken);
+        await _cache.Lock.WaitAsync(cancellationToken);
         try
         {
             now = clock.GetUtcNow();
-            if (_cachedAccessToken is not null && now + TokenRefreshMargin < _tokenExpiresAt)
-                return _cachedAccessToken;
+            if (_cache.AccessToken is not null && now + TokenRefreshMargin < _cache.ExpiresAt)
+                return _cache.AccessToken;
 
             var assertion = CreateSignedJwtAssertion(now);
             using var tokenRequest = new HttpRequestMessage(HttpMethod.Post, options.TokenEndpoint)
@@ -91,8 +103,9 @@ public sealed class FcmPushNotificationService(
             using var response = await http.SendAsync(tokenRequest, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
+                var errorSummary = await ReadErrorSummaryAsync(response, cancellationToken);
                 throw new HttpRequestException(
-                    $"FCM OAuth2 token exchange failed with status {(int)response.StatusCode} ({response.StatusCode}).",
+                    $"FCM OAuth2 token exchange failed with status {(int)response.StatusCode} ({response.StatusCode}).{errorSummary}",
                     inner: null,
                     statusCode: response.StatusCode);
             }
@@ -110,14 +123,51 @@ public sealed class FcmPushNotificationService(
                 ? secs
                 : 3600;
 
-            _cachedAccessToken = accessToken;
-            _tokenExpiresAt = now.AddSeconds(Math.Max(60, expiresInSeconds));
-            return _cachedAccessToken;
+            _cache.AccessToken = accessToken;
+            _cache.ExpiresAt = now.AddSeconds(Math.Max(60, expiresInSeconds));
+            return _cache.AccessToken;
         }
         finally
         {
-            _tokenLock.Release();
+            _cache.Lock.Release();
         }
+    }
+
+    private static async Task<string> ReadErrorSummaryAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var raw = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(raw))
+                return "";
+
+            using var doc = JsonDocument.Parse(raw);
+            var root = doc.RootElement;
+            if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("error", out var err))
+            {
+                if (err.ValueKind == JsonValueKind.Object)
+                {
+                    var status = err.TryGetProperty("status", out var s) && s.ValueKind == JsonValueKind.String ? s.GetString() : null;
+                    var message = err.TryGetProperty("message", out var m) && m.ValueKind == JsonValueKind.String ? m.GetString() : null;
+                    var details = string.Join(": ", new[] { status, message }.Where(x => !string.IsNullOrWhiteSpace(x)));
+                    if (!string.IsNullOrWhiteSpace(details))
+                        return $" Details: {details}";
+                }
+                else if (err.ValueKind == JsonValueKind.String)
+                {
+                    var errDesc = root.TryGetProperty("error_description", out var ed) && ed.ValueKind == JsonValueKind.String ? ed.GetString() : null;
+                    var details = string.Join(": ", new[] { err.GetString(), errDesc }.Where(x => !string.IsNullOrWhiteSpace(x)));
+                    if (!string.IsNullOrWhiteSpace(details))
+                        return $" Details: {details}";
+                }
+            }
+        }
+        catch
+        {
+            // Ignore malformed error bodies; the HTTP status code is still included.
+        }
+
+        return "";
     }
 
     private string CreateSignedJwtAssertion(DateTimeOffset now)
