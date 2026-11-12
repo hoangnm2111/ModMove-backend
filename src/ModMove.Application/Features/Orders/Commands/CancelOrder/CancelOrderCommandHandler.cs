@@ -52,14 +52,7 @@ internal sealed class CancelOrderCommandHandler(
         }
 
         if (payments is not null)
-        {
-            foreach (var pending in await payments.GetPendingPayOsForOrderAsync(order.Id, cancellationToken))
-            {
-                pending.Cancel();
-                if (gateway is not null && pending.PayosOrderCode is { } code && pending.ExpiresAt > now)
-                    await gateway.CancelPaymentLinkAsync(code, cancellationToken);
-            }
-        }
+            await PendingPayOsCodes.CancelForOrderAsync(order.Id, payments, gateway, now, cancellationToken);
 
         // Accept, MarkPaid and Cancel all bump RowVersion: of two racing saves, the later one is a 409.
         await unitOfWork.SaveChangesAsync(cancellationToken);

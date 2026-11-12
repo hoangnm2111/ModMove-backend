@@ -318,11 +318,46 @@ public class AdminRefundsTests
     }
 
     [Fact]
+    public async Task Admin_cannot_approve_a_zero_proposal_but_can_reject_it_B9()
+    {
+        var s = Build();
+        var refund = Refund.Request(s.Order.Id, null, RefundSourceType.Complaint, "Hàng vỡ", null, 100_000m);
+        refund.Propose(0m, "Không đủ căn cứ", 5);
+        s.App.Refunds.Add(refund);
+
+        var error = await Assert.ThrowsAsync<DomainException>(() => s.App.Sender.Send(new ApproveRefundCommand(refund.Id)));
+        Assert.Equal("REFUND_ZERO_PROPOSAL", error.Code);
+        Assert.Equal(0, s.App.UnitOfWork.Saves);
+
+        await s.App.Sender.Send(new RejectRefundCommand(refund.Id, "Không đủ căn cứ"));
+        Assert.Equal(RefundStatus.Rejected, refund.RefundStatus);
+    }
+
+    [Fact]
+    public async Task Payout_failed_without_a_payout_account_is_refused_R01()
+    {
+        // No transfer could have been made: the customer is still owed a bank account, not a "transfer failed" notice.
+        var s = Build();
+        var refund = Refund.Request(s.Order.Id, null, RefundSourceType.Cancellation, "Khách hủy", null, 180_000m);
+        refund.Approve(s.Admin.Id, Now);
+        s.App.Refunds.Add(refund);
+
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(new MarkRefundPayoutFailedCommand(refund.Id, "Lỗi chuyển khoản")));
+
+        Assert.Equal("REFUND_BANK_ACCOUNT_REQUIRED", error.Code);
+        Assert.Equal(RefundStatus.Approved, refund.RefundStatus);
+        Assert.Equal(0, s.App.UnitOfWork.Saves);
+        Assert.Empty(s.App.Realtime.Sent);
+    }
+
+    [Fact]
     public async Task Payout_failed_concurrent_save_throws_ConflictException_409_R01()
     {
         var s = Build();
         var refund = Refund.Request(s.Order.Id, null, RefundSourceType.Cancellation, "Khách hủy", null, 180_000m);
         refund.Approve(s.Admin.Id, Now);
+        refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now);
         s.App.Refunds.Add(refund);
         s.App.UnitOfWork.ThrowConflictOnSave = true;
 

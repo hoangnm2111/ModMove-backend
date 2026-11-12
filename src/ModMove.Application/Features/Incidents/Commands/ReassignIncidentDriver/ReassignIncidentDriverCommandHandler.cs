@@ -59,8 +59,10 @@ internal sealed class ReassignIncidentDriverCommandHandler(
             throw NotEligible("The replacement driver has no recent GPS signal within the last 5 minutes.");
         }
 
+        var oldProfile = oldDriverProfileId is { } oldId ? await driverProfiles.GetByIdAsync(oldId, cancellationToken) : null;
         var radiusKm = (double)await settings.GetDecimalAsync(SettingKeys.MatchingRadiusKm, cancellationToken);
-        var (refLat, refLon) = IncidentHandlingRules.ReferencePoint(incident, order.PickupLatitude, order.PickupLongitude);
+        var (refLat, refLon) = IncidentHandlingRules.ReferencePoint(
+            incident, await IncidentHandlingRules.ReportedByDriverAsync(incident, users, cancellationToken), order, oldProfile);
         if (GeoDistance.HaversineKm(refLat, refLon, dLat, dLon) > radiusKm)
             throw NotEligible("The replacement driver is outside the matching radius.");
 
@@ -85,12 +87,8 @@ internal sealed class ReassignIncidentDriverCommandHandler(
         incident.Resolve(IncidentDecision.ReassignDriver, reason, dispatcher.Id, now);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var oldDriverUserId = oldDriverProfileId is { } oldId
-            ? (await driverProfiles.GetByIdAsync(oldId, cancellationToken))?.UserId
-            : null;
-
         await IncidentNotifications.NotifyReassignedAsync(
-            notifications, order, oldDriverUserId, newProfile.UserId, incident, reason, cancellationToken);
+            notifications, order, oldProfile?.UserId, newProfile.UserId, incident, reason, cancellationToken);
     }
 
     private static DomainException NotEligible(string message) => new(message, "DRIVER_NOT_ELIGIBLE");

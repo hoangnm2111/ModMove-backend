@@ -109,6 +109,53 @@ public class DriverWalletTests
     }
 
     [Fact]
+    public void CompleteWithdrawal_moves_the_wallet_version_so_a_racing_reject_is_a_409()
+    {
+        var wallet = DriverWallet.Create(1);
+        wallet.CreditTripEarning(10, 100_000, 10_000);
+        var withdrawal = wallet.RequestWithdrawal(50_000);
+        var before = wallet.RowVersion;
+
+        wallet.CompleteWithdrawal(withdrawal, 2, "FT123", Now);
+
+        Assert.Equal(before + 1, wallet.RowVersion);
+    }
+
+    [Fact]
+    public void An_empty_wallet_lets_the_driver_delete_the_account_Q12()
+    {
+        var wallet = DriverWallet.Create(1);
+
+        wallet.EnsureEmptyForAccountDeletion(); // nothing held, nothing owed
+        Assert.False(wallet.HasPendingWithdrawal);
+    }
+
+    [Fact]
+    public void A_pending_withdrawal_stops_the_account_deletion_Q12()
+    {
+        var wallet = DriverWallet.Create(1);
+        wallet.CreditTripEarning(10, 100_000, 10_000);
+        wallet.RequestWithdrawal(90_000); // the whole total is held: WalletTotal is 0, but the payout is not done
+
+        Assert.True(wallet.HasPendingWithdrawal);
+        Assert.Equal("ACCOUNT_HAS_PENDING_WITHDRAWAL", Assert.Throws<DomainException>(wallet.EnsureEmptyForAccountDeletion).Code);
+    }
+
+    [Theory]
+    [InlineData(50_000)]  // money left: withdraw it first
+    [InlineData(-50_000)] // a deposit gone negative on a cash commission (GB-15): money owed to the platform
+    public void Money_left_or_owed_stops_the_account_deletion_Q12(decimal balance)
+    {
+        var wallet = DriverWallet.Create(1);
+        if (balance > 0)
+            wallet.CreditTripEarning(10, balance, 0);
+        else
+            wallet.DeductCommissionFromDeposit(10, -balance);
+
+        Assert.Equal("ACCOUNT_HAS_WALLET_BALANCE", Assert.Throws<DomainException>(wallet.EnsureEmptyForAccountDeletion).Code);
+    }
+
+    [Fact]
     public void Completed_withdrawal_cannot_be_processed_twice()
     {
         var wallet = DriverWallet.Create(1);

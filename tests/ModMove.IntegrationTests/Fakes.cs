@@ -83,6 +83,13 @@ internal sealed class InMemoryOrders : IShippingOrderRepository
     public Task<bool> HasOpenOrdersForCustomerAsync(long customerId, CancellationToken cancellationToken = default) =>
         Task.FromResult(CustomersWithOpenOrders.Contains(customerId));
 
+    public Task<bool> HasOrdersWithDriverForCustomerAsync(long customerId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Any(o => o.CustomerId == customerId
+            && o.OrderStatus is OrderStatus.Accepted or OrderStatus.Arrived or OrderStatus.PickedUp or OrderStatus.InTransit));
+
+    public Task<IReadOnlyList<ShippingOrder>> GetPendingForCustomerAsync(long customerId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<ShippingOrder>>(Items.Where(o => o.CustomerId == customerId && o.OrderStatus == OrderStatus.Pending).ToList());
+
     public Task<bool> HasOrdersInProgressAsync(CancellationToken cancellationToken = default) =>
         Task.FromResult(HasOrdersInProgress);
 
@@ -268,6 +275,9 @@ internal sealed class InMemoryIncidents : IIncidentRepository
 
     public Task<bool> HasOpenReportedByAsync(long orderId, long reporterUserId, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.Any(i => i.OrderId == orderId && i.ReportedBy == reporterUserId && i.IsOpen));
+
+    public Task<List<InTransitIncident>> GetInProgressHandledByAsync(long dispatcherId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Where(i => i.HandledBy == dispatcherId && i.ResolutionStatus == IncidentResolutionStatus.InProgress).ToList());
 }
 
 internal sealed class InMemoryCoupons : ICouponRepository

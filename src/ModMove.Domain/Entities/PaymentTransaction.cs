@@ -37,16 +37,17 @@ public sealed class PaymentTransaction : BaseAuditableEntity, IAggregateRoot
 
     /// <summary>
     /// R-01: keeps what PayOS reported about the payer. Empty, blank and the text "null" or "undefined" (PayOS sends them
-    /// for a missing value) become null, so nothing meaningless is stored. Values are cut to the column sizes.
+    /// for a missing value) become null, so nothing meaningless is stored. A bank or account number too long for its column
+    /// is dropped: cut, it would be another account and the refund would go to it. Only the name is cut to fit.
     /// </summary>
     public void RecordPayer(string? bankBin, string? accountNumber, string? accountName)
     {
-        PayerBankBin = Clean(bankBin, 20);
-        PayerAccountNumber = Clean(accountNumber, 19);
-        PayerAccountName = Clean(accountName, 100);
+        PayerBankBin = Clean(bankBin, 20, cut: false);
+        PayerAccountNumber = Clean(accountNumber, 19, cut: false);
+        PayerAccountName = Clean(accountName, 100, cut: true);
     }
 
-    private static string? Clean(string? value, int maxLength)
+    private static string? Clean(string? value, int maxLength, bool cut)
     {
         var text = value?.Trim();
         if (string.IsNullOrEmpty(text)
@@ -54,7 +55,9 @@ public sealed class PaymentTransaction : BaseAuditableEntity, IAggregateRoot
             || text.Equals("undefined", StringComparison.OrdinalIgnoreCase))
             return null;
 
-        return text.Length > maxLength ? text[..maxLength] : text;
+        if (text.Length <= maxLength)
+            return text;
+        return cut ? text[..maxLength] : null;
     }
 
     public static PaymentTransaction ForOrderViaPayOs(long orderId, decimal amount, long payosOrderCode, string checkoutUrl, DateTimeOffset now) =>

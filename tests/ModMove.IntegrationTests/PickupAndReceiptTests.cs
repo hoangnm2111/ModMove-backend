@@ -298,7 +298,10 @@ public class ConfirmReceiptTests
                     complaint.MarkProcessed("BANK1", TripSetup.Now);
                 }
                 else
+                {
+                    complaint.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", TripSetup.Now);
                     complaint.MarkFailed("Sai số tài khoản");
+                }
                 break;
         }
 

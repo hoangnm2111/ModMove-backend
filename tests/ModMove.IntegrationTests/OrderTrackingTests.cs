@@ -47,6 +47,12 @@ public class OrderTrackingTests
         /// <summary>Where the incident behind a mid-trip reassignment happened; null = no such reassignment.</summary>
         public (decimal? Latitude, decimal? Longitude)? Handover { get; set; }
 
+        /// <summary>The customer reported the incident behind the reassignment, so its point is not the vehicle's.</summary>
+        public bool HandoverByCustomer { get; set; }
+
+        /// <summary>The last GPS point the previous driver logged on the order before the reassignment; null = none.</summary>
+        public (decimal Latitude, decimal Longitude)? VehicleLog { get; set; }
+
         public List<(string Sql, IReadOnlyDictionary<string, object?> Parameters)> Executed { get; } = [];
 
         public Db()
@@ -58,10 +64,20 @@ public class OrderTrackingTests
                     return Table(("AccountStatus", typeof(string), AccountStatus));
                 if (text.Contains("FROM in_transit_incidents"))
                 {
-                    var handover = Table(("Latitude", typeof(decimal), Handover?.Latitude), ("Longitude", typeof(decimal), Handover?.Longitude));
+                    var handover = Table(
+                        ("Latitude", typeof(decimal), Handover?.Latitude), ("Longitude", typeof(decimal), Handover?.Longitude),
+                        ("ReporterRole", typeof(string), HandoverByCustomer ? "Customer" : "Driver"),
+                        ("ResolvedAt", typeof(DateTime), SeenAt));
                     if (Handover is null)
                         handover.Rows.Clear();
                     return handover;
+                }
+                if (text.Contains("FROM driver_location_logs"))
+                {
+                    var log = Table(("Latitude", typeof(decimal), VehicleLog?.Latitude), ("Longitude", typeof(decimal), VehicleLog?.Longitude));
+                    if (VehicleLog is null)
+                        log.Rows.Clear();
+                    return log;
                 }
 
                 var row = Table(
@@ -125,6 +141,32 @@ public class OrderTrackingTests
 
         Assert.Equal(("Handover", 14), (tracking.Eta!.Target, tracking.Eta.DurationMinutes));
         Assert.Equal(new GeoPoint(21.07m, 105.87m), Assert.Single(db.Maps.Routes).To);
+    }
+
+    [Fact]
+    public async Task After_a_reassignment_on_a_customer_incident_the_eta_runs_to_the_vehicles_last_gps_7_2()
+    {
+        // The customer reported from Ho Chi Minh City; the old vehicle last logged its GPS in Ha Noi.
+        var db = new Db { OrderStatus = "Accepted", Handover = (10.7769m, 106.7009m), HandoverByCustomer = true, VehicleLog = (21.07m, 105.87m) };
+
+        var tracking = await db.Sender().Send(new GetOrderTrackingQuery(1));
+
+        Assert.Equal(("Handover", 14), (tracking.Eta!.Target, tracking.Eta.DurationMinutes));
+        Assert.Equal(new GeoPoint(21.07m, 105.87m), Assert.Single(db.Maps.Routes).To);
+        var (sql, parameters) = db.Executed.Last(e => e.Sql.Contains("FROM driver_location_logs"));
+        Assert.Contains("recorded_at <= @ResolvedAt", sql);
+        Assert.Equal(1L, parameters["OrderId"]);
+    }
+
+    [Fact]
+    public async Task Customer_incident_without_a_logged_vehicle_position_has_no_eta_7_2()
+    {
+        var db = new Db { OrderStatus = "Accepted", Handover = (10.7769m, 106.7009m), HandoverByCustomer = true };
+
+        var tracking = await db.Sender().Send(new GetOrderTrackingQuery(1));
+
+        Assert.Null(tracking.Eta);
+        Assert.Empty(db.Maps.Routes);
     }
 
     [Fact]

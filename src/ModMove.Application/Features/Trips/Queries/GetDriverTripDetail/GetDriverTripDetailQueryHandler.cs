@@ -276,7 +276,7 @@ internal static class DriverTripDetailReader
                 i.Id,
                 i.IncidentType,
                 // DECISIONS 8.3: if the customer reported the incident, their words may be about the driver; show generic text.
-                i.ReportedBy == driverUserId ? i.Description : "Khách hàng báo cáo sự cố, Điều phối viên đang xử lý.",
+                i.ReportedBy == driverUserId ? i.Description : "Có sự cố trên đơn này, Điều phối viên đang xử lý.",
                 i.ReportedBy == driverUserId ? SqlHelpers.ParseJsonList(i.PhotoUrls) : [],
                 i.ReportedBy == driverUserId,
                 i.ResolutionStatus,

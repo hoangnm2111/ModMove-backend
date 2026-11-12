@@ -451,6 +451,7 @@ public class CustomerRefundTests
             default:
                 refund.Propose(180_000, "Đủ", 1);
                 refund.Approve(1, TripSetup.Now);
+                refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", TripSetup.Now);
                 refund.MarkFailed("Sai số tài khoản");
                 break;
         }

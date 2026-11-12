@@ -125,6 +125,9 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
         EnsureStatus(RefundStatus.Requested);
         if (ProposedAmount is null)
             throw new DomainException("A refund needs a dispatcher proposal before it can be approved.");
+        // B9: approving 0 VND would leave a complaint open with nothing to pay, holding the order and the driver (7.3).
+        if (ProposedAmount == 0)
+            throw new DomainException("A 0 VND proposal can only be rejected.", "REFUND_ZERO_PROPOSAL");
 
         RefundStatus = RefundStatus.Approved;
         ApprovedBy = adminId;
@@ -159,6 +162,9 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
     public void MarkFailed(string reason)
     {
         EnsureStatus(RefundStatus.Approved);
+        // Without an account no transfer was made: the customer still needs REFUND_BANK_INFO_REQUIRED, not a failure.
+        if (!HasPayoutAccount)
+            throw new DomainException("The customer has not given a bank account to receive this refund.", "REFUND_BANK_ACCOUNT_REQUIRED");
         RefundStatus = RefundStatus.Failed;
         PayoutFailureReason = reason;
         RowVersion++;

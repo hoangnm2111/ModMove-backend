@@ -18,13 +18,15 @@ internal sealed class GetMyRefundDetailQueryHandler(ISqlConnectionFactory connec
           AND r.id = @RefundId
         """;
 
+    // The same payment confirm copies (IPaymentTransactionRepository.GetLatestPaidWithPayerAsync): the latest Paid one with a
+    // payer. The BANK list only names it; a bank that is not offered means no suggestion, not an older payment's account.
     private const string SuggestionSql = """
         SELECT p.payer_bank_bin AS BankCode, b.name AS BankName,
                p.payer_account_number AS AccountNumber, p.payer_account_name AS AccountHolder
         FROM payment_transactions p
-        JOIN master_data_items b ON b.category = 'BANK' AND b.code = p.payer_bank_bin AND b.is_active = 1
+        LEFT JOIN master_data_items b ON b.category = 'BANK' AND b.code = p.payer_bank_bin AND b.is_active = 1
         WHERE p.order_id = @OrderId AND p.payment_method = 'PayOS' AND p.transaction_status = 'Paid'
-          AND p.payer_account_number IS NOT NULL
+          AND p.payer_bank_bin IS NOT NULL AND p.payer_account_number IS NOT NULL
         ORDER BY p.paid_at DESC, p.id DESC
         LIMIT 1
         """;
@@ -61,7 +63,7 @@ internal sealed class GetMyRefundDetailQueryHandler(ISqlConnectionFactory connec
     {
         var payer = await connection.QueryFirstOrDefaultAsync<PayerRow>(
             new CommandDefinition(SuggestionSql, new { OrderId = orderId }, cancellationToken: cancellationToken));
-        if (payer is null)
+        if (payer?.BankName is not { } bankName)
             return null;
 
         // The same checks the server runs when the customer confirms, so a suggestion is never one that confirm would refuse.
@@ -69,7 +71,7 @@ internal sealed class GetMyRefundDetailQueryHandler(ISqlConnectionFactory connec
         if (payer.AccountNumber is not { } number || !IsValidNumber(number) || holder.Length < 2)
             return null;
 
-        return new PayoutAccountView(payer.BankCode, payer.BankName, PayoutAccountView.Mask(number), holder);
+        return new PayoutAccountView(payer.BankCode, bankName, PayoutAccountView.Mask(number), holder);
     }
 
     private static bool IsValidNumber(string number) =>
@@ -78,7 +80,7 @@ internal sealed class GetMyRefundDetailQueryHandler(ISqlConnectionFactory connec
     private sealed class PayerRow
     {
         public string BankCode { get; init; } = "";
-        public string BankName { get; init; } = "";
+        public string? BankName { get; init; } // null: the bank is not in the active BANK list
         public string? AccountNumber { get; init; }
         public string? AccountHolder { get; init; }
     }

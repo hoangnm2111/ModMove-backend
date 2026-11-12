@@ -22,6 +22,12 @@ public sealed record UserDetailResponse
     public int TotalOrders { get; init; }
     public int CompletedOrders { get; init; }
 
+    /// <summary>
+    /// Q11: refunds still open on the customer's orders (Requested, Approved, Failed). Locking does not stop them, but a
+    /// locked customer cannot give a bank account or answer a Dispatcher, so the web warns the Administrator first.
+    /// </summary>
+    public int OpenRefundCount { get; init; }
+
     public UserDetailResponse() { }
 
     public UserDetailResponse(

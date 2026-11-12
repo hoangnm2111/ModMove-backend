@@ -129,6 +129,21 @@ public class RefundDomainTests
     // 2b. Payout account (R-01)
     // ==========================================
 
+    [Fact]
+    public void Approve_with_a_zero_proposal_is_REFUND_ZERO_PROPOSAL()
+    {
+        var refund = Refund.Request(10, null, RefundSourceType.Complaint, "Hàng vỡ", null, 100_000m);
+        refund.Propose(0m, "Không đủ căn cứ", 5);
+
+        var ex = Assert.Throws<DomainException>(() => refund.Approve(99, Now));
+
+        Assert.Equal("REFUND_ZERO_PROPOSAL", ex.Code);
+        Assert.Equal(RefundStatus.Requested, refund.RefundStatus);
+
+        refund.RejectRefund(99, Now); // the only way to close it
+        Assert.Equal(RefundStatus.Rejected, refund.RefundStatus);
+    }
+
     private static Refund ApprovedCancellationRefund()
     {
         var refund = Refund.Request(10, null, RefundSourceType.Cancellation, "Hủy đơn", null, 180_000m);
@@ -144,7 +159,11 @@ public class RefundDomainTests
     {
         var refund = Refund.Request(10, null, RefundSourceType.Cancellation, "Hủy đơn", null, 180_000m);
         if (status != RefundStatus.Requested) refund.Approve(99, Now);
-        if (status == RefundStatus.Failed) refund.MarkFailed("Sai số tài khoản");
+        if (status == RefundStatus.Failed)
+        {
+            refund.SetPayoutAccount("970436", "Vietcombank", "1111111111", "NGUYEN VAN A", Now); // the account the transfer failed on
+            refund.MarkFailed("Sai số tài khoản");
+        }
         var versionBefore = refund.RowVersion;
 
         refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now);
@@ -238,9 +257,21 @@ public class RefundDomainTests
     }
 
     [Fact]
+    public void MarkFailed_without_a_payout_account_is_REFUND_BANK_ACCOUNT_REQUIRED_R01()
+    {
+        var refund = ApprovedCancellationRefund();
+
+        var ex = Assert.Throws<DomainException>(() => refund.MarkFailed("Lỗi chuyển khoản"));
+
+        Assert.Equal("REFUND_BANK_ACCOUNT_REQUIRED", ex.Code);
+        Assert.Equal(RefundStatus.Approved, refund.RefundStatus);
+    }
+
+    [Fact]
     public void MarkFailed_keeps_the_reason()
     {
         var refund = ApprovedCancellationRefund();
+        refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now);
 
         refund.MarkFailed("Tài khoản không tồn tại");
 

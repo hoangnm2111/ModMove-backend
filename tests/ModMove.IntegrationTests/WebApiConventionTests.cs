@@ -5,9 +5,18 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.Extensions.DependencyInjection;
+using System.Data;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Abstractions;
+using Microsoft.AspNetCore.Mvc.Filters;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging.Abstractions;
+using ModMove.Application;
 using ModMove.Application.Common.Exceptions;
+using ModMove.Application.Common.Interfaces;
+using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.WebApi.Controllers;
+using ModMove.WebApi.Filters;
 using ModMove.WebApi.Middlewares;
 
 // Stand-in controllers: the convention only looks at the namespace, so they can live in the test assembly.
@@ -100,6 +109,7 @@ namespace ModMove.IntegrationTests
         [InlineData(typeof(WebApi.Controllers.Driver.IncidentsController), "Driver")]
         [InlineData(typeof(WebApi.Controllers.Driver.RatingsController), "Driver")]
         [InlineData(typeof(WebApi.Controllers.Driver.UploadsController), "Driver")]
+        [InlineData(typeof(WebApi.Controllers.Driver.AccountController), "Driver")] // Q12: only a driver deletes a driver account here
         [InlineData(typeof(WebApi.Controllers.Dispatcher.FakeIncidentsController), "Dispatcher")]
         [InlineData(typeof(WebApi.Controllers.Admin.FakeUsersController), "Administrator")]
         [InlineData(typeof(WebApi.Controllers.Admin.RefundsController), "Administrator")]
@@ -113,6 +123,63 @@ namespace ModMove.IntegrationTests
             Assert.False(await IsAllowedAsync(model)); // signed in without any role
             foreach (var other in new[] { "Customer", "Driver", "Dispatcher", "Administrator" }.Where(r => r != role))
                 Assert.False(await IsAllowedAsync(model, other));
+        }
+
+        // Customer and Driver handlers load the user themselves (LoadUserAsync); Dispatcher and Admin rely on the filter.
+        [Theory]
+        [InlineData(typeof(WebApi.Controllers.Dispatcher.FakeIncidentsController), true)]
+        [InlineData(typeof(WebApi.Controllers.Admin.FakeUsersController), true)]
+        [InlineData(typeof(WebApi.Controllers.Admin.RefundsController), true)]
+        [InlineData(typeof(WebApi.Controllers.Customer.FakeOrdersController), false)]
+        [InlineData(typeof(WebApi.Controllers.Driver.FakeJobsController), false)]
+        [InlineData(typeof(WebApi.Controllers.Account.FakeProfileController), false)]
+        public void Dispatcher_and_Admin_controllers_check_the_account_is_active_B8(Type controller, bool expected)
+        {
+            Assert.Equal(expected, Apply(controller).Filters.OfType<ActiveAccountFilter>().Any());
+        }
+
+        private static async Task<bool> RunFilterAsync(string? accountStatus)
+        {
+            var sql = new FakeSql();
+            sql.Result = new DataTable();
+            sql.Result.Columns.Add("AccountStatus", typeof(string));
+            if (accountStatus is not null)
+                sql.Result.Rows.Add(accountStatus);
+
+            var services = new ServiceCollection()
+                .AddLogging()
+                .AddApplication()
+                .AddSingleton<ISqlConnectionFactory>(sql)
+                .AddSingleton<ICurrentUserService>(new FakeCurrentUser(5))
+                .BuildServiceProvider();
+            var http = new DefaultHttpContext { RequestServices = services };
+            var context = new ActionExecutingContext(
+                new ActionContext(http, new RouteData(), new ActionDescriptor()), [], new Dictionary<string, object?>(), new object());
+
+            var ranAction = false;
+            await new ActiveAccountFilter().OnActionExecutionAsync(context, () =>
+            {
+                ranAction = true;
+                return Task.FromResult(new ActionExecutedContext(context, [], new object()));
+            });
+            return ranAction;
+        }
+
+        [Theory]
+        [InlineData("Locked")]
+        [InlineData("Inactive")]
+        [InlineData(null)] // the account is gone
+        public async Task ActiveAccountFilter_refuses_an_account_that_is_not_active_B8(string? status)
+        {
+            var error = await Assert.ThrowsAsync<ForbiddenAccessException>(() => RunFilterAsync(status));
+
+            Assert.Equal("ACCOUNT_INACTIVE", error.Code);
+        }
+
+        [Fact]
+        public async Task ActiveAccountFilter_lets_an_active_account_through()
+        {
+            Assert.True(await RunFilterAsync("Active"));
         }
 
         [Theory]

@@ -27,7 +27,9 @@ internal sealed class GetUserDetailQueryHandler(ISqlConnectionFactory connection
              WHERE so.customer_id = u.id OR (dp.id IS NOT NULL AND so.driver_profile_id = dp.id)) AS TotalOrders,
             (SELECT COUNT(1) FROM shipping_orders so
              WHERE (so.customer_id = u.id OR (dp.id IS NOT NULL AND so.driver_profile_id = dp.id))
-               AND so.order_status = 'Completed') AS CompletedOrders
+               AND so.order_status = 'Completed') AS CompletedOrders,
+            (SELECT COUNT(1) FROM refunds r JOIN shipping_orders so ON so.id = r.order_id
+             WHERE so.customer_id = u.id AND r.refund_status IN ('Requested', 'Approved', 'Failed')) AS OpenRefundCount
         FROM users u
         LEFT JOIN driver_profiles dp ON dp.user_id = u.id
         LEFT JOIN vehicles v ON v.driver_profile_id = dp.id

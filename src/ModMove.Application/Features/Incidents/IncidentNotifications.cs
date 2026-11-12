@@ -1,5 +1,6 @@
 using System.Globalization;
 using ModMove.Application.Common.Interfaces;
+using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Notifications;
 using ModMove.Domain.Entities;
 
@@ -11,6 +12,31 @@ namespace ModMove.Application.Features.Incidents;
 /// </summary>
 internal static class IncidentNotifications
 {
+    /// <summary>
+    /// The driver an incident concerns (8.3): whoever reported a driver's incident, even after the order moved to another
+    /// driver; for a customer's or a Dispatcher's incident (Q6b), the driver now holding the order.
+    /// </summary>
+    public static async Task<long?> DriverConcernedAsync(
+        InTransitIncident incident, ShippingOrder order, IUserRepository users, IDriverProfileRepository driverProfiles,
+        CancellationToken cancellationToken) =>
+        await IncidentHandlingRules.ReportedByDriverAsync(incident, users, cancellationToken)
+            ? incident.ReportedBy
+            : await Orders.DriverNotifications.DriverUserIdAsync(driverProfiles, order, cancellationToken);
+
+    /// <summary>
+    /// DECISIONS Q10: an incident is back to Open; only Dispatchers are told, so one of them takes it. For the customer and
+    /// the driver it is still being handled.
+    /// </summary>
+    public static Task NotifyReleasedAsync(INotificationService notifications, InTransitIncident incident, CancellationToken cancellationToken) =>
+        notifications.NotifyDispatchersAsync(new Notification(
+            "INCIDENT_RELEASED", "Sự cố cần người tiếp nhận",
+            $"Sự cố #{incident.Id} vừa được trả lại, cần Điều phối viên khác tiếp nhận.",
+            new Dictionary<string, string>
+            {
+                ["incidentId"] = incident.Id.ToString(CultureInfo.InvariantCulture),
+                ["orderId"] = incident.OrderId.ToString(CultureInfo.InvariantCulture),
+            }), cancellationToken);
+
     /// <summary>
     /// DECISIONS 8.3: a Dispatcher took over the incident; the customer and the driver it concerns (<paramref name="driverUserId"/>) are told.
     /// The driver's text is the same for every incident, so a customer's report is never repeated to the driver.

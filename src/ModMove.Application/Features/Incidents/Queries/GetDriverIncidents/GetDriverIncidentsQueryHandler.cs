@@ -146,8 +146,8 @@ internal sealed class DriverIncidentRow
             OrderCode,
             OrderStatus,
             IncidentType,
-            // DECISIONS 8.3: customer incident text may be about the driver and goes to Dispatchers only.
-            reportedByYou ? Description : "Khách hàng báo cáo sự cố, Điều phối viên đang xử lý.",
+            // DECISIONS 8.3: someone else's report (the customer's, a Dispatcher's note, a previous driver's) goes to Dispatchers only.
+            reportedByYou ? Description : "Có sự cố trên đơn này, Điều phối viên đang xử lý.",
             reportedByYou ? SqlHelpers.ParseJsonList(PhotoUrls) : [],
             reportedByYou ? Latitude : null,
             reportedByYou ? Longitude : null,

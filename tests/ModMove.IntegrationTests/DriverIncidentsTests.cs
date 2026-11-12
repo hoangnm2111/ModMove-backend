@@ -140,6 +140,8 @@ public class DriverIncidentsTests
 
         Assert.False(page.Items[1].ReportedByYou);
         Assert.DoesNotContain("riêng tư", page.Items[1].Description);
+        // Q6b: it may be a Dispatcher's or a previous driver's report, so the notice does not name the customer.
+        Assert.Equal("Có sự cố trên đơn này, Điều phối viên đang xử lý.", page.Items[1].Description);
         Assert.Empty(page.Items[1].PhotoUrls);
         Assert.Null(page.Items[1].Latitude);
 

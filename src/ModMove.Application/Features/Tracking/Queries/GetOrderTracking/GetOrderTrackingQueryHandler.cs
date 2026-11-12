@@ -32,11 +32,23 @@ internal sealed class GetOrderTrackingQueryHandler(
 
     // The proof row exists once the cargo was picked up, so an earlier reassignment before pickup does not count.
     private const string HandoverSql = """
-        SELECT i.latitude AS Latitude, i.longitude AS Longitude
+        SELECT i.latitude AS Latitude, i.longitude AS Longitude,
+               rep.role AS ReporterRole, i.resolved_at AS ResolvedAt
         FROM in_transit_incidents i
+        JOIN users rep ON rep.id = i.reported_by
         JOIN proof_of_deliveries p ON p.order_id = i.order_id
         WHERE i.order_id = @OrderId AND i.resolution_decision = 'ReassignDriver'
         ORDER BY i.resolved_at DESC, i.id DESC
+        LIMIT 1
+        """;
+
+    // A customer's incident holds the customer's phone position and a Dispatcher's none (Q6b), so the vehicle is where the
+    // previous driver last logged GPS.
+    private const string VehicleSql = """
+        SELECT latitude AS Latitude, longitude AS Longitude
+        FROM driver_location_logs
+        WHERE order_id = @OrderId AND recorded_at <= @ResolvedAt
+        ORDER BY recorded_at DESC
         LIMIT 1
         """;
 
@@ -70,6 +82,13 @@ internal sealed class GetOrderTrackingQueryHandler(
             new CommandDefinition(HandoverSql, new { OrderId = orderId }, cancellationToken: cancellationToken));
         if (handover is null)
             return await DriverAsync(row, "Pickup", pickup, cancellationToken);
+
+        if (handover.ReporterRole is "Customer" or "Dispatcher")
+        {
+            handover = await connection.QueryFirstOrDefaultAsync<HandoverRow>(
+                new CommandDefinition(VehicleSql, new { OrderId = orderId, handover.ResolvedAt }, cancellationToken: cancellationToken))
+                ?? new HandoverRow();
+        }
 
         var vehicle = handover is { Latitude: { } latitude, Longitude: { } longitude } ? new GeoPoint(latitude, longitude) : null;
         return await DriverAsync(row, "Handover", vehicle, cancellationToken);
@@ -106,6 +125,8 @@ internal sealed class GetOrderTrackingQueryHandler(
     {
         public decimal? Latitude { get; init; }
         public decimal? Longitude { get; init; }
+        public string? ReporterRole { get; init; }
+        public DateTime? ResolvedAt { get; init; }
     }
 
     private sealed class Row

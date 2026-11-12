@@ -117,6 +117,30 @@ public class GetReplacementDriversTests
         Assert.Equal(2L, Assert.Single(result).DriverProfileId);
     }
 
+    [Theory]
+    [InlineData("Customer")]   // the point is the customer's phone
+    [InlineData("Dispatcher")] // a Dispatcher's incident has no point at all (Q6b)
+    public async Task Incident_not_reported_by_a_driver_measures_from_the_current_drivers_position_7_2(string reporterRole)
+    {
+        var sql = new FakeSql();
+
+        var ctx = IncidentContextTable();
+        ctx.Columns.Add("ReporterRole", typeof(string));
+        ctx.Columns.Add("DriverLatitude", typeof(decimal));
+        ctx.Columns.Add("DriverLongitude", typeof(decimal));
+        // The report says Ho Chi Minh City; the vehicle is in Ha Noi, about 20 km from the pickup point.
+        ctx.Rows.Add(10L, 10.7769m, 106.7009m, 100L, 1L, 1L, 21.2000m, 105.7000m, 500_000m, "PayOS", reporterRole, 21.0285m, 105.8542m);
+        sql.Results.Enqueue(ctx);
+
+        var candidates = CandidateDriversTable();
+        candidates.Rows.Add(2L, 20L, "Tài Cạnh Xe", "0900000002", "29A-00002", 1L, "Xe tải 500kg", 21.0290m, 105.8545m, Now.UtcDateTime, "Active", 200_000m);
+        sql.Results.Enqueue(candidates);
+
+        var result = await SenderWith(sql).Send(new GetReplacementDriversQuery(10));
+
+        Assert.Equal(2L, Assert.Single(result).DriverProfileId);
+    }
+
     [Fact]
     public async Task Drivers_with_gps_exactly_5_minutes_old_are_left_out_6_4()
     {

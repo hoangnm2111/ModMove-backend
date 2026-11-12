@@ -1,4 +1,5 @@
 using ModMove.Application.Common.Exceptions;
+using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 
@@ -21,10 +22,20 @@ internal static class IncidentHandlingRules
         }
     }
 
-    /// <summary>Incident GPS point when available; falls back to the order's pickup point when reported without coordinates.</summary>
+    /// <summary>Whether a driver reported the incident: only then is its point the vehicle's and its reporter the driver it concerns.</summary>
+    public static async Task<bool> ReportedByDriverAsync(InTransitIncident incident, IUserRepository users, CancellationToken cancellationToken) =>
+        (await users.GetByIdAsync(incident.ReportedBy, cancellationToken))?.Role == UserRole.Driver;
+
+    /// <summary>
+    /// Where the vehicle is, to look for a replacement driver near it (DECISIONS 7.2). A driver's incident carries the
+    /// vehicle's point; a customer's carries the customer's phone and a Dispatcher's none (Q6b), so for those the current
+    /// driver's last GPS is used instead. Either way, without a full point the order's pickup point is used.
+    /// </summary>
     public static (decimal Latitude, decimal Longitude) ReferencePoint(
-        InTransitIncident incident, decimal pickupLatitude, decimal pickupLongitude) =>
-        ReferencePoint(incident.Latitude, incident.Longitude, pickupLatitude, pickupLongitude);
+        InTransitIncident incident, bool reportedByDriver, ShippingOrder order, DriverProfile? currentDriver) =>
+        reportedByDriver
+            ? ReferencePoint(incident.Latitude, incident.Longitude, order.PickupLatitude, order.PickupLongitude)
+            : ReferencePoint(currentDriver?.LastLatitude, currentDriver?.LastLongitude, order.PickupLatitude, order.PickupLongitude);
 
     /// <summary>Same rule for a row read with Dapper: a point with only one coordinate is not used.</summary>
     public static (decimal Latitude, decimal Longitude) ReferencePoint(
