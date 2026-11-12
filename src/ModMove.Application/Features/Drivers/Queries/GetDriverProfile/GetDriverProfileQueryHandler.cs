@@ -45,7 +45,9 @@ internal sealed class GetDriverProfileQueryHandler(
                v.vehicle_status AS VehicleStatus,
                (SELECT COUNT(1) FROM ratings r WHERE r.driver_profile_id = dp.id) AS TotalRatings,
                (SELECT AVG(CAST(r.rating_stars AS DECIMAL(5,2))) FROM ratings r WHERE r.driver_profile_id = dp.id) AS AverageStars,
-               (SELECT COUNT(1) FROM shipping_orders so WHERE so.driver_profile_id = dp.id AND so.order_status = 'Completed') AS CompletedTrips
+               (SELECT COUNT(1) FROM shipping_orders so WHERE so.driver_profile_id = dp.id AND so.order_status = 'Completed') AS CompletedTrips,
+               (SELECT da.document_urls FROM driver_applications da WHERE da.driver_profile_id = dp.id
+                ORDER BY da.version_number DESC LIMIT 1) AS DocumentUrlsJson
         FROM users u
         LEFT JOIN driver_profiles dp ON dp.user_id = u.id
         LEFT JOIN vehicles v ON v.driver_profile_id = dp.id
@@ -102,6 +104,10 @@ internal sealed class GetDriverProfileQueryHandler(
             ? Math.Round(avg, 2, MidpointRounding.AwayFromZero)
             : (decimal?)null;
 
+        // D2: CCCD photos are the last two documents of the latest version, the one citizen_id_number came from.
+        // Applications sent before D2 have five documents, so both are null.
+        var documents = SqlHelpers.ParseJsonList(row.DocumentUrlsJson);
+
         return new DriverProfileDetailResponse(
             row.UserId,
             row.FullName,
@@ -117,6 +123,8 @@ internal sealed class GetDriverProfileQueryHandler(
             row.DriverLicenseNumber,
             row.LicenseFrontUrl,
             row.LicenseBackUrl,
+            documents.ElementAtOrDefault(5),
+            documents.ElementAtOrDefault(6),
             bankAccount,
             vehicle,
             averageStars,
@@ -159,6 +167,7 @@ internal sealed class GetDriverProfileQueryHandler(
         public int TotalRatings { get; init; }
         public decimal? AverageStars { get; init; }
         public int CompletedTrips { get; init; }
+        public string? DocumentUrlsJson { get; init; }
     }
 }
 

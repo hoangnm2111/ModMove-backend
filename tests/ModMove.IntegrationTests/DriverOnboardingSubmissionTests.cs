@@ -19,7 +19,8 @@ namespace ModMove.IntegrationTests;
 public class DriverOnboardingSubmissionTests
 {
     private static readonly string[] Docs =
-        ["https://cdn.x/front.jpg", "https://cdn.x/back.jpg", "https://cdn.x/reg.jpg", "https://cdn.x/insp.jpg", "https://cdn.x/veh.jpg"];
+        ["https://res.cloudinary.com/demo/image/upload/front.jpg", "https://res.cloudinary.com/demo/image/upload/back.jpg", "https://res.cloudinary.com/demo/image/upload/reg.jpg", "https://res.cloudinary.com/demo/image/upload/insp.jpg", "https://res.cloudinary.com/demo/image/upload/veh.jpg",
+         "https://res.cloudinary.com/demo/image/upload/cccd-front.jpg", "https://res.cloudinary.com/demo/image/upload/cccd-back.jpg"];
 
     private sealed class App
     {
@@ -53,6 +54,7 @@ public class DriverOnboardingSubmissionTests
             .AddSingleton<IDriverProfileRepository>(Profiles)
             .AddSingleton<IRepository<VehicleType>>(VehicleTypes)
             .AddSingleton<IUnitOfWork>(UnitOfWork)
+            .AddSingleton<IFileStorage>(new FakeFileStorage())
             .AddSingleton<ICurrentUserService>(new FakeCurrentUser(signedInId))
             .AddSingleton<TimeProvider>(Time)
             .BuildServiceProvider()
@@ -225,7 +227,7 @@ public class DriverOnboardingSubmissionTests
 
         app.Time.Now = TestApp.Start.AddDays(1);
         var newDocs = Docs.ToArray();
-        newDocs[3] = "https://cdn.x/insp-new.jpg";
+        newDocs[3] = "https://res.cloudinary.com/demo/image/upload/insp-new.jpg";
         await app.DriverSender.Send(Command() with { DocumentUrls = newDocs, DriverLicenseNumber = "B2999999999" });
 
         Assert.Equal(ApprovalStatus.Pending, profile.ApprovalStatus);
@@ -234,7 +236,7 @@ public class DriverOnboardingSubmissionTests
         var second = profile.Applications.Single(a => a.VersionNumber == 2);
         Assert.Equal(ApprovalStatus.Rejected, first.ApplicationStatus);          // earlier decision kept
         Assert.Equal(ApprovalStatus.Pending, second.ApplicationStatus);
-        Assert.Equal("https://cdn.x/insp-new.jpg", second.DocumentUrls[3]);
+        Assert.Equal("https://res.cloudinary.com/demo/image/upload/insp-new.jpg", second.DocumentUrls[3]);
         Assert.Equal(TestApp.Start.AddDays(1), second.SubmittedAt);
         Assert.Equal("B2999999999", profile.DriverLicenseNumber);                // credentials follow the latest version
         Assert.Single(app.Profiles.Items);                                       // no second profile

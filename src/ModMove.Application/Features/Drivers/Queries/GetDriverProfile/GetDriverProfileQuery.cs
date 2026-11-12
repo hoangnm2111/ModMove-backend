@@ -23,6 +23,8 @@ public sealed record DriverProfileDetailResponse(
     string? DriverLicenseNumber,
     string? LicenseFrontUrl,
     string? LicenseBackUrl,
+    string? CitizenIdFrontUrl,
+    string? CitizenIdBackUrl,
     DriverProfileBankAccountDto? BankAccount,
     DriverVehicleDetailDto? Vehicle,
     decimal? AverageStars,
