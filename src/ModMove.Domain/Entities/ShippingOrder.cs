@@ -337,6 +337,40 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         return InTransitIncident.Report(Id, driverUserId, type, description, photoUrls, latitude, longitude);
     }
 
+    /// <summary>
+    /// UC-DIS-05: a Dispatcher's ContinueTrip needs a running trip that can move on. Once the customer rejected the 5th
+    /// pickup photos (DECISIONS 6.3) the driver cannot send more and the customer has nothing to approve, so only a
+    /// reassignment (fresh count, 7.2) or a cancellation gets the order moving again.
+    /// </summary>
+    public void EnsureTripCanContinue()
+    {
+        if (OrderStatus is not (OrderStatus.Accepted or OrderStatus.Arrived or OrderStatus.PickedUp or OrderStatus.InTransit))
+            throw new DomainException("The trip can only continue while the order is active.", "ORDER_NOT_ACTIVE");
+        if (OrderStatus == OrderStatus.PickedUp
+            && Proof is { ProofStatus: ProofStatus.Rejected } proof
+            && proof.PickupSubmissionCount >= BusinessRules.MaxPickupSubmissions)
+        {
+            throw new DomainException(
+                $"Pickup photos were sent {BusinessRules.MaxPickupSubmissions} times. Reassign the driver or cancel the order.",
+                "PICKUP_PHOTO_LIMIT");
+        }
+    }
+
+    /// <summary>
+    /// DECISIONS Q6b: a Dispatcher opens an incident on a running order (Accepted to InTransit), so a driver can be reassigned
+    /// or the order cancelled when nobody reported anything. It starts in the Dispatcher's hands (InProgress), carries no
+    /// point (the vehicle's comes from the driver's GPS, 7.2) and does not hold the trip (7.6).
+    /// </summary>
+    public InTransitIncident ReportIncidentByDispatcher(long dispatcherId, IncidentType type, string description)
+    {
+        if (OrderStatus is not (OrderStatus.Accepted or OrderStatus.Arrived or OrderStatus.PickedUp or OrderStatus.InTransit))
+            throw new DomainException("A Dispatcher can open an incident only on an order with a driver, before delivery.", "INCIDENT_NOT_ALLOWED");
+
+        var incident = InTransitIncident.Report(Id, dispatcherId, type, description, null, null, null);
+        incident.StartHandling(dispatcherId);
+        return incident;
+    }
+
     /// <summary>DECISIONS B9: more than 0 and at most what the order cost; larger compensation is handled outside the system.</summary>
     private void EnsureRefundAmount(decimal requestedAmount)
     {

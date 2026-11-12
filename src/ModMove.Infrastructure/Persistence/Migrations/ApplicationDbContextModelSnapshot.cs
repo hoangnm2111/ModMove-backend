@@ -161,6 +161,7 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<long>("Id"));
 
                     b.Property<string>("ApplicationStatus")
+                        .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)")
@@ -500,6 +501,7 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnName("resolution_note");
 
                     b.Property<string>("ResolutionStatus")
+                        .IsConcurrencyToken()
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)")

@@ -29,6 +29,12 @@ public sealed class ShippingOrderRepository(ApplicationDbContext dbContext)
             o => o.CustomerId == customerId && o.OrderStatus != OrderStatus.Completed && o.OrderStatus != OrderStatus.Cancelled,
             cancellationToken);
 
+    public Task<bool> HasOrdersWithDriverForCustomerAsync(long customerId, CancellationToken cancellationToken = default) =>
+        Set.AnyAsync(o => o.CustomerId == customerId && InProgress.Contains(o.OrderStatus), cancellationToken);
+
+    public async Task<IReadOnlyList<ShippingOrder>> GetPendingForCustomerAsync(long customerId, CancellationToken cancellationToken = default) =>
+        await Set.Where(o => o.CustomerId == customerId && o.OrderStatus == OrderStatus.Pending).ToListAsync(cancellationToken);
+
     public Task<bool> HasOrdersInProgressAsync(CancellationToken cancellationToken = default) =>
         Set.AnyAsync(o => InProgress.Contains(o.OrderStatus), cancellationToken);
 

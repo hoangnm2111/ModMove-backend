@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using ModMove.Application.Common.Models;
+using ModMove.Application.Features.Incidents.Commands.ReportIncidentByDispatcher;
 using ModMove.Application.Features.Monitoring.Queries.GetDispatcherOrderById;
 using ModMove.Application.Features.Monitoring.Queries.GetDispatcherOrdersSummary;
 using ModMove.Application.Features.Monitoring.Queries.ListDispatcherOrders;
@@ -29,5 +30,17 @@ public sealed class OrdersController : ApiControllerBase
     [HttpGet("{id:long}")]
     public Task<DispatcherOrderDetailResponse> GetById(long id, CancellationToken cancellationToken) =>
         Sender.Send(new GetDispatcherOrderByIdQuery(id), cancellationToken);
+
+    /// <summary>
+    /// Q6b: open an incident on a running order (Accepted…InTransit) to reassign or cancel it when nobody reported one.
+    /// It is yours at once (InProgress), does not hold the trip, and the description is not shown to the customer or the driver.
+    /// </summary>
+    [HttpPost("{id:long}/incidents")]
+    [ProducesResponseType(StatusCodes.Status201Created)]
+    public async Task<IActionResult> ReportIncident(long id, ReportIncidentByDispatcherBody body, CancellationToken cancellationToken)
+    {
+        var result = await Sender.Send(new ReportIncidentByDispatcherCommand(id, body.IncidentType, body.Description), cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, result);
+    }
 }
 

@@ -28,6 +28,8 @@ public class PersistenceModelTests
     [InlineData(typeof(OtpVerification), nameof(OtpVerification.CodeHash))]       // A-02, GB-25: a replaced code cannot verify, a resend cannot lose a count
     [InlineData(typeof(OtpVerification), nameof(OtpVerification.VerifiedAt))]     // a code is used once
     [InlineData(typeof(OtpVerification), nameof(OtpVerification.FailedAttempts))] // parallel guesses cannot overwrite the count: the loser gets 409
+    [InlineData(typeof(InTransitIncident), nameof(InTransitIncident.ResolutionStatus))]   // Q7: two Dispatchers on one incident, the second gets 409
+    [InlineData(typeof(DriverApplication), nameof(DriverApplication.ApplicationStatus))] // two Administrators approving and rejecting at once
     public void Column_is_a_concurrency_token(Type entity, string property)
     {
         using var db = NewContext();

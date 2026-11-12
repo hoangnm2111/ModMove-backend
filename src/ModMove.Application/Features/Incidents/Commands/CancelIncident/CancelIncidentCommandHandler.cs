@@ -3,7 +3,6 @@ using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
-using ModMove.Application.Features.Orders;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 
@@ -41,7 +40,7 @@ internal sealed class CancelIncidentCommandHandler(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        var driverUserId = await driverProfiles.DriverUserIdAsync(order, cancellationToken);
+        var driverUserId = await IncidentNotifications.DriverConcernedAsync(incident, order, users, driverProfiles, cancellationToken);
         await IncidentNotifications.NotifyIncidentCancelledAsync(notifications, order, driverUserId, incident, reason, cancellationToken);
     }
 }

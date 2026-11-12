@@ -3,6 +3,7 @@ using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Features.Incidents.Commands.CancelIncident;
 using ModMove.Application.Features.Incidents.Commands.CancelOrderByIncident;
 using ModMove.Application.Features.Incidents.Commands.ReassignIncidentDriver;
+using ModMove.Application.Features.Incidents.Commands.ReleaseIncident;
 using ModMove.Application.Features.Incidents.Commands.ResolveIncidentContinue;
 using ModMove.Application.Features.Incidents.Commands.StartIncidentHandling;
 using ModMove.Domain.Entities;
@@ -435,6 +436,197 @@ public class IncidentResolutionTests
 
         var notification = s.SentTo(s.Customer).First(n => n.Type == "INCIDENT_RESOLVED");
         Assert.Contains("toàn bộ tiền cước đã được duyệt hoàn trước đó", notification.Body);
+    }
+
+    [Theory]
+    [InlineData("start")]
+    [InlineData("resolve")]
+    [InlineData("cancel")]
+    public async Task A_decision_racing_another_dispatcher_is_a_409_and_tells_nobody(string step)
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit();
+        var incident = s.Incident(order);
+        s.App.UnitOfWork.ThrowConflictOnSave = true; // the other Dispatcher's save moved resolution_status first
+
+        await Assert.ThrowsAsync<ConflictException>(() => step switch
+        {
+            "start" => s.App.Sender.Send(new StartIncidentHandlingCommand(incident.Id)),
+            "resolve" => s.App.Sender.Send(new ResolveIncidentContinueCommand(incident.Id, "Tiếp tục")),
+            _ => s.App.Sender.Send(new CancelIncidentCommand(incident.Id, "Báo nhầm")),
+        });
+
+        Assert.Empty(s.App.Realtime.Sent);
+    }
+
+    [Fact]
+    public async Task Dispatcher_releases_an_incident_and_another_one_takes_it_Q10()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit();
+        var incident = s.Incident(order);
+        incident.StartHandling(s.Dispatcher.Id);
+
+        await s.App.Sender.Send(new ReleaseIncidentCommand(incident.Id));
+
+        Assert.Equal(IncidentResolutionStatus.Open, incident.ResolutionStatus);
+        Assert.Null(incident.HandledBy);
+        var released = Assert.Single(s.App.Realtime.Sent, x => x.Target == "dispatchers");
+        Assert.Equal("INCIDENT_RELEASED", ((Notification)released.Payload).Type);
+        Assert.Empty(s.SentTo(s.Customer)); // for them it is still being handled
+        Assert.Empty(s.SentTo(s.Driver));
+
+        var other = User.Create("Điều phối 2", "0900000099", "disp2@x.vn", "h", UserRole.Dispatcher, emailVerified: true);
+        incident.StartHandling(other.Id); // what the next Dispatcher's start does
+        Assert.Equal(other.Id, incident.HandledBy);
+    }
+
+    [Fact]
+    public async Task A_released_driver_incident_still_holds_the_trip_7_6()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit();
+        var incident = s.Incident(order);
+        incident.StartHandling(s.Dispatcher.Id);
+
+        await s.App.Sender.Send(new ReleaseIncidentCommand(incident.Id));
+
+        Assert.True(await s.App.Incidents.HasOpenReportedByAsync(order.Id, s.Driver.Id));
+    }
+
+    [Fact]
+    public async Task A_dispatcher_cannot_release_an_incident_held_by_another_one_Q10()
+    {
+        var s = new DispatcherSetup();
+        var incident = s.Incident(s.InTransit());
+        incident.StartHandling(dispatcherId: 999);
+
+        await Assert.ThrowsAsync<ConflictException>(() => s.App.Sender.Send(new ReleaseIncidentCommand(incident.Id)));
+
+        Assert.Equal(999L, incident.HandledBy);
+        Assert.Equal(0, s.App.UnitOfWork.Saves);
+    }
+
+    [Fact]
+    public async Task Releasing_an_incident_nobody_holds_is_a_business_error_Q10()
+    {
+        var s = new DispatcherSetup();
+        var incident = s.Incident(s.InTransit()); // still Open
+
+        await Assert.ThrowsAsync<DomainException>(() => s.App.Sender.Send(new ReleaseIncidentCommand(incident.Id)));
+    }
+
+    [Fact]
+    public async Task Releasing_needs_a_valid_incident_id()
+    {
+        var s = new DispatcherSetup();
+
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new ReleaseIncidentCommand(0)));
+        await Assert.ThrowsAsync<NotFoundException>(() => s.App.Sender.Send(new ReleaseIncidentCommand(999)));
+    }
+
+    /// <summary>The pickup photos were rejected after the 5th submission (DECISIONS 6.3).</summary>
+    private static ShippingOrder PickupPhotosUsedUp(DispatcherSetup s)
+    {
+        var order = s.PickedUp(); // 1st submission
+        for (var i = 2; i <= 5; i++)
+        {
+            order.RejectPickupEvidence("Ảnh mờ", s.Customer.Id);
+            order.ConfirmPickup(["1.jpg", "2.jpg"], s.Driver.Id, DispatcherSetup.Now);
+        }
+        order.RejectPickupEvidence("Vẫn mờ", s.Customer.Id);
+        return order;
+    }
+
+    [Fact]
+    public async Task ResolveContinue_is_refused_once_the_pickup_photos_are_used_up_6_3()
+    {
+        var s = new DispatcherSetup();
+        var order = PickupPhotosUsedUp(s);
+        var incident = s.Incident(order, IncidentType.Other);
+
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            s.App.Sender.Send(new ResolveIncidentContinueCommand(incident.Id, "Tiếp tục")));
+
+        Assert.Equal("PICKUP_PHOTO_LIMIT", error.Code);
+        Assert.True(incident.IsOpen);
+        Assert.Equal(0, s.App.UnitOfWork.Saves);
+    }
+
+    [Fact]
+    public async Task ResolveContinue_is_allowed_while_pickup_photos_can_still_be_sent_6_3()
+    {
+        var s = new DispatcherSetup();
+        var order = s.PickedUp();
+        order.RejectPickupEvidence("Ảnh mờ", s.Customer.Id);
+        var incident = s.Incident(order, IncidentType.Other);
+
+        await s.App.Sender.Send(new ResolveIncidentContinueCommand(incident.Id, "Tiếp tục"));
+
+        Assert.Equal(IncidentResolutionStatus.Resolved, incident.ResolutionStatus);
+    }
+
+    [Fact]
+    public async Task Reassign_still_works_once_the_pickup_photos_are_used_up_6_3()
+    {
+        var s = new DispatcherSetup();
+        var order = PickupPhotosUsedUp(s);
+        var incident = s.Incident(order, IncidentType.Other);
+        var (_, newProfile, _) = s.ReplacementDriver();
+
+        await s.App.Sender.Send(new ReassignIncidentDriverCommand(incident.Id, newProfile.Id, "Đổi tài xế"));
+
+        Assert.Equal(OrderStatus.Accepted, order.OrderStatus);
+    }
+
+    [Fact]
+    public async Task ReassignDriver_on_a_customer_incident_looks_near_the_vehicle_not_the_customer_7_2()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit();
+        s.Profile.UpdateLocation(21.05m, 105.85m, DispatcherSetup.Now);
+        // The customer reports from Ho Chi Minh City while the vehicle is in Ha Noi.
+        var incident = InTransitIncident.Report(order.Id, s.Customer.Id, IncidentType.Other, "Tài xế lái ẩu", null, 10.7769m, 106.7009m);
+        s.App.Incidents.Add(incident);
+        var (_, newProfile, _) = s.ReplacementDriver(); // next to the vehicle
+
+        await s.App.Sender.Send(new ReassignIncidentDriverCommand(incident.Id, newProfile.Id, "Đổi tài xế"));
+
+        Assert.Equal(newProfile.Id, order.DriverProfileId);
+    }
+
+    [Fact]
+    public async Task ResolveContinue_on_an_incident_left_by_the_previous_driver_tells_that_driver_8_3()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit();
+        var first = s.Incident(order);
+        var leftOpen = s.Incident(order, IncidentType.Other);
+        var (newDriverUser, newProfile, _) = s.ReplacementDriver();
+        order.ReassignDriver(newProfile.Id, s.Dispatcher.Id, "Đổi xe");
+        first.Resolve(IncidentDecision.ReassignDriver, "Đổi xe", s.Dispatcher.Id, DispatcherSetup.Now);
+
+        await s.App.Sender.Send(new ResolveIncidentContinueCommand(leftOpen.Id, "Đã xử lý"));
+
+        Assert.Single(s.SentTo(s.Driver), n => n.Type == "INCIDENT_DECIDED");
+        Assert.DoesNotContain(s.SentTo(newDriverUser), n => n.Type == "INCIDENT_DECIDED");
+    }
+
+    [Fact]
+    public async Task CancelIncident_left_by_the_previous_driver_tells_that_driver_8_3()
+    {
+        var s = new DispatcherSetup();
+        var order = s.InTransit();
+        var first = s.Incident(order);
+        var leftOpen = s.Incident(order, IncidentType.Other);
+        var (newDriverUser, newProfile, _) = s.ReplacementDriver();
+        order.ReassignDriver(newProfile.Id, s.Dispatcher.Id, "Đổi xe");
+        first.Resolve(IncidentDecision.ReassignDriver, "Đổi xe", s.Dispatcher.Id, DispatcherSetup.Now);
+
+        await s.App.Sender.Send(new CancelIncidentCommand(leftOpen.Id, "Báo trùng"));
+
+        Assert.Single(s.SentTo(s.Driver), n => n.Type == "INCIDENT_DECIDED");
+        Assert.DoesNotContain(s.SentTo(newDriverUser), n => n.Type == "INCIDENT_DECIDED");
     }
 }
 

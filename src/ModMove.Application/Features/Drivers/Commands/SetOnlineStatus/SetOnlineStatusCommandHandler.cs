@@ -10,6 +10,7 @@ internal sealed class SetOnlineStatusCommandHandler(
     ICurrentUserService currentUser,
     IUserRepository users,
     IDriverProfileRepository driverProfiles,
+    IShippingOrderRepository orders,
     IUnitOfWork unitOfWork) : ICommandHandler<SetOnlineStatusCommand>
 {
     public async Task Handle(SetOnlineStatusCommand request, CancellationToken cancellationToken)
@@ -24,7 +25,7 @@ internal sealed class SetOnlineStatusCommandHandler(
         if (request.IsOnline)
             profile.GoOnline(); // the entity refuses a profile that is not Approved (GB-03)
         else
-            profile.GoOffline();
+            profile.GoOffline(await orders.GetActiveOrderIdForDriverAsync(profile.Id, cancellationToken) is not null); // DRIVER_HAS_ACTIVE_ORDER
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }

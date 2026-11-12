@@ -166,14 +166,27 @@ public class ProcessPayOsWebhookPayerTests
     }
 
     [Fact]
-    public void Payer_values_longer_than_the_columns_are_cut_not_rejected_R01()
+    public void A_bank_or_account_number_too_long_for_its_column_is_dropped_not_cut_R01()
     {
         var transaction = PaymentTransaction.ForOrderViaPayOs(1, 180_000, 1234567, "https://pay.test/x", Now);
 
+        // Cut to 19 digits, 40 ones would still look like a valid account and send the refund to someone else.
         transaction.RecordPayer(new string('9', 30), new string('1', 40), new string('A', 150));
 
-        Assert.Equal(20, transaction.PayerBankBin!.Length);
-        Assert.Equal(19, transaction.PayerAccountNumber!.Length);
-        Assert.Equal(100, transaction.PayerAccountName!.Length);
+        Assert.Null(transaction.PayerBankBin);
+        Assert.Null(transaction.PayerAccountNumber);
+        Assert.False(transaction.HasPayerAccount); // nothing to suggest
+        Assert.Equal(100, transaction.PayerAccountName!.Length); // a name is only shown to be confirmed, so cutting it is safe
+    }
+
+    [Fact]
+    public void A_bank_and_account_number_that_fit_are_kept_whole_R01()
+    {
+        var transaction = PaymentTransaction.ForOrderViaPayOs(1, 180_000, 1234567, "https://pay.test/x", Now);
+
+        transaction.RecordPayer(new string('9', 20), new string('1', 19), "NGUYEN VAN A");
+
+        Assert.Equal(new string('9', 20), transaction.PayerBankBin);
+        Assert.Equal(new string('1', 19), transaction.PayerAccountNumber);
     }
 }

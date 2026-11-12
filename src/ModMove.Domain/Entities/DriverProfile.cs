@@ -83,7 +83,13 @@ public sealed class DriverProfile : BaseAuditableEntity, IAggregateRoot
         OnlineStatus = OnlineStatus.Online;
     }
 
-    public void GoOffline() => OnlineStatus = OnlineStatus.Offline;
+    /// <summary>DECISIONS B5: a driver with an order from Accepted to InTransit stays Online until it is delivered or reassigned.</summary>
+    public void GoOffline(bool hasActiveOrder = false)
+    {
+        if (hasActiveOrder)
+            throw new DomainException("You cannot go offline while you have an order in progress.", "DRIVER_HAS_ACTIVE_ORDER");
+        OnlineStatus = OnlineStatus.Offline;
+    }
 
     public void UpdateLocation(decimal latitude, decimal longitude, DateTimeOffset at)
     {

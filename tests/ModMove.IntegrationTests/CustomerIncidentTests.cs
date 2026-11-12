@@ -148,6 +148,7 @@ public class MyIncidentsQueryTests
         public FakeSql Sql { get; } = new();
         public string AccountStatus { get; set; } = "Active";
         public long ReportedBy { get; set; } = CustomerId;
+        public string? ReporterRole { get; set; }
         public string? PhotoUrls { get; set; }
         public List<(string Sql, IReadOnlyDictionary<string, object?> Parameters)> Executed { get; } = [];
 
@@ -163,6 +164,7 @@ public class MyIncidentsQueryTests
                     ("Id", typeof(long), 5L), ("OrderId", typeof(long), 1L), ("OrderCode", typeof(string), "MM20261020001"),
                     ("IncidentType", typeof(string), "VehicleBreakdown"), ("Description", typeof(string), "Xe hỏng"),
                     ("PhotoUrls", typeof(string), PhotoUrls), ("ReportedBy", typeof(long), ReportedBy),
+                    ("ReporterRole", typeof(string), ReporterRole),
                     ("ResolutionStatus", typeof(string), "Resolved"), ("ResolutionDecision", typeof(string), "ReassignDriver"),
                     ("ResolutionNote", typeof(string), "Đã đổi tài xế"), ("ResolvedAt", typeof(DateTime), new DateTime(2026, 10, 20, 10, 0, 0)),
                     ("CreatedAt", typeof(DateTime), new DateTime(2026, 10, 20, 9, 0, 0)));
@@ -215,6 +217,18 @@ public class MyIncidentsQueryTests
         Assert.False(item.ReportedByYou);
         Assert.Equal("Xe hỏng", item.Description);
         Assert.Equal(["https://res.cloudinary.com/demo/x.jpg"], item.PhotoUrls);
+    }
+
+    [Fact]
+    public async Task A_dispatchers_note_is_not_shown_to_the_customer_Q6b_8_3()
+    {
+        var db = new Db { ReportedBy = 40, ReporterRole = "Dispatcher", PhotoUrls = """["https://res.cloudinary.com/demo/x.jpg"]""" };
+
+        var item = (await db.Sender().Send(new GetMyIncidentsQuery())).Items.Single();
+
+        Assert.Equal("Điều phối viên đang xử lý sự cố trên đơn của bạn.", item.Description);
+        Assert.Empty(item.PhotoUrls);
+        Assert.Contains("JOIN users", db.Executed.Last(e => e.Sql.Contains("FROM in_transit_incidents")).Sql);
     }
 
     [Fact]
