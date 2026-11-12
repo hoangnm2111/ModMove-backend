@@ -55,6 +55,7 @@ public class DriverProfileMatchingAndRatingsTests
         dt.Columns.Add("TotalRatings", typeof(int));
         dt.Columns.Add("AverageStars", typeof(decimal));
         dt.Columns.Add("CompletedTrips", typeof(int));
+        dt.Columns.Add("DocumentUrlsJson", typeof(string));
 
         dt.Rows.Add(
             driver.Id, "Nguyễn Văn Tài", "0912000001", "driver@x.vn", true, "Active", TestApp.Start.UtcDateTime,
@@ -62,7 +63,8 @@ public class DriverProfileMatchingAndRatingsTests
             "Vietcombank", "0071001234567", "NGUYEN VAN TAI",
             20L, 1L, "Xe tải 1 tấn", "51C-123.45", 1000m, 300, 160, 170, "300x160x170",
             "https://cdn/reg.jpg", "https://cdn/ins.jpg", "https://cdn/veh.jpg", "Active",
-            12, 4.8333m, 45);
+            12, 4.8333m, 45,
+            """["https://cdn/f.jpg","https://cdn/b.jpg","https://cdn/reg.jpg","https://cdn/ins.jpg","https://cdn/veh.jpg","https://cdn/cccd-f.jpg","https://cdn/cccd-b.jpg"]""");
         app.Sql.Results.Enqueue(dt);
 
         var profile = await app.Sender.Send(new GetDriverProfileQuery());
@@ -72,6 +74,7 @@ public class DriverProfileMatchingAndRatingsTests
         Assert.Equal("Vietcombank", profile.BankAccount!.BankName);
         Assert.Equal(("51C-123.45", 300, 160, 170), (profile.Vehicle!.LicensePlate, profile.Vehicle.CargoBedLengthCm, profile.Vehicle.CargoBedWidthCm, profile.Vehicle.CargoBedHeightCm));
         Assert.Equal((4.83m, 12, 45), (profile.AverageStars, profile.TotalRatings, profile.CompletedTrips));
+        Assert.Equal(("https://cdn/cccd-f.jpg", "https://cdn/cccd-b.jpg"), (profile.CitizenIdFrontUrl, profile.CitizenIdBackUrl)); // D2
     }
 
     [Fact]
