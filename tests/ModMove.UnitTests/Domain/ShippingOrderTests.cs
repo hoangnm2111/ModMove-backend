@@ -24,6 +24,43 @@ public class ShippingOrderTests
     }
 
     [Fact]
+    public void A_dispatcher_opens_an_incident_on_a_running_order_already_in_their_hands_Q6b()
+    {
+        var order = AcceptedOrder();
+
+        var incident = order.ReportIncidentByDispatcher(dispatcherId: 40, IncidentType.Other, "Tài xế không nghe máy");
+
+        Assert.Equal((40L, IncidentResolutionStatus.InProgress, 40L), (incident.ReportedBy, incident.ResolutionStatus, incident.HandledBy));
+        Assert.Null(incident.Latitude); // the vehicle's point comes from the driver's GPS (7.2)
+    }
+
+    [Theory]
+    [InlineData(OrderStatus.Pending)]
+    [InlineData(OrderStatus.Delivered)]
+    [InlineData(OrderStatus.Completed)]
+    [InlineData(OrderStatus.Cancelled)]
+    public void A_dispatcher_can_open_an_incident_only_on_a_running_order_Q6b(OrderStatus status)
+    {
+        var order = NewOrder();
+        if (status == OrderStatus.Cancelled)
+            order.Cancel("Hủy", ChangedByRole.System, null, Now);
+        else if (status != OrderStatus.Pending)
+        {
+            order.Accept(5, 9, Now);
+            order.ConfirmArrival(9, Now);
+            order.ConfirmPickup(["1.jpg", "2.jpg"], 9, Now);
+            order.ApprovePickupEvidence(1, Now);
+            order.Deliver("pod.jpg", 9, Now);
+            if (status == OrderStatus.Completed)
+                order.Complete(0.1m, ChangedByRole.System, null, Now);
+        }
+
+        var ex = Assert.Throws<DomainException>(() => order.ReportIncidentByDispatcher(40, IncidentType.Other, "Kiểm tra"));
+
+        Assert.Equal("INCIDENT_NOT_ALLOWED", ex.Code);
+    }
+
+    [Fact]
     public void Create_computes_total_from_fees_and_discount()
     {
         Assert.Equal(180_000m, NewOrder().TotalFee);

@@ -3,7 +3,6 @@ using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
-using ModMove.Application.Features.Orders;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 
@@ -35,11 +34,7 @@ internal sealed class StartIncidentHandlingCommandHandler(
 
         var order = await orders.GetByIdAsync(incident.OrderId, cancellationToken)
             ?? throw new NotFoundException(nameof(ShippingOrder), incident.OrderId);
-        // The driver it concerns: whoever reported a driver's incident (even after the order moved to another driver);
-        // for a customer's incident, the driver now holding the order.
-        var driverUserId = incident.ReportedBy == order.CustomerId
-            ? await driverProfiles.DriverUserIdAsync(order, cancellationToken)
-            : incident.ReportedBy;
+        var driverUserId = await IncidentNotifications.DriverConcernedAsync(incident, order, users, driverProfiles, cancellationToken);
         await IncidentNotifications.NotifyHandlingStartedAsync(notifications, order, driverUserId, incident, cancellationToken);
     }
 }

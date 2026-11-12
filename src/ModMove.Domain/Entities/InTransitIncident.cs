@@ -46,6 +46,18 @@ public sealed class InTransitIncident : BaseAuditableEntity, IAggregateRoot
         ResolutionStatus = IncidentResolutionStatus.InProgress;
     }
 
+    /// <summary>
+    /// DECISIONS Q10: the Dispatcher holding the incident gives it back (end of shift, account locked) so another one can take
+    /// it. A driver's incident still holds the trip (7.6) until someone decides.
+    /// </summary>
+    public void Release(long dispatcherId)
+    {
+        if (ResolutionStatus != IncidentResolutionStatus.InProgress || HandledBy != dispatcherId)
+            throw new DomainException("Only the Dispatcher handling an incident can give it back.");
+        HandledBy = null;
+        ResolutionStatus = IncidentResolutionStatus.Open;
+    }
+
     public void Resolve(IncidentDecision decision, string? note, long dispatcherId, DateTimeOffset now)
     {
         EnsureOpen();

@@ -51,6 +51,8 @@ migrations and seeds reference data on start (`Database__MigrateOnStartup`); dem
 - Logs: `cd /opt/modmove && docker compose logs -f api`.
 - Roll back: set `API_TAG=sha-<7 chars>` (or `WEB_TAG`) in `.env`, then `./deploy.sh`. Back to `latest` after the fix.
   A migration is not rolled back: restore the backup taken before it if the schema must go back.
+- `20261111183627_RegistrationHeldUntilVerified` deletes every `users` row with `email_verified = 0` (DECISIONS D1, Q9).
+  `deploy.sh` backs up first; check that a fresh backup is in `backups/` before the first deploy that carries it.
 - Restore a backup: `gunzip -c backups/<file>.sql.gz | docker compose exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -uroot modmove'`.
 - Backups: `deploy.sh` keeps the 14 newest in `/opt/modmove/backups` (owner-only files). Copy them off the VPS too
   (one disk is not a backup).

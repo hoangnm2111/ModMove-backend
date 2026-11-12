@@ -15,6 +15,8 @@ internal sealed class InTransitIncidentConfiguration : IEntityTypeConfiguration<
         builder.Property(i => i.Latitude).HasPrecision(9, 6);
         builder.Property(i => i.Longitude).HasPrecision(9, 6);
         builder.Property(i => i.ResolutionNote).HasMaxLength(1000);
+        // Q7: one Dispatcher per incident. Two deciding or taking an Open incident at once: the later save is a 409.
+        builder.Property(i => i.ResolutionStatus).IsConcurrencyToken();
 
         builder.HasIndex(i => i.OrderId);
 

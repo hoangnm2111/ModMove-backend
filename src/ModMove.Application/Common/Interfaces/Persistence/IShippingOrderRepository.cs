@@ -18,6 +18,15 @@ public interface IShippingOrderRepository : IRepository<ShippingOrder>
     Task<bool> HasOpenOrdersForCustomerAsync(long customerId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// True while a driver has one of the customer's orders (Accepted to InTransit): it still needs the customer to approve
+    /// the pickup photos, so the account cannot be locked (DECISIONS B8).
+    /// </summary>
+    Task<bool> HasOrdersWithDriverForCustomerAsync(long customerId, CancellationToken cancellationToken = default);
+
+    /// <summary>The customer's orders still waiting for a driver, cancelled when the account is locked (DECISIONS B8, Q6a).</summary>
+    Task<IReadOnlyList<ShippingOrder>> GetPendingForCustomerAsync(long customerId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// True while any order is running: from Accepted up to, but not including, Completed (DECISIONS C8).
     /// Pending has no driver yet and Cancelled is over, so neither counts.
     /// </summary>

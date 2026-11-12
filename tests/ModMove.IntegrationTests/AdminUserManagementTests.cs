@@ -27,6 +27,9 @@ public class AdminUserManagementTests
         public FakeSql Sql { get; } = new();
         public InMemoryUsers Users { get; }
         public InMemoryDriverProfiles DriverProfiles { get; } = new();
+        public InMemoryOrders Orders { get; } = new();
+        public InMemoryIncidents Incidents { get; } = new();
+        public InMemoryRefunds Refunds { get; } = new();
         public InMemoryRefreshTokens RefreshTokens { get; } = new();
         public CountingUnitOfWork UnitOfWork { get; } = new();
         public CapturingEmailSender Email { get; } = new();
@@ -45,6 +48,9 @@ public class AdminUserManagementTests
                 .AddSingleton<ISqlConnectionFactory>(Sql)
                 .AddSingleton<IUserRepository>(Users)
                 .AddSingleton<IDriverProfileRepository>(DriverProfiles)
+                .AddSingleton<IShippingOrderRepository>(Orders)
+                .AddSingleton<IIncidentRepository>(Incidents)
+                .AddSingleton<IRefundRepository>(Refunds)
                 .AddSingleton<IRefreshTokenRepository>(RefreshTokens)
                 .AddSingleton<IUnitOfWork>(UnitOfWork)
                 .AddSingleton<IPasswordHasher>(new FakeHasher())
@@ -142,6 +148,25 @@ public class AdminUserManagementTests
     }
 
     [Fact]
+    public async Task User_detail_shows_how_many_refunds_are_still_open_so_the_Admin_is_warned_before_locking_Q11()
+    {
+        var app = new AdminUsersApp();
+        var dt = new DataTable();
+        dt.Columns.Add("Id", typeof(long));
+        dt.Columns.Add("Role", typeof(string));
+        dt.Columns.Add("CreatedAt", typeof(DateTimeOffset));
+        dt.Columns.Add("OpenRefundCount", typeof(int));
+        dt.Rows.Add(2L, "Customer", TestApp.Start, 2);
+        app.Sql.Result = dt;
+
+        var detail = await app.Sender.Send(new GetUserDetailQuery(2L));
+
+        Assert.Equal(2, detail.OpenRefundCount);
+        Assert.Contains("r.refund_status IN ('Requested', 'Approved', 'Failed')", app.Sql.LastSql);
+        Assert.Contains("so.customer_id = u.id", app.Sql.LastSql);
+    }
+
+    [Fact]
     public async Task GetUserDetail_for_unknown_id_throws_NotFoundException()
     {
         var app = new AdminUsersApp();
@@ -194,6 +219,164 @@ public class AdminUserManagementTests
 
         Assert.Equal(AccountStatus.Locked, app.Driver.AccountStatus);
         Assert.Equal(OnlineStatus.Offline, profile.OnlineStatus);
+    }
+
+    private static ShippingOrder OrderOf(User customer) => ShippingOrder.Create(
+        "MM20261020001", customer.Id, vehicleTypeId: 1, couponId: null,
+        "A", 21.0m, 105.8m, "B", 21.1m, 105.9m, "Bình", "0912345678",
+        12m, 30, hasLoadingService: false, distanceFee: 200_000, serviceFee: 0, discountAmount: 0,
+        PaymentMethod.Cash, PayerRole.Sender, CargoDetail.Create("FURNITURE", 1, 50, 100, 50, 50, ["a.jpg"], null), TestApp.Start);
+
+    [Theory]
+    [InlineData(AccountStatus.Locked)]
+    [InlineData(AccountStatus.Inactive)]
+    public async Task A_driver_with_a_running_order_cannot_be_locked_B8(AccountStatus status)
+    {
+        var app = new AdminUsersApp();
+        var profile = DriverProfile.Create(app.Driver.Id, "079090000002", "790000000002", "https://cdn/f.jpg", "https://cdn/b.jpg");
+        app.DriverProfiles.Add(profile);
+        var order = OrderOf(app.Customer);
+        order.Accept(profile.Id, app.Driver.Id, TestApp.Start);
+        app.Orders.Add(order);
+
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            app.Sender.Send(new UpdateUserStatusCommand(app.Driver.Id, status, "Vi phạm")));
+
+        Assert.Equal("ACCOUNT_HAS_OPEN_ORDERS", error.Code);
+        Assert.Equal(AccountStatus.Active, app.Driver.AccountStatus);
+        Assert.Equal(0, app.UnitOfWork.Saves);
+    }
+
+    [Fact]
+    public async Task A_customer_with_an_order_a_driver_already_took_cannot_be_locked_B8()
+    {
+        var app = new AdminUsersApp();
+        var order = OrderOf(app.Customer);
+        order.Accept(1, app.Driver.Id, TestApp.Start); // the driver is on the way: only a Dispatcher can stop it
+        app.Orders.Add(order);
+
+        var error = await Assert.ThrowsAsync<DomainException>(() =>
+            app.Sender.Send(new UpdateUserStatusCommand(app.Customer.Id, AccountStatus.Locked, "Gian lận")));
+
+        Assert.Equal("ACCOUNT_HAS_OPEN_ORDERS", error.Code);
+        Assert.Equal(AccountStatus.Active, app.Customer.AccountStatus);
+        Assert.Equal(OrderStatus.Accepted, order.OrderStatus);
+    }
+
+    [Fact]
+    public async Task Locking_a_customer_cancels_their_pending_orders_B8_Q6a()
+    {
+        var app = new AdminUsersApp();
+        var order = OrderOf(app.Customer);
+        app.Orders.Add(order);
+
+        await app.Sender.Send(new UpdateUserStatusCommand(app.Customer.Id, AccountStatus.Locked, "Gian lận"));
+
+        Assert.Equal(AccountStatus.Locked, app.Customer.AccountStatus);
+        Assert.Equal(OrderStatus.Cancelled, order.OrderStatus);
+        Assert.Equal("Tài khoản bị khóa.", order.CancellationReason);
+        var last = order.StatusHistories.Last();
+        Assert.Equal((ChangedByRole.Admin, (long?)app.Admin.Id), (last.ChangedByRole, last.ChangedByUserId));
+        Assert.Equal(1, app.UnitOfWork.Saves); // the lock and the cancellation together
+    }
+
+    [Fact]
+    public async Task Locking_a_customer_refunds_a_paid_pending_order_and_closes_its_open_payment_code_B8_Q6a()
+    {
+        var admin = User.Create("Admin", "0900000001", "admin@x.vn", "h", UserRole.Administrator, emailVerified: true);
+        var customer = User.Create("Khách", "0911111111", "khach@x.vn", "h", UserRole.Customer, emailVerified: true);
+        var app = TestApp.SignedInAs(admin, customer);
+        var paid = ShippingOrder.Create(
+            "MM20261020001", customer.Id, 1, null, "A", 21.0m, 105.8m, "B", 21.1m, 105.9m, "Bình", "0912345678",
+            12m, 30, false, 200_000, 0, 0, PaymentMethod.PayOS, null,
+            CargoDetail.Create("FURNITURE", 1, 50, 100, 50, 50, ["a.jpg"], null), TestApp.Start);
+        paid.MarkPaid(TestApp.Start);
+        app.Orders.Add(paid);
+        var unpaid = ShippingOrder.Create(
+            "MM20261020002", customer.Id, 1, null, "A", 21.0m, 105.8m, "B", 21.1m, 105.9m, "Bình", "0912345678",
+            12m, 30, false, 200_000, 0, 0, PaymentMethod.PayOS, null,
+            CargoDetail.Create("FURNITURE", 1, 50, 100, 50, 50, ["a.jpg"], null), TestApp.Start);
+        app.Orders.Add(unpaid);
+        var code = PaymentTransaction.ForOrderViaPayOs(unpaid.Id, 200_000, 777, "https://pay.test/x", TestApp.Start);
+        app.Payments.Add(code);
+
+        await app.Sender.Send(new UpdateUserStatusCommand(customer.Id, AccountStatus.Locked, "Gian lận"));
+
+        var refund = Assert.Single(app.Refunds.Items);
+        Assert.Equal((paid.Id, RefundSourceType.Cancellation, 200_000m), (refund.OrderId, refund.SourceType, refund.RequestedAmount));
+        Assert.Equal(PaymentTransactionStatus.Cancelled, code.TransactionStatus);
+        Assert.Contains(777L, app.Gateway.Cancelled);
+        Assert.Equal((OrderStatus.Cancelled, OrderStatus.Cancelled), (paid.OrderStatus, unpaid.OrderStatus));
+    }
+
+    [Fact]
+    public async Task A_customer_with_an_open_refund_can_still_be_locked_B8_Q11()
+    {
+        var admin = User.Create("Admin", "0900000001", "admin@x.vn", "h", UserRole.Administrator, emailVerified: true);
+        var customer = User.Create("Khách", "0911111111", "khach@x.vn", "h", UserRole.Customer, emailVerified: true);
+        var app = TestApp.SignedInAs(admin, customer);
+        var refund = Refund.Request(5, null, RefundSourceType.Complaint, "Hàng vỡ", null, 100_000m);
+        app.Refunds.Add(refund);
+        app.Refunds.CustomersWithOpenRefunds.Add(customer.Id);
+
+        await app.Sender.Send(new UpdateUserStatusCommand(customer.Id, AccountStatus.Locked, "Gian lận"));
+
+        Assert.Equal(AccountStatus.Locked, customer.AccountStatus);
+        Assert.Equal(RefundStatus.Requested, refund.RefundStatus); // the Administrator settles it outside the system
+    }
+
+    [Fact]
+    public async Task A_customer_whose_order_is_delivered_can_be_locked_B8()
+    {
+        var app = new AdminUsersApp();
+        var order = OrderOf(app.Customer);
+        order.Accept(1, app.Driver.Id, TestApp.Start);
+        order.ConfirmArrival(app.Driver.Id, TestApp.Start);
+        order.ConfirmPickup(["1.jpg", "2.jpg"], app.Driver.Id, TestApp.Start);
+        order.ApprovePickupEvidence(app.Customer.Id, TestApp.Start);
+        order.Deliver("pod.jpg", app.Driver.Id, TestApp.Start); // completes on its own after 24 hours (GB-23)
+        app.Orders.Add(order);
+
+        await app.Sender.Send(new UpdateUserStatusCommand(app.Customer.Id, AccountStatus.Locked, "Gian lận"));
+
+        Assert.Equal(AccountStatus.Locked, app.Customer.AccountStatus);
+    }
+
+    [Theory]
+    [InlineData(AccountStatus.Locked)]
+    [InlineData(AccountStatus.Inactive)]
+    public async Task Locking_a_dispatcher_releases_the_incidents_they_hold_Q10(AccountStatus status)
+    {
+        var admin = User.Create("Admin", "0900000001", "admin@x.vn", "h", UserRole.Administrator, emailVerified: true);
+        var dispatcher = User.Create("Điều phối", "0900000010", "disp@x.vn", "h", UserRole.Dispatcher, emailVerified: true);
+        var other = User.Create("Điều phối 2", "0900000011", "disp2@x.vn", "h", UserRole.Dispatcher, emailVerified: true);
+        var app = TestApp.SignedInAs(admin, dispatcher, other);
+        var mine = InTransitIncident.Report(1, 50, IncidentType.VehicleBreakdown, "Xe hỏng", null, null, null);
+        mine.StartHandling(dispatcher.Id);
+        var theirs = InTransitIncident.Report(2, 51, IncidentType.Other, "Khác", null, null, null);
+        theirs.StartHandling(other.Id);
+        app.Incidents.Add(mine);
+        app.Incidents.Add(theirs);
+
+        await app.Sender.Send(new UpdateUserStatusCommand(dispatcher.Id, status, "Nghỉ việc"));
+
+        Assert.Equal((IncidentResolutionStatus.Open, (long?)null), (mine.ResolutionStatus, mine.HandledBy));
+        Assert.Equal((IncidentResolutionStatus.InProgress, (long?)other.Id), (theirs.ResolutionStatus, theirs.HandledBy));
+        Assert.Equal(1, app.UnitOfWork.Saves);
+        var released = Assert.Single(app.Realtime.Sent, x => x.Target == "dispatchers");
+        Assert.Equal("INCIDENT_RELEASED", ((Notification)released.Payload).Type);
+    }
+
+    [Fact]
+    public async Task The_status_email_shows_the_reason_as_plain_text()
+    {
+        var app = new AdminUsersApp();
+
+        await app.Sender.Send(new UpdateUserStatusCommand(app.Customer.Id, AccountStatus.Locked, "<script>x</script>"));
+
+        var body = Assert.Single(app.Email.Sent).Body;
+        Assert.DoesNotContain("<script>", body);
+        Assert.Contains("&lt;script&gt;x&lt;/script&gt;", body);
     }
 
     [Fact]

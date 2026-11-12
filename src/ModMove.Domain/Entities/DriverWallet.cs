@@ -141,7 +141,7 @@ public sealed class DriverWallet : BaseAuditableEntity, IAggregateRoot
     {
         EnsureActive();
         EnsurePositive(amount);
-        if (_transactions.Any(t => t.TransactionType == WalletTransactionType.Withdrawal && t.TransactionStatus == WalletTransactionStatus.Pending))
+        if (HasPendingWithdrawal)
             throw new DomainException("A withdrawal request is already pending review.", "WITHDRAWAL_ALREADY_PENDING");
 
         if (amount > GetMaxWithdrawable(hasActiveOrder))
@@ -158,10 +158,31 @@ public sealed class DriverWallet : BaseAuditableEntity, IAggregateRoot
         return Record(WalletTransactionType.Withdrawal, null, amount, WalletTotal, WalletTransactionStatus.Pending, fromEarnings, fromDeposit);
     }
 
+    /// <summary>A withdrawal is waiting for an Administrator's transfer (GB-32 allows one at a time).</summary>
+    public bool HasPendingWithdrawal =>
+        _transactions.Any(t => t.TransactionType == WalletTransactionType.Withdrawal && t.TransactionStatus == WalletTransactionStatus.Pending);
+
+    /// <summary>
+    /// DECISIONS Q12: a driver deletes the account only with nothing left between them and the platform: no withdrawal waiting
+    /// and a wallet total of exactly 0. Money left is withdrawn first; a negative deposit (GB-15) is money owed.
+    /// </summary>
+    public void EnsureEmptyForAccountDeletion()
+    {
+        if (HasPendingWithdrawal)
+            throw new DomainException("Wait for your withdrawal to be paid before deleting the account.", "ACCOUNT_HAS_PENDING_WITHDRAWAL");
+        if (WalletTotal != 0)
+            throw new DomainException(
+                WalletTotal > 0
+                    ? "Withdraw the money left in your wallet before deleting the account."
+                    : "Your deposit is negative: top it up before deleting the account.",
+                "ACCOUNT_HAS_WALLET_BALANCE");
+    }
+
     public void CompleteWithdrawal(WalletTransaction withdrawal, long adminId, string referenceCode, DateTimeOffset now)
     {
         EnsurePendingWithdrawal(withdrawal);
         withdrawal.Complete(adminId, referenceCode, now);
+        RowVersion++; // an Administrator rejecting the same withdrawal at the same time gets a 409, not a refund of paid money
     }
 
     /// <summary>

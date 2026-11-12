@@ -269,6 +269,21 @@ public class MyRefundsQueryTests
         Assert.DoesNotContain(db.Executed, e => e.Sql.Contains("FROM payment_transactions"));
     }
 
+    [Fact]
+    public async Task PayOS_suggestion_is_the_latest_payment_and_none_when_its_bank_is_not_offered_R01()
+    {
+        // Confirming copies the latest Paid payment, so an older payment with an offered bank must not be shown instead:
+        // the customer would see an account that confirm then refuses (NO_SUGGESTED_PAYOUT_ACCOUNT).
+        var db = new Db { Status = "Requested", PayerAccountNumber = "0011001234567", PayerBankName = null };
+
+        var detail = await db.Sender().Send(new GetMyRefundDetailQuery(4));
+
+        Assert.Null(detail.SuggestedPayoutAccount);
+        var sql = Assert.Single(db.Executed, e => e.Sql.Contains("FROM payment_transactions")).Sql;
+        Assert.Contains("LEFT JOIN master_data_items b", sql); // the bank does not pick the payment, it only names it
+        Assert.Contains("p.payer_bank_bin IS NOT NULL", sql);
+    }
+
     [Theory]
     [InlineData("12345", "NGUYEN VAN A")]
     [InlineData("123456abc", "NGUYEN VAN A")]

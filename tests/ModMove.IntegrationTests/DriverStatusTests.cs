@@ -98,19 +98,50 @@ public class SetOnlineStatusTests
         Assert.Equal(OnlineStatus.Offline, s.Profile!.OnlineStatus);
     }
 
-    [Fact]
-    public async Task Going_offline_does_not_touch_an_order_in_progress_6_4()
+    private static ShippingOrder OrderOf(Setup s, OrderStatus status)
+    {
+        var order = ShippingOrder.Create(
+            "MM20261020001", 77, vehicleTypeId: 1, couponId: null,
+            "A", 21.0m, 105.8m, "B", 21.1m, 105.9m, "Bình", "0912345678",
+            12m, 30, hasLoadingService: false, distanceFee: 200_000, serviceFee: 0, discountAmount: 0,
+            PaymentMethod.Cash, PayerRole.Sender, CargoDetail.Create("FURNITURE", 1, 50, 100, 50, 50, ["a.jpg"], null), TestApp.Start);
+        order.Accept(s.Profile!.Id, s.Driver.Id, TestApp.Start);
+        if (status >= OrderStatus.Arrived) order.ConfirmArrival(s.Driver.Id, TestApp.Start);
+        if (status >= OrderStatus.PickedUp) order.ConfirmPickup(["1.jpg", "2.jpg"], s.Driver.Id, TestApp.Start);
+        if (status >= OrderStatus.InTransit) order.ApprovePickupEvidence(77, TestApp.Start);
+        if (status >= OrderStatus.Delivered) order.Deliver("pod.jpg", s.Driver.Id, TestApp.Start);
+        s.App.Orders.Add(order);
+        return order;
+    }
+
+    [Theory]
+    [InlineData(OrderStatus.Accepted)]
+    [InlineData(OrderStatus.Arrived)]
+    [InlineData(OrderStatus.PickedUp)]
+    [InlineData(OrderStatus.InTransit)]
+    public async Task A_driver_cannot_go_offline_mid_trip(OrderStatus status)
     {
         var s = new Setup();
         s.Profile!.GoOnline();
-        var trip = new TripSetup();
-        var order = trip.PickedUp();
-        s.App.Orders.Add(order);
+        OrderOf(s, status);
+
+        var ex = await Assert.ThrowsAsync<DomainException>(() => s.App.Sender.Send(new SetOnlineStatusCommand(false)));
+
+        Assert.Equal("DRIVER_HAS_ACTIVE_ORDER", ex.Code);
+        Assert.Equal(OnlineStatus.Online, s.Profile.OnlineStatus);
+        Assert.Equal(0, s.App.UnitOfWork.Saves);
+    }
+
+    [Fact]
+    public async Task A_driver_can_go_offline_once_the_order_is_delivered()
+    {
+        var s = new Setup();
+        s.Profile!.GoOnline();
+        OrderOf(s, OrderStatus.Delivered);
 
         await s.App.Sender.Send(new SetOnlineStatusCommand(false));
 
         Assert.Equal(OnlineStatus.Offline, s.Profile.OnlineStatus);
-        Assert.Equal(OrderStatus.PickedUp, order.OrderStatus);
     }
 
     [Fact]

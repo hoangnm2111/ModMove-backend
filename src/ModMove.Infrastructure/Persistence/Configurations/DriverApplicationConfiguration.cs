@@ -16,6 +16,8 @@ internal sealed class DriverApplicationConfiguration : IEntityTypeConfiguration<
         builder.Property(a => a.MaxLoadWeightKg).HasPrecision(8, 2);
         builder.Property(a => a.DocumentUrls).HasJsonList();
         builder.Property(a => a.RejectionReasons).HasJsonList();
+        // Two Administrators approving and rejecting the same application at once: the later save is a 409.
+        builder.Property(a => a.ApplicationStatus).IsConcurrencyToken();
 
         builder.HasIndex(a => new { a.DriverProfileId, a.VersionNumber }).IsUnique();
 

@@ -3,6 +3,7 @@ using ModMove.Application.Common.Models;
 using ModMove.Application.Features.Incidents.Commands.CancelIncident;
 using ModMove.Application.Features.Incidents.Commands.CancelOrderByIncident;
 using ModMove.Application.Features.Incidents.Commands.ReassignIncidentDriver;
+using ModMove.Application.Features.Incidents.Commands.ReleaseIncident;
 using ModMove.Application.Features.Incidents.Commands.ResolveIncidentContinue;
 using ModMove.Application.Features.Incidents.Commands.StartIncidentHandling;
 using ModMove.Application.Features.Incidents.Queries.GetIncidentById;
@@ -79,6 +80,14 @@ public sealed class IncidentsController : ApiControllerBase
     public async Task<IActionResult> Cancel(long id, IncidentReasonBody body, CancellationToken cancellationToken)
     {
         await Sender.Send(new CancelIncidentCommand(id, body.Reason), cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>Q10: give back an incident you are handling (end of shift); it returns to Open for another Dispatcher.</summary>
+    [HttpPost("{id:long}/release")]
+    public async Task<IActionResult> Release(long id, CancellationToken cancellationToken)
+    {
+        await Sender.Send(new ReleaseIncidentCommand(id), cancellationToken);
         return NoContent();
     }
 

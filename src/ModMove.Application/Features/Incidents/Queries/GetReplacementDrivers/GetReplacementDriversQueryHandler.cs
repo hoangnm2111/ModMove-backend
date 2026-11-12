@@ -20,6 +20,9 @@ internal sealed class GetReplacementDriversQueryHandler(
             i.id AS IncidentId,
             i.latitude AS IncidentLatitude,
             i.longitude AS IncidentLongitude,
+            rep.role AS ReporterRole,
+            cur.last_latitude AS DriverLatitude,
+            cur.last_longitude AS DriverLongitude,
             o.id AS OrderId,
             o.driver_profile_id AS CurrentDriverProfileId,
             o.vehicle_type_id AS VehicleTypeId,
@@ -29,6 +32,8 @@ internal sealed class GetReplacementDriversQueryHandler(
             o.payment_method AS PaymentMethod
         FROM in_transit_incidents i
         INNER JOIN shipping_orders o ON o.id = i.order_id
+        INNER JOIN users rep ON rep.id = i.reported_by
+        LEFT JOIN driver_profiles cur ON cur.id = o.driver_profile_id
         WHERE i.id = @IncidentId;
         """;
 
@@ -95,8 +100,10 @@ internal sealed class GetReplacementDriversQueryHandler(
                 new { FreshSince = freshSince, ctx.CurrentDriverProfileId, ctx.VehicleTypeId },
                 cancellationToken: cancellationToken));
 
-        var (refLat, refLon) = IncidentHandlingRules.ReferencePoint(
-            ctx.IncidentLatitude, ctx.IncidentLongitude, ctx.PickupLatitude, ctx.PickupLongitude);
+        // Same point as ReassignIncidentDriver: a customer's or a Dispatcher's incident is measured from the current driver's last GPS (7.2).
+        var (refLat, refLon) = ctx.ReporterRole is "Customer" or "Dispatcher"
+            ? IncidentHandlingRules.ReferencePoint(ctx.DriverLatitude, ctx.DriverLongitude, ctx.PickupLatitude, ctx.PickupLongitude)
+            : IncidentHandlingRules.ReferencePoint(ctx.IncidentLatitude, ctx.IncidentLongitude, ctx.PickupLatitude, ctx.PickupLongitude);
 
         var results = new List<(double RawDistanceKm, ReplacementDriverResponse Dto)>();
         foreach (var c in candidates)
@@ -136,6 +143,9 @@ internal sealed class GetReplacementDriversQueryHandler(
         public long IncidentId { get; init; }
         public decimal? IncidentLatitude { get; init; }
         public decimal? IncidentLongitude { get; init; }
+        public string? ReporterRole { get; init; }
+        public decimal? DriverLatitude { get; init; }
+        public decimal? DriverLongitude { get; init; }
         public long OrderId { get; init; }
         public long? CurrentDriverProfileId { get; init; }
         public long VehicleTypeId { get; init; }

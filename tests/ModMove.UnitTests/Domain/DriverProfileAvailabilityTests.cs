@@ -40,6 +40,18 @@ public class DriverProfileAvailabilityTests
     }
 
     [Fact]
+    public void Going_offline_with_an_active_order_is_DRIVER_HAS_ACTIVE_ORDER()
+    {
+        var profile = ApprovedProfile();
+        profile.GoOnline();
+
+        var ex = Assert.Throws<DomainException>(() => profile.GoOffline(hasActiveOrder: true));
+
+        Assert.Equal("DRIVER_HAS_ACTIVE_ORDER", ex.Code);
+        Assert.Equal(OnlineStatus.Online, profile.OnlineStatus);
+    }
+
+    [Fact]
     public void Without_a_gps_point_the_location_is_not_fresh()
     {
         Assert.False(ApprovedProfile().HasFreshLocation(Now));

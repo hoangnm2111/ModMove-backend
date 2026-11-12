@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.ApplicationModels;
 using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.AspNetCore.Mvc.Routing;
 using ModMove.Domain.Enums;
+using ModMove.WebApi.Filters;
 
 namespace ModMove.WebApi.Controllers;
 
@@ -49,5 +50,9 @@ public sealed class RoleConvention : IControllerModelConvention
 
         if (policy is not null)
             controller.Filters.Add(new AuthorizeFilter(policy));
+
+        // B8: Dispatcher and Admin handlers do not load the user, so a locked account is refused here instead.
+        if (folder is "Dispatcher" or "Admin")
+            controller.Filters.Add(new ActiveAccountFilter());
     }
 }
