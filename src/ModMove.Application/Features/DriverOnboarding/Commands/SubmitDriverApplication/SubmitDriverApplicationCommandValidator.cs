@@ -1,13 +1,14 @@
 using FluentValidation;
+using ModMove.Application.Common.Interfaces;
 
 namespace ModMove.Application.Features.DriverOnboarding.Commands.SubmitDriverApplication;
 
 internal sealed class SubmitDriverApplicationCommandValidator : AbstractValidator<SubmitDriverApplicationCommand>
 {
-    /// <summary>Licence front, licence back, registration, inspection, vehicle photo (UC-DRV-03 step 3).</summary>
-    internal const int RequiredDocumentCount = 5;
+    /// <summary>Licence front, licence back, registration, inspection, vehicle photo, citizen ID front, citizen ID back (UC-DRV-03 step 3).</summary>
+    internal const int RequiredDocumentCount = 7;
 
-    public SubmitDriverApplicationCommandValidator()
+    public SubmitDriverApplicationCommandValidator(IFileStorage storage)
     {
         RuleFor(x => x.VehicleTypeId).GreaterThan(0);
 
@@ -24,11 +25,13 @@ internal sealed class SubmitDriverApplicationCommandValidator : AbstractValidato
 
         RuleFor(x => x.DocumentUrls).NotNull()
             .Must(d => d is { Count: RequiredDocumentCount })
-            .WithMessage($"Exactly {RequiredDocumentCount} documents are required: licence front, licence back, registration, inspection, vehicle photo.");
+            .WithMessage($"Exactly {RequiredDocumentCount} documents are required: licence front, licence back, registration, inspection, vehicle photo, citizen ID front, citizen ID back.");
 
+        // security.md: images come only from the team's Cloudinary (uploaded through api/driver/uploads), never a link the
+        // Administrator would open on another host.
         RuleForEach(x => x.DocumentUrls)
-            .Must(url => url is { Length: > 0 and <= 500 } && Uri.TryCreate(url, UriKind.Absolute, out var u) && u.Scheme is "http" or "https")
-            .WithMessage("Each document must be an http(s) URL of at most 500 characters.")
+            .Must(url => url is { Length: > 0 and <= 500 } && storage.IsOwnedUrl(url))
+            .WithMessage("Each document must be a photo uploaded to ModMove, at most 500 characters.")
             .When(x => x.DocumentUrls is not null);
     }
 }
