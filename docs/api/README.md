@@ -8,7 +8,7 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 - **Route theo thư mục controller:** `api/public/*` không cần đăng nhập; `api/account/*` cần đăng nhập, mọi role; `api/customer/*`, `api/driver/*`, `api/dispatcher/*`, `api/admin/*` chỉ đúng role (Admin là role `Administrator`); `api/webhooks/*` cho PayOS.
 - **Xác thực:** header `Authorization: Bearer <accessToken>`. Access token sống 15 phút; hết hạn thì gọi `refresh` với `refreshToken` (30 ngày, dùng một lần) để lấy cặp mới. Gọi lại một refresh token đã được đổi sang cặp mới sẽ đăng xuất tài khoản trên mọi máy; token bị thu hồi do đăng xuất hay đổi mật khẩu chỉ bị từ chối (401).
 - **JSON:** enum là chuỗi (`"Pending"`), tiền là số VND, thời gian ISO 8601 UTC, phân trang `?page=1&pageSize=20` → `{ items, pageNumber, pageSize, totalCount }`.
-- **Lỗi:** mọi lỗi là ProblemDetails `{ status, title, detail, code, traceId }`, lỗi 400 có thêm `errors` theo từng trường. Client rẽ nhánh theo `code`, không theo `detail` (tiếng Anh). App map `code` sang MSGxx tiếng Việt của SRS.
+- **Lỗi:** mọi lỗi là ProblemDetails `{ status, title, detail, code, traceId }`, lỗi 400 có thêm `errors` theo từng trường. Client rẽ nhánh theo `code`, không theo `detail` (tiếng Anh). App map `code` sang MSGxx tiếng Việt của SRS theo bảng cuối mục [Mã lỗi](#mã-lỗi).
 - **Giới hạn tần suất:** 10 request/phút/IP cho `api/public/auth/*`, `api/public/fareestimate`, `api/account/password` và `api/public/supportrequests`; 10 request/phút cho mỗi user trên từng endpoint với `GET api/customer/orders/{id}/tracking` và `POST api/customer/incidents` → 429 `TOO_MANY_REQUESTS`.
 
 ## Endpoint đã có
@@ -99,7 +99,7 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | PATCH | `api/driver/online-status` | Driver | `{ isOnline }` → 204. Bật Online chỉ khi hồ sơ `Approved` và tài khoản `Active` (GB-03), ngược lại 422 `BUSINESS_RULE`. Bật hai lần liên tiếp không lỗi. Tắt Online khi đang có đơn `Accepted`…`InTransit` → 422 `DRIVER_HAS_ACTIVE_ORDER` (Q8); không có đơn thì tài xế chỉ thôi thấy đơn mới. GPS gửi qua SignalR `SendLocation` hoặc REST `POST api/driver/location` |
 | POST | `api/driver/location` | Driver | `{ latitude, longitude }` → 204. Cập nhật vị trí GPS hiện tại của tài xế (REST endpoint song song với SignalR `SendLocation`). Cập nhật `last_latitude`, `last_longitude` và làm mới `last_location_at` (giúp `isGpsStale = false`). Ghi nhận `driver_location_logs` nếu đang có đơn chạy, phát `LocationUpdated` qua SignalR (DECISIONS B12, 6.4) |
 | GET | `api/driver/matching/orders` | Driver | Danh sách đơn `Pending` lân cận cho tài xế (UC-DRV-08, B5) → `[{ orderId, orderCode, pickupAddress, pickupLatitude, pickupLongitude, dropoffAddress, dropoffLatitude, dropoffLongitude, distanceToPickupKm, estimatedDistanceKm, estimatedDurationMin, totalFee, commissionAmount, driverEarning, paymentMethod, payerRole, hasLoadingService, cargoType, cargoTypeName, cargoQuantity, cargoWeightKg, cargoLengthCm, cargoWidthCm, cargoHeightCm, cargoPhotoUrls, specialNotes, createdAt }]`. Trả rỗng `[]` khi tài xế chưa `Approved`, đang `Offline`, xe không `Active`, đang có đơn chạy (GB-09), hoặc GPS thiếu / ≥ 5 phút (6.4). Chỉ hiện đơn đúng loại xe (GB-10), điểm lấy trong bán kính `MATCHING_RADIUS_KM` theo Haversine (GB-08, B5), còn trong cửa sổ 10 phút từ `created_at` (Cash) hoặc `paid_at` với đơn PayOS đã `Paid` (GB-24, GB-31, B10, 3.2); mọi đơn hàng chỉ hiện khi ví `Active` và `depositBalance ≥ REQUIRED_DEPOSIT` (200.000đ), riêng đơn tiền mặt cần thêm `depositBalance ≥ commissionAmount` (GB-16). Sắp xếp từ gần đến xa theo khoảng cách tới điểm lấy |
-| GET | `api/driver/matching/orders/{id}` | Driver | Chi tiết đơn `Pending` trước khi nhận (UC-DRV-09, Screen #21) → chi tiết cước (`distanceFee`, `serviceFee`, `discountAmount`, `totalFee`, `commissionAmount`, `driverEarning`), hàng hóa, `distanceToPickupKm`, `matchingExpiresAt`, `canAccept`, `ineligibleReason`. Đơn đã được tài xế khác nhận → 409 `CONFLICT` (MSG40); đơn đã hủy → 422 `ORDER_CANCELLED`; hết cửa sổ 10 phút hoặc không còn mở → 422 `ORDER_NOT_AVAILABLE` |
+| GET | `api/driver/matching/orders/{id}` | Driver | Chi tiết đơn `Pending` trước khi nhận (UC-DRV-09, Screen #21) → chi tiết cước (`distanceFee`, `serviceFee`, `discountAmount`, `totalFee`, `commissionAmount`, `driverEarning`), hàng hóa, `distanceToPickupKm`, `matchingExpiresAt`, `canAccept`, `ineligibleReason` (`null` khi `canAccept`; nếu không, lý do đầu tiên theo thứ tự: `OFFLINE` chưa Online, `VEHICLE_MISMATCH` xe không `Active` hoặc sai loại xe, `ACTIVE_TRIP` đang có đơn khác, `GPS_STALE` mất GPS ≥ 5 phút (6.4), `OUT_OF_RADIUS` ngoài `MATCHING_RADIUS_KM`, `INSUFFICIENT_DEPOSIT` ví không `Active`, cọc dưới `REQUIRED_DEPOSIT` hoặc đơn tiền mặt có hoa hồng lớn hơn cọc (GB-16)). Đơn đã được tài xế khác nhận → 409 `CONFLICT` (MSG40); đơn đã hủy → 422 `ORDER_CANCELLED`; hết cửa sổ 10 phút hoặc không còn mở → 422 `ORDER_NOT_AVAILABLE` |
 | POST | `api/driver/matching/orders/{id}/accept` | Driver | → 204; Tài xế nhận đơn `Pending` (UC-DRV-10, GB-08). Kiểm tra lại đủ điều kiện nhận đơn (`DRIVER_NOT_ELIGIBLE`: phải `Approved` + `Online`, xe `Active` đúng loại xe GB-10, GPS < 5 phút 6.4, trong bán kính `MATCHING_RADIUS_KM` GB-08, chưa có đơn đang chạy GB-09, ví `Active` và đủ cọc tối thiểu `REQUIRED_DEPOSIT` cho mọi đơn + `≥ commissionAmount` nếu đơn tiền mặt GB-16). Đơn đã được tài xế khác nhận trước → 409 `CONFLICT` (MSG32); đơn đã hủy → 422 `ORDER_CANCELLED`; đơn PayOS chưa trả hoặc quá 10 phút ghép đơn → 422 `BUSINESS_RULE`. Chuyển đơn sang `Accepted`, phát `OrderStatusChanged` (B12) và gửi `ORDER_ACCEPTED` cho khách (8.3) |
 | POST | `api/driver/uploads` | Driver | `multipart/form-data`, field `file`: một ảnh JPG/PNG ≤ 5 MB (kiểm tra magic bytes, GB-06) → `{ url }` (Cloudinary `modmove/drivers/{userId}`) dùng cho giấy tờ hồ sơ, ảnh lấy hàng, POD hoặc báo sự cố |
 | GET | `api/driver/trips` | Driver | `?page=1&pageSize=20&view=All\|Active\|History\|Completed\|Cancelled&search=&status=&fromDate=&toDate=` → `PagedResult` đơn được gán cho tài xế, mới nhất trước, kèm `commissionAmount`, `driverEarning`, thông tin khách và người nhận (UC-DRV-11) |
@@ -147,7 +147,7 @@ Kết nối với JWT trên query string: `/hubs/tracking?access_token=<accessTo
 | client → server | `JoinOrder(orderId)` | Customer | Theo dõi đơn của mình (vào group `order-{id}`); đơn người khác → `ORDER_NOT_YOURS`. Kết nối lại thì gọi lại |
 | client → server | `SendLocation(latitude, longitude)` | Driver (đã duyệt) | Gửi GPS vài giây một lần. Server lưu vị trí cuối; ghi `driver_location_logs` khi đang có đơn (`Accepted`…`InTransit`) |
 | server → client | `LocationUpdated` | khách theo dõi đơn, Dispatcher | `{ driverProfileId, orderId?, latitude, longitude, at }`. Tới group `order-{id}` khi tài xế đang chở đơn đó; tới mọi Dispatcher khi tài xế `Online` (Dispatcher tự vào group `dispatchers` khi kết nối). Quá 5 phút không có GPS: coi là mất kết nối (6.4) |
-| server → client | `NotificationReceived` | mọi user (Dispatcher: thông báo chung) | `{ type, title, body, data }` (B17): cùng nội dung FCM, tới mọi kết nối của user. Khách (8.3): `ORDER_ACCEPTED`, `DRIVER_ARRIVED`, `DRIVER_ARRIVED_DROPOFF` (UC-DRV-15), `PICKUP_PHOTOS_TO_REVIEW`, `ORDER_DELIVERED`, `ORDER_COMPLETED`, `INCIDENT_RESOLVED`, `REFUND_DECIDED`, `REFUND_INFO_REQUESTED` (Dispatcher xin thêm thông tin, 7.4), `REFUND_BANK_INFO_REQUIRED` (khoản hoàn do hủy đơn đã trả, khách cần khai tài khoản nhận, R-01), `REFUND_PAYOUT_FAILED` (Admin báo chuyển hoàn tiền lỗi, khách kiểm tra lại tài khoản, R-01; nội dung không có số tài khoản), `ORDER_CANCELLED` (hệ thống tự hủy: hết hạn thanh toán hoặc không tìm được tài xế), `INCIDENT_REPORTED` (tài xế báo sự cố, kèm `data.incidentId`), `INCIDENT_IN_PROGRESS` (Dispatcher nhận xử lý, kèm `data.incidentId`). Tài xế: `ORDER_CANCELLED`, `PICKUP_APPROVED`, `PICKUP_REJECTED`, `ORDER_COMPLETED`, `INCIDENT_DECIDED` (kết quả xử lý sự cố từ Dispatcher, kèm `data.incidentId`, `data.decision`), `INCIDENT_REPORTED` (khách báo sự cố, kèm `data.incidentId`), `INCIDENT_IN_PROGRESS` (Dispatcher nhận xử lý, kèm `data.incidentId`; không lộ nội dung khách báo), `RATING_RECEIVED` (đánh giá mới, kèm `data.ratingId`). Dispatcher: `COMPLAINT_SUBMITTED`, `INCIDENT_REFUND_REQUESTED`, `REFUND_INFO_REPLIED`, `INCIDENT_REPORTED`. `data.orderId` luôn có. `ORDER_COMPLETED` và `ORDER_CANCELLED` gửi cho cả khách và tài xế với nội dung khác: app (một app cho mọi role) xét thêm role của người đang đăng nhập |
+| server → client | `NotificationReceived` | mọi user (Dispatcher: thông báo chung) | `{ type, title, body, data }` (B17): cùng nội dung FCM, tới mọi kết nối của user. Khách (8.3): `ORDER_ACCEPTED`, `DRIVER_ARRIVED`, `DRIVER_ARRIVED_DROPOFF` (UC-DRV-15), `PICKUP_PHOTOS_TO_REVIEW`, `ORDER_DELIVERED`, `ORDER_COMPLETED`, `INCIDENT_RESOLVED`, `REFUND_DECIDED`, `REFUND_INFO_REQUESTED` (Dispatcher xin thêm thông tin, 7.4), `REFUND_BANK_INFO_REQUIRED` (khoản hoàn do hủy đơn đã trả, khách cần khai tài khoản nhận, R-01), `REFUND_PAYOUT_FAILED` (Admin báo chuyển hoàn tiền lỗi, khách kiểm tra lại tài khoản, R-01; nội dung không có số tài khoản), `ORDER_CANCELLED` (hệ thống tự hủy: hết hạn thanh toán hoặc không tìm được tài xế), `INCIDENT_REPORTED` (tài xế báo sự cố, kèm `data.incidentId`), `INCIDENT_IN_PROGRESS` (Dispatcher nhận xử lý, kèm `data.incidentId`). Tài xế: `ORDER_CANCELLED`, `PICKUP_APPROVED`, `PICKUP_REJECTED`, `ORDER_COMPLETED`, `INCIDENT_DECIDED` (kết quả xử lý sự cố từ Dispatcher, kèm `data.incidentId`, `data.decision`), `INCIDENT_REPORTED` (khách báo sự cố, kèm `data.incidentId`), `INCIDENT_IN_PROGRESS` (Dispatcher nhận xử lý, kèm `data.incidentId`; không lộ nội dung khách báo), `RATING_RECEIVED` (đánh giá mới, kèm `data.ratingId`), `NEW_MATCHING_ORDER` (đơn mới gần mà tài xế đủ điều kiện nhận: đơn tiền mặt lúc tạo, đơn PayOS lúc thanh toán xong), `DRIVER_APPLICATION_APPROVED`, `DRIVER_APPLICATION_REJECTED` (kết quả duyệt hồ sơ, kèm `data.applicationId`), `WITHDRAWAL_DECIDED` (kết quả rút tiền, kèm `data.transactionId`, `data.walletId`, `data.status`). Dispatcher: `COMPLAINT_SUBMITTED`, `INCIDENT_REFUND_REQUESTED`, `REFUND_INFO_REPLIED`, `INCIDENT_REPORTED`, `INCIDENT_RELEASED` (sự cố được trả lại, cần người nhận, kèm `data.incidentId`). `data.orderId` có ở mọi sự kiện về đơn; hồ sơ tài xế và rút tiền không có. `ORDER_COMPLETED` và `ORDER_CANCELLED` gửi cho cả khách và tài xế với nội dung khác: app (một app cho mọi role) xét thêm role của người đang đăng nhập |
 | server → client | `OrderStatusChanged` | khách theo dõi đơn, tài xế của đơn | `{ orderId, orderStatus }` sau mỗi lần đổi trạng thái đơn: tới group `order-{id}` và tới tài xế qua `Clients.User` (B12) |
 
 ## Mã lỗi
@@ -157,7 +157,7 @@ Kết nối với JWT trên query string: `/hubs/tracking?access_token=<accessTo
 | `VALIDATION` | 400 | Dữ liệu sai định dạng hoặc thiếu; xem `errors` |
 | `UNAUTHORIZED` | 401 | Sai thông tin đăng nhập, token hỏng hoặc refresh token không dùng được |
 | `FORBIDDEN` | 403 | Không có quyền |
-| `EMAIL_NOT_VERIFIED` | 403 | Đăng nhập khi chưa xác minh email |
+| `EMAIL_NOT_VERIFIED` | 403 | Chỉ còn cho tài khoản cũ chưa xác minh email. Tài khoản mới chỉ được tạo sau khi xác minh, nên đăng nhập trước đó trả 401 `UNAUTHORIZED` như email không tồn tại (D1) |
 | `ACCOUNT_INACTIVE` | 403 | Tài khoản đã xóa hoặc bị khóa. Mọi endpoint, kể cả `api/dispatcher/*` và `api/admin/*`, kiểm tra trên từng request, không chờ token hết hạn (B8) |
 | `NOT_FOUND` | 404 | Không tìm thấy |
 | `CONFLICT` | 409 | Trùng email/số điện thoại, hoặc dữ liệu vừa bị người khác đổi: tải lại rồi thử lại |
@@ -218,3 +218,47 @@ Kết nối với JWT trên query string: `/hubs/tracking?access_token=<accessTo
 | `CARGO_DISPOSITION_REQUIRED` | 422 | Hủy đơn do sự cố khi hàng đã trên xe (`PickedUp`/`InTransit`) nhưng chưa chọn hướng xử lý hàng `ReturnToPickup` hay `Keep` (2.6) |
 | `REFUND_NOT_ALLOWED` | 422 | Hoàn tiền cho đơn tiền mặt hoặc đơn PayOS chưa thanh toán: Dispatcher chọn hoàn khi hủy đơn sự cố (2.5), hoặc khách yêu cầu hoàn do sự cố (B9) |
 | `SERVER_ERROR` | 500 | Lỗi không lường trước (xem log theo `traceId`) |
+
+**Mã lỗi → thông báo SRS (Report 3, V.2).** App và web hiển thị theo bảng này; mã không có ở đây dùng MSG05 (lỗi chung) hoặc MSG01–MSG03 (lỗi `VALIDATION` theo trường).
+
+| MSG | `code` |
+|---|---|
+| MSG03 | `TOP_UP_BELOW_MISSING_DEPOSIT`, `REFUND_AMOUNT_INVALID`, `TOO_MANY_PHOTOS` |
+| MSG07 | `WITHDRAWAL_ALREADY_PENDING`, `APPLICATION_NOT_EDITABLE`, `ORDER_NOT_ACTIVE`, `COMPLAINT_WINDOW_CLOSED`, `DRIVER_NOT_ELIGIBLE` |
+| MSG08 | `UNAUTHORIZED` (đăng nhập), `WRONG_PASSWORD` |
+| MSG09 | `EMAIL_NOT_VERIFIED` (tài khoản cũ) |
+| MSG10 | `ACCOUNT_INACTIVE` |
+| MSG13 | `FORBIDDEN`, `ORDER_NOT_YOURS` |
+| MSG16 | `OTP_INVALID` |
+| MSG25 | `DRIVER_NOT_APPROVED` |
+| MSG28 | `ADDRESS_NOT_FOUND`, `ROUTE_NOT_FOUND` |
+| MSG30 | `VEHICLE_TOO_SMALL` |
+| MSG31 | `COUPON_NOT_FOUND`, `COUPON_INACTIVE`, `COUPON_EXPIRED`, `COUPON_LIMIT_REACHED`, `COUPON_MIN_ORDER_NOT_MET` |
+| MSG38 | `ORDER_NOT_CANCELLABLE`, `ORDER_CANCELLED` |
+| MSG40 | `ORDER_NOT_AVAILABLE`, `CONFLICT` khi nhận đơn đã có tài xế khác nhận |
+| MSG55 | `WITHDRAWAL_EXCEEDS_BALANCE` |
+| MSG58 | `RATING_NOT_ALLOWED`, `RATING_WINDOW_CLOSED` |
+| MSG65 | `CANNOT_CHANGE_OWN_STATUS` |
+| MSG66 | `BANK_ACCOUNT_REQUIRED` |
+| MSG70 | `INCIDENT_PENDING` |
+| MSG71 | `FARE_CHANGED` |
+| MSG72 | `COMPLAINT_OPEN` |
+| MSG73 | `PICKUP_PHOTO_LIMIT` |
+| MSG74 | `REFUND_TOTAL_EXCEEDED` |
+| MSG75 | `REFUND_NOT_ALLOWED` |
+| MSG76 | `REFUND_ZERO_PROPOSAL` |
+| MSG78 | `REFUND_BANK_ACCOUNT_REQUIRED` |
+| MSG79 | `REFUND_PAYOUT_LOCKED`, `REFUND_PAYOUT_UNCHANGED` |
+| MSG80 | `ACCOUNT_HAS_OPEN_ORDERS` |
+| MSG81 | `ACCOUNT_HAS_OPEN_REFUNDS` |
+| MSG82 | `ACCOUNT_HAS_PENDING_WITHDRAWAL`, `ACCOUNT_HAS_WALLET_BALANCE` |
+| MSG83 | `DRIVER_HAS_ACTIVE_ORDER` |
+| MSG84 | `VERIFY_PASSWORD_MISMATCH` |
+| MSG85 | `TOO_MANY_REQUESTS` |
+| MSG86 | `CONFLICT` (các trường hợp còn lại) |
+| MSG87 | `COMMISSION_RATE_LOCKED` |
+| MSG88 | `CASH_NOT_COLLECTED`, `CASH_COLLECTION_NOT_ALLOWED`, `ORDER_ALREADY_PAID` |
+| MSG89 | `CARGO_DISPOSITION_REQUIRED` |
+| MSG91 | `INCIDENT_NOT_ALLOWED` |
+
+Thông báo realtime: `REFUND_BANK_INFO_REQUIRED` → MSG77, `INCIDENT_RELEASED` → MSG90. MSG29 (GPS cũ hoặc xa quá 500 m) là kiểm tra của app, backend không trả mã này (DECISIONS GB-52).
