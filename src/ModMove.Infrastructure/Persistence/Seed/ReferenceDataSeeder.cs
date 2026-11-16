@@ -94,8 +94,17 @@ internal static class ReferenceDataSeeder
 
         foreach (var r in rows)
         {
-            if (!await db.Set<MasterDataItem>().AnyAsync(m => m.Category == r.Category && m.Code == r.Code, ct))
-                db.Add(MasterDataItem.Create(r.Category, r.Code, r.Name));
+            var defaultDescription = r.Category == "POLICY" ? DefaultPolicyContent.Get(r.Code) : null;
+            var existing = await db.Set<MasterDataItem>().FirstOrDefaultAsync(m => m.Category == r.Category && m.Code == r.Code, ct);
+            if (existing is null)
+            {
+                db.Add(MasterDataItem.Create(r.Category, r.Code, r.Name, defaultDescription));
+            }
+            else if (r.Category == "POLICY" && string.IsNullOrWhiteSpace(existing.Description) && defaultDescription is not null)
+            {
+                // Seed default content if description is empty/NULL; never overwrite what the Administrator changed.
+                existing.UpdateDescription(defaultDescription);
+            }
         }
 
         // R-01: banks for the refund payout account (code = BIN). Same rule: never overwrite what the Administrator changed.
