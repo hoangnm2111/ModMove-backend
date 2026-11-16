@@ -111,6 +111,31 @@ public class CustomerCoverageGapTests
         Assert.Empty(result);
     }
 
+    [Fact]
+    public async Task Public_content_orders_policies_canonically_Warranty_Refund_Terms_Privacy()
+    {
+        var app = new TestApp();
+        var rows = new DataTable();
+        rows.Columns.Add("Code", typeof(string));
+        rows.Columns.Add("Name", typeof(string));
+        rows.Columns.Add("Description", typeof(string));
+
+        // Add out of order
+        rows.Rows.Add("PRIVACY", "Chính sách bảo mật", "Bảo mật...");
+        rows.Rows.Add("TERMS_OF_USE", "Điều khoản sử dụng", "Điều khoản...");
+        rows.Rows.Add("WARRANTY", "Chính sách bảo hành", "Bảo hành...");
+        rows.Rows.Add("REFUND", "Chính sách hoàn tiền", "Hoàn tiền...");
+        app.Sql.Result = rows;
+
+        var result = await app.Sender.Send(new GetPublicContentQuery(PublicContentCategories.Policy));
+
+        Assert.Equal(4, result.Count);
+        Assert.Equal("WARRANTY", result[0].Code);
+        Assert.Equal("REFUND", result[1].Code);
+        Assert.Equal("TERMS_OF_USE", result[2].Code);
+        Assert.Equal("PRIVACY", result[3].Code);
+    }
+
     // ------------------------------------------------- Order business errors
 
     [Fact]

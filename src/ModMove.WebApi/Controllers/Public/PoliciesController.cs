@@ -7,6 +7,7 @@ public sealed class PoliciesController : ApiControllerBase
 {
     /// <summary>Warranty, refund, terms of use and privacy policies (UC-GST-04).</summary>
     [HttpGet]
+    [ResponseCache(Duration = 60, Location = ResponseCacheLocation.Any)]
     public Task<IReadOnlyList<ContentResponse>> GetAll(CancellationToken cancellationToken) =>
         Sender.Send(new GetPublicContentQuery(PublicContentCategories.Policy), cancellationToken);
 }
