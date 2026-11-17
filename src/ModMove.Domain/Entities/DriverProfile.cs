@@ -12,8 +12,8 @@ public sealed class DriverProfile : BaseAuditableEntity, IAggregateRoot
     private DriverProfile() { }
 
     public long UserId { get; private set; }
-    public string CitizenIdNumber { get; private set; } = null!;
-    public string DriverLicenseNumber { get; private set; } = null!;
+    public string? CitizenIdNumber { get; private set; }
+    public string? DriverLicenseNumber { get; private set; }
     public string LicenseFrontUrl { get; private set; } = null!;
     public string LicenseBackUrl { get; private set; } = null!;
     public ApprovalStatus ApprovalStatus { get; private set; } = ApprovalStatus.Pending;
@@ -28,7 +28,7 @@ public sealed class DriverProfile : BaseAuditableEntity, IAggregateRoot
     public Vehicle? Vehicle { get; private set; }
     public IReadOnlyCollection<DriverApplication> Applications => _applications;
 
-    public static DriverProfile Create(long userId, string citizenIdNumber, string driverLicenseNumber, string licenseFrontUrl, string licenseBackUrl) =>
+    public static DriverProfile Create(long userId, string? citizenIdNumber, string? driverLicenseNumber, string licenseFrontUrl, string licenseBackUrl) =>
         new()
         {
             UserId = userId,
@@ -41,7 +41,7 @@ public sealed class DriverProfile : BaseAuditableEntity, IAggregateRoot
     public int NextVersionNumber() => _applications.Count == 0 ? 1 : _applications.Max(a => a.VersionNumber) + 1;
 
     /// <summary>UC-DRV-05: a resubmission replaces the personal credentials kept on the profile.</summary>
-    public void UpdateCredentials(string citizenIdNumber, string driverLicenseNumber, string licenseFrontUrl, string licenseBackUrl)
+    public void UpdateCredentials(string? citizenIdNumber, string? driverLicenseNumber, string licenseFrontUrl, string licenseBackUrl)
     {
         CitizenIdNumber = citizenIdNumber;
         DriverLicenseNumber = driverLicenseNumber;

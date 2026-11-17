@@ -1,6 +1,3 @@
-using Dapper;
-using ModMove.Application.Common;
-using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
@@ -19,38 +16,14 @@ internal sealed class SubmitDriverApplicationCommandHandler(
     IUnitOfWork unitOfWork,
     TimeProvider clock) : ICommandHandler<SubmitDriverApplicationCommand, long>
 {
-    // Names the fields already used by another driver (GB-01 citizen ID / licence, GB-04 plate).
-    // A plate is also "taken" while another driver's application for it is still waiting for review.
-    private const string DuplicateSql = """
-        SELECT 'CitizenIdNumber' FROM driver_profiles WHERE citizen_id_number = @CitizenIdNumber AND user_id <> @UserId
-        UNION
-        SELECT 'DriverLicenseNumber' FROM driver_profiles WHERE driver_license_number = @DriverLicenseNumber AND user_id <> @UserId
-        UNION
-        SELECT 'LicensePlate' FROM vehicles v JOIN driver_profiles dp ON dp.id = v.driver_profile_id
-            WHERE v.license_plate = @LicensePlate AND dp.user_id <> @UserId
-        UNION
-        SELECT 'LicensePlate' FROM driver_applications da JOIN driver_profiles dp ON dp.id = da.driver_profile_id
-            WHERE da.license_plate = @LicensePlate AND da.application_status = 'Pending' AND dp.user_id <> @UserId
-        """;
-
     public async Task<long> Handle(SubmitDriverApplicationCommand request, CancellationToken cancellationToken)
     {
-        var user = await currentUser.LoadUserAsync(users, cancellationToken);
-        if (user.Role != UserRole.Driver)
-            throw new ForbiddenAccessException("Only drivers can submit a driver application.");
-        if (!user.EmailVerified)
-            throw new ForbiddenAccessException("Verify your email before submitting an application.", "EMAIL_NOT_VERIFIED");
+        var user = await DriverApplicationSubmissionHelper.LoadVerifiedDriverAsync(currentUser, users, cancellationToken);
+        var vehicleType = await DriverApplicationSubmissionHelper.ValidateVehicleTypeAndLoadAsync(
+            vehicleTypes, request.VehicleTypeId, request.MaxLoadWeightKg, cancellationToken);
 
-        var vehicleType = await vehicleTypes.GetByIdAsync(request.VehicleTypeId, cancellationToken)
-                          ?? throw new NotFoundException(nameof(VehicleType), request.VehicleTypeId);
-        if (!vehicleType.IsActive)
-            throw new DomainException("This vehicle type is not available.");
-        if (request.MaxLoadWeightKg > vehicleType.MaxLoadWeightKg)
-            throw new DomainException($"The maximum load of this vehicle type is {vehicleType.MaxLoadWeightKg:0.##} kg.");
-
-        var citizenId = request.CitizenIdNumber.Trim();
-        var licenseNumber = request.DriverLicenseNumber.Trim().ToUpperInvariant();
-        var plate = request.LicensePlate.Trim().ToUpperInvariant();
+        var (citizenId, licenseNumber, plate) = DriverApplicationSubmissionHelper.NormalizeCredentials(
+            request.CitizenIdNumber, request.DriverLicenseNumber, request.LicensePlate);
 
         var profile = await driverProfiles.GetByUserIdWithApplicationsAndVehicleAsync(user.Id, cancellationToken);
 
@@ -60,16 +33,8 @@ internal sealed class SubmitDriverApplicationCommandHandler(
             throw new DomainException(
                 "A driver application is already pending review or approved.", "APPLICATION_NOT_EDITABLE");
 
-        using (var connection = connectionFactory.CreateConnection())
-        {
-            var duplicates = (await connection.QueryAsync<string>(new CommandDefinition(
-                DuplicateSql,
-                new { CitizenIdNumber = citizenId, DriverLicenseNumber = licenseNumber, LicensePlate = plate, UserId = user.Id },
-                cancellationToken: cancellationToken))).ToList();
-
-            if (duplicates.Count > 0)
-                throw new ConflictException($"Already used by another driver: {string.Join(", ", duplicates)}.");
-        }
+        await DriverApplicationSubmissionHelper.EnsureNoDuplicatesAsync(
+            connectionFactory, user.Id, citizenId, licenseNumber, plate, cancellationToken);
 
         var urls = request.DocumentUrls.Select(u => u.Trim()).ToList();
         var isNewProfile = profile is null;

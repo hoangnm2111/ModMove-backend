@@ -7,8 +7,8 @@ public sealed record DriverApplicationDetailsResponse(
     string FullName,
     string PhoneNumber,
     string Email,
-    string CitizenIdNumber,
-    string DriverLicenseNumber,
+    string? CitizenIdNumber,
+    string? DriverLicenseNumber,
     long VehicleTypeId,
     string VehicleTypeName,
     string LicensePlate,
@@ -20,7 +20,8 @@ public sealed record DriverApplicationDetailsResponse(
     DateTimeOffset? ReviewedAt,
     IReadOnlyList<string> DocumentUrls,
     IReadOnlyList<string>? RejectionReasons,
-    IReadOnlyList<ApplicationHistoryDto> History);
+    IReadOnlyList<ApplicationHistoryDto> History,
+    IReadOnlyList<RejectedApplicationItemDto>? RejectedItems = null);
 
 public sealed record ApplicationHistoryDto(
     long ApplicationId,
@@ -28,4 +29,5 @@ public sealed record ApplicationHistoryDto(
     string ApplicationStatus,
     DateTimeOffset SubmittedAt,
     DateTimeOffset? ReviewedAt,
-    IReadOnlyList<string>? RejectionReasons);
+    IReadOnlyList<string>? RejectionReasons,
+    IReadOnlyList<RejectedApplicationItemDto>? RejectedItems = null);

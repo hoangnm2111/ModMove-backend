@@ -10,8 +10,8 @@ namespace ModMove.Application.Features.DriverOnboarding.Commands.SubmitDriverApp
 /// </summary>
 public sealed record SubmitDriverApplicationCommand(
     long VehicleTypeId,
-    string CitizenIdNumber,
-    string DriverLicenseNumber,
+    string? CitizenIdNumber,
+    string? DriverLicenseNumber,
     string LicensePlate,
     decimal MaxLoadWeightKg,
     IReadOnlyList<string> DocumentUrls) : ICommand<long>;

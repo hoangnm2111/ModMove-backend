@@ -36,11 +36,17 @@ public sealed class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Ex
     {
         ValidationException e => WithCode(
             new ValidationProblemDetails(e.Errors) { Status = StatusCodes.Status400BadRequest, Title = "Validation failed" },
-            "VALIDATION"),
+            e.Code ?? "VALIDATION"),
+        BadHttpRequestException e when e.StatusCode == StatusCodes.Status413PayloadTooLarge => Problem(
+            StatusCodes.Status413PayloadTooLarge, "File too large", e.Message, "FILE_TOO_LARGE"),
+        BadHttpRequestException e => Problem(
+            e.StatusCode, "Bad request", e.Message, "VALIDATION"),
         UnauthorizedException e => Problem(StatusCodes.Status401Unauthorized, "Unauthorized", e.Message, "UNAUTHORIZED"),
         NotFoundException e => Problem(StatusCodes.Status404NotFound, "Not found", e.Message, "NOT_FOUND"),
         ForbiddenAccessException e => Problem(StatusCodes.Status403Forbidden, "Forbidden", e.Message, e.Code ?? "FORBIDDEN"),
         ConflictException e => Problem(StatusCodes.Status409Conflict, "Conflict", e.Message, "CONFLICT"),
+        WrongBankAccountException e => Problem(
+            StatusCodes.Status422UnprocessableEntity, "Wrong bank account", e.Message, WrongBankAccountException.ErrorCode),
         DomainException e => Problem(StatusCodes.Status422UnprocessableEntity, "Business rule violated", e.Message, e.Code ?? "BUSINESS_RULE"),
         _ => Problem(StatusCodes.Status500InternalServerError, "Server error", "An unexpected error occurred.", "SERVER_ERROR"),
     };

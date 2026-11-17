@@ -479,5 +479,89 @@ public class AdminRefundsTests
         Assert.False((await queryValidator.ValidateAsync(new GetAdminRefundsQuery(PageSize: 101))).IsValid);
         Assert.True((await queryValidator.ValidateAsync(new GetAdminRefundsQuery(1, 20, RefundStatus.Requested, RefundSourceType.Cancellation))).IsValid);
     }
+
+    [Fact]
+    public async Task Admin_rejecting_approved_refund_with_WrongBankAccount_marks_Failed_keeps_open_and_notifies_customer()
+    {
+        var s = Build();
+        var refund = Refund.Request(s.Order.Id, null, RefundSourceType.Cancellation, "Khách hủy", null, 180_000m);
+        refund.Approve(s.Admin.Id, Now);
+        refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now);
+        s.App.Refunds.Add(refund);
+
+        await s.App.Sender.Send(new RejectRefundCommand(
+            refund.Id,
+            "Sai số tài khoản ngân hàng",
+            PayoutRejectionReasonCode.WrongBankAccount));
+
+        Assert.Equal(RefundStatus.Failed, refund.RefundStatus);
+        Assert.Equal("Sai số tài khoản ngân hàng", refund.PayoutFailureReason);
+        Assert.Equal(1, s.App.UnitOfWork.Saves);
+
+        var signalR = Assert.Single(s.App.Realtime.Sent, x => x.EventName == RealtimeEvents.NotificationReceived);
+        Assert.Equal("REFUND_PAYOUT_FAILED", Assert.IsType<Notification>(signalR.Payload).Type);
+
+        // Customer updates bank account -> returns to Approved
+        var customerApp = TestApp.SignedInAs(s.Customer);
+        customerApp.Orders.Add(s.Order);
+        customerApp.Refunds.Add(refund);
+        await customerApp.Sender.Send(new SetRefundPayoutAccountCommand(
+            refund.Id, new PayoutAccountInput(false, "970415", "9876543210", "NGUYEN VAN A")));
+
+        Assert.Equal(RefundStatus.Approved, refund.RefundStatus);
+        Assert.Null(refund.PayoutFailureReason);
+    }
+
+    [Fact]
+    public async Task Admin_rejecting_requested_refund_with_WrongBankAccount_keeps_refund_and_notifies_customer()
+    {
+        var s = Build();
+        var refund = Refund.Request(s.Order.Id, null, RefundSourceType.Cancellation, "Khách hủy", null, 180_000m);
+        refund.SetPayoutAccount("970436", "Vietcombank", "0123456789", "NGUYEN VAN A", Now);
+        s.App.Refunds.Add(refund);
+
+        await s.App.Sender.Send(new RejectRefundCommand(
+            refund.Id,
+            "Số tài khoản không hợp lệ",
+            PayoutRejectionReasonCode.WrongBankAccount));
+
+        Assert.Equal(RefundStatus.Failed, refund.RefundStatus);
+        Assert.Equal("Số tài khoản không hợp lệ", refund.PayoutFailureReason);
+        var signalR = Assert.Single(s.App.Realtime.Sent, x => x.EventName == RealtimeEvents.NotificationReceived);
+        Assert.Equal("REFUND_PAYOUT_FAILED", Assert.IsType<Notification>(signalR.Payload).Type);
+    }
+
+    [Fact]
+    public async Task Admin_rejecting_refund_with_WrongBankAccount_without_account_throws_WRONG_BANK_ACCOUNT()
+    {
+        var s = Build();
+        var refund = Refund.Request(s.Order.Id, null, RefundSourceType.Cancellation, "Khách hủy", null, 180_000m);
+        refund.Approve(s.Admin.Id, Now);
+        s.App.Refunds.Add(refund);
+
+        var ex = await Assert.ThrowsAsync<WrongBankAccountException>(() => s.App.Sender.Send(
+            new RejectRefundCommand(refund.Id, "Sai số tài khoản", PayoutRejectionReasonCode.WrongBankAccount)));
+
+        Assert.Equal("WRONG_BANK_ACCOUNT", ex.Code);
+        Assert.Equal(RefundStatus.Approved, refund.RefundStatus);
+        Assert.Equal(0, s.App.UnitOfWork.Saves);
+    }
+
+    [Fact]
+    public async Task Admin_payout_with_malformed_refund_bank_account_throws_WRONG_BANK_ACCOUNT()
+    {
+        var s = Build();
+        var refund = Refund.Request(s.Order.Id, null, RefundSourceType.Cancellation, "Khách hủy", null, 180_000m);
+        refund.Approve(s.Admin.Id, Now);
+        refund.SetPayoutAccount("970436", "Vietcombank", "BAD-ACCT", "NGUYEN VAN A", Now);
+        s.App.Refunds.Add(refund);
+
+        var ex = await Assert.ThrowsAsync<WrongBankAccountException>(() =>
+            s.App.Sender.Send(new ProcessRefundPayoutCommand(refund.Id, "FT12345")));
+
+        Assert.Equal("WRONG_BANK_ACCOUNT", ex.Code);
+        Assert.Equal(RefundStatus.Approved, refund.RefundStatus);
+        Assert.Equal(0, s.App.UnitOfWork.Saves);
+    }
 }
 

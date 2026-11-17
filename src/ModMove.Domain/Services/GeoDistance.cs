@@ -1,7 +1,7 @@
-namespace ModMove.Application.Features.Matching;
+namespace ModMove.Domain.Services;
 
-/// <summary>Great-circle distance between two WGS84 coordinates for the 5 km driver matching filter (GB-08, DECISIONS B5).</summary>
-internal static class GeoDistance
+/// <summary>Great-circle distance between two WGS84 coordinates (GB-08, DECISIONS B5, cash collection radius).</summary>
+public static class GeoDistance
 {
     private const double EarthRadiusKm = 6371.0;
 

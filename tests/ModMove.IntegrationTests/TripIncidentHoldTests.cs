@@ -62,7 +62,7 @@ public class TripIncidentHoldTests
             order.Accept(Profile.Id, Driver.Id, Now);
             if (step != Step.Arrive)
                 order.ConfirmArrival(Driver.Id, Now);
-            if (step is Step.ArriveAtDropoff or Step.CollectCash or Step.Deliver)
+            if (step is Step.ArriveAtDropoff or Step.Deliver)
             {
                 order.ConfirmPickup([Photo, Photo], Driver.Id, Now);
                 order.ApprovePickupEvidence(Customer.Id, Now);
@@ -83,7 +83,7 @@ public class TripIncidentHoldTests
             Step.Arrive => App.Sender.Send(new ConfirmArrivalCommand(order.Id)),
             Step.Pickup => App.Sender.Send(new ConfirmPickupCommand(order.Id, [Photo, Photo])),
             Step.ArriveAtDropoff => App.Sender.Send(new NotifyArrivalAtDropoffCommand(order.Id)),
-            Step.CollectCash => App.Sender.Send(new CollectCashCommand(order.Id)),
+            Step.CollectCash => App.Sender.Send(new CollectCashCommand(order.Id, order.PickupLatitude, order.PickupLongitude)),
             Step.Deliver => App.Sender.Send(new DeliverTripCommand(order.Id, Photo, CashCollected: false)),
             _ => throw new ArgumentOutOfRangeException(nameof(step)),
         };

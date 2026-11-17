@@ -6,8 +6,6 @@ using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
 using ModMove.Application.Features.Incidents;
 using ModMove.Domain.Entities;
-using ModMove.Domain.Enums;
-using ModMove.Domain.Exceptions;
 
 namespace ModMove.Application.Features.Trips.Commands.NotifyArrivalAtDropoff;
 
@@ -17,6 +15,8 @@ internal sealed class NotifyArrivalAtDropoffCommandHandler(
     IDriverProfileRepository driverProfiles,
     IShippingOrderRepository orders,
     IIncidentRepository incidents,
+    IUnitOfWork unitOfWork,
+    TimeProvider clock,
     INotificationService notifications) : ICommandHandler<NotifyArrivalAtDropoffCommand>
 {
     public async Task Handle(NotifyArrivalAtDropoffCommand request, CancellationToken cancellationToken)
@@ -28,8 +28,8 @@ internal sealed class NotifyArrivalAtDropoffCommandHandler(
         order.EnsureDriver(profile.Id);
         await IncidentGuard.EnsureDriverHasNoOpenIncidentAsync(incidents, order.Id, driver.Id, cancellationToken); // 7.6
 
-        if (order.OrderStatus != OrderStatus.InTransit)
-            throw new DomainException($"Order in {order.OrderStatus} status cannot confirm arrival at drop-off.");
+        order.MarkArrivedAtDropoff(profile.Id, clock.GetUtcNow());
+        await unitOfWork.SaveChangesAsync(cancellationToken);
 
         await notifications.NotifyAsync(
             order.CustomerId,
