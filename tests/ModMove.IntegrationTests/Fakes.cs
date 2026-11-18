@@ -405,6 +405,9 @@ internal sealed class InMemoryRefreshTokens : IRefreshTokenRepository
         return Task.CompletedTask;
     }
 
+    public Task<int> DeleteExpiredAsync(DateTimeOffset now, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.RemoveAll(t => t.IsExpired(now)));
+
     public Task<RefreshToken?> GetByIdAsync(long id, CancellationToken cancellationToken = default) => Task.FromResult(Items.FirstOrDefault(t => t.Id == id));
     public void Add(RefreshToken aggregate) => Items.Add(aggregate);
     public void Update(RefreshToken aggregate) { }

@@ -16,6 +16,7 @@ internal sealed class WalletTransactionConfiguration : IEntityTypeConfiguration<
         builder.Property(t => t.ReferenceCode).HasMaxLength(50);
 
         builder.HasIndex(t => t.WalletId);
+        builder.HasIndex(t => new { t.TransactionType, t.TransactionStatus }); // withdrawal lists for Admin and drivers
         builder.HasIndex(t => new { t.OrderId, t.TransactionType }).IsUnique(); // an order settles once
 
         builder.HasOne<ShippingOrder>().WithMany().HasForeignKey(t => t.OrderId).OnDelete(DeleteBehavior.Restrict);

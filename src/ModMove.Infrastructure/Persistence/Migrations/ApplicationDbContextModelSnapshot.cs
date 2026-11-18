@@ -772,6 +772,8 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                     b.HasIndex("PayosOrderCode")
                         .IsUnique();
 
+                    b.HasIndex("TransactionStatus");
+
                     b.HasIndex("WalletId");
 
                     b.ToTable("payment_transactions", null, t =>
@@ -971,6 +973,8 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnName("user_id");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
 
                     b.HasIndex("TokenHash")
                         .IsUnique();
@@ -1322,6 +1326,8 @@ namespace ModMove.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CouponId");
 
+                    b.HasIndex("CreatedAt");
+
                     b.HasIndex("CustomerId");
 
                     b.HasIndex("DriverProfileId");
@@ -1460,6 +1466,8 @@ namespace ModMove.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Email")
                         .IsUnique();
+
+                    b.HasIndex("FcmToken");
 
                     b.HasIndex("PhoneNumber")
                         .IsUnique();
@@ -1691,6 +1699,8 @@ namespace ModMove.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("OrderId", "TransactionType")
                         .IsUnique();
+
+                    b.HasIndex("TransactionType", "TransactionStatus");
 
                     b.ToTable("wallet_transactions", (string)null);
                 });

@@ -70,6 +70,7 @@ public static class DependencyInjection
         services.AddScoped<IPaymentTransactionRepository, PaymentTransactionRepository>();
 
         services.AddHostedService<GpsLogCleanupJob>();
+        services.AddHostedService<RefreshTokenCleanupJob>();
         services.AddHostedService<CancelUnmatchedOrdersJob>();
         services.AddHostedService<ExpireStalePaymentsJob>();
         services.AddHostedService<AutoCompleteDeliveredOrdersJob>();

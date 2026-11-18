@@ -63,6 +63,15 @@ public class InfrastructureWiringTests
     }
 
     [Fact]
+    public void Refresh_token_cleanup_job_is_registered_JOB_AUTH_01()
+    {
+        var services = new ServiceCollection().AddLogging().AddApplication().AddInfrastructure(Config());
+
+        Assert.Contains(services, d => d.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)
+            && d.ImplementationType == typeof(ModMove.Infrastructure.BackgroundJobs.RefreshTokenCleanupJob));
+    }
+
+    [Fact]
     public void App_starts_without_maps_or_cloudinary_keys()
     {
         var services = new ServiceCollection().AddLogging().AddApplication().AddInfrastructure(Config());

@@ -107,4 +107,14 @@ public class BackgroundJobTests
 
         Assert.IsType<PurgeOldLocationLogsCommand>(sender.Sent[0]);
     }
+
+    [Fact]
+    public async Task Refresh_token_cleanup_purges_expired_tokens_JOB_AUTH_01()
+    {
+        var sender = new RecordingSender();
+
+        await RunUntilReachedAsync(new RefreshTokenCleanupJob(Scopes(sender), TimeProvider.System, NullLogger<RefreshTokenCleanupJob>.Instance), sender);
+
+        Assert.IsType<ModMove.Application.Features.Auth.Commands.PurgeExpiredRefreshTokens.PurgeExpiredRefreshTokensCommand>(sender.Sent[0]);
+    }
 }

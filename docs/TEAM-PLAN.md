@@ -69,6 +69,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [x] Danh mục `api/public/lookups/...`, mã loại hàng và mã lý do khi tạo đơn, hủy, khiếu nại; danh sách coupon cho khách (GST-10, 14, CUS-21, 29)
 - [x] Khách thấy lý do quyết định hoàn tiền (CUS-23); tài xế nhận `INCIDENT_REPORTED`, `RATING_RECEIVED`
 - [x] JOB-GPS-01 (xóa GPS log quá 30 ngày): `GpsLogCleanupJob` chạy mỗi 24 giờ; job của Hoàng kế thừa `PeriodicCommandJob`
+- [ ] JOB-AUTH-01 (xóa refresh token đã hết hạn, giữ token xoay vòng còn hạn để vẫn bắt được token dùng lại, 9.1): `RefreshTokenCleanupJob` chạy mỗi 24 giờ; migration `AddQueryIndexes` thêm index cho đơn theo ngày, rút tiền, PayOS `Pending`, FCM token và `refresh_tokens.expires_at`
 - [x] Tài khoản nhận hoàn tiền (R-01): khai kèm khiếu nại/hoàn sự cố, `PUT api/customer/refunds/{id}/payout-account`, khách xem số đã che, `GET api/public/lookups/banks`, nhắc khi hủy đơn đã trả (`REFUND_BANK_INFO_REQUIRED`), gợi ý tài khoản PayOS (`useSuggested`, `suggestedPayoutAccount`)
 - [ ] Bảng mã lỗi cho frontend trong `api/README.md` đủ cho mọi endpoint (9.4)
 
