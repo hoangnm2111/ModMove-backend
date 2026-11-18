@@ -46,7 +46,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 **Phase 1**
 - [x] Auth: đăng ký Customer (`register`) , OTP email, xác minh, đăng nhập, refresh token, quên/đặt lại/đổi mật khẩu, đăng xuất
 - [x] Tài khoản: xem/sửa hồ sơ, FCM token, xóa tài khoản (`Inactive`, chặn khi còn đơn mở)
-- [x] Public: loại xe, chính sách, giới thiệu dịch vụ, gửi yêu cầu hỗ trợ
+- [x] Public: loại xe, chính sách, giới thiệu dịch vụ
 - [x] Gửi email Gmail SMTP (Development không có SMTP thì ghi OTP ra log)
 - [x] MapVina (`IMapService`: Search v2 + Directions v2, DECISIONS 3.4; trước đây Google Maps) và `FareCalculator` (B1)
 - [x] `POST api/public/fareestimate`: loại xe, tải trọng và lọt thùng theo món lớn nhất (GB-10, 4.2: dùng `VehicleType.CanCarry`), phí bốc xếp, coupon (GB-21) với mã lỗi riêng `COUPON_NOT_FOUND`, `COUPON_INACTIVE`, `COUPON_EXPIRED`, `COUPON_LIMIT_REACHED`, `COUPON_MIN_ORDER_NOT_MET`

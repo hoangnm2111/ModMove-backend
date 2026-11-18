@@ -77,7 +77,7 @@
 | 7.5 | Đánh giá chỉ trong **1 ngày** sau khi đơn `Completed` (GB-20: một lần, không sửa). Điểm trung bình tính khi truy vấn. Đánh giá 1–2 sao như mọi đánh giá khác: số sao và nhận xét, không có tag hay trường bắt buộc thêm (2026-11-02) |
 | CUS-23 | Khách thấy lý do của Admin (`refunds.decision_note`, trả về là `decisionReason`) khi Admin đã quyết định. `proposal_reason` của Dispatcher chỉ là ghi chú nội bộ, không trả về cho khách. `Refund.Approve`/`RejectRefund` nhận tham số `note`, **không bắt buộc**: Admin không ghi thì `decisionReason` là `null` (2026-11-02) |
 | Danh mục | `cargoType`, lý do hủy và lý do khiếu nại gửi bằng **mã** master data (`CARGO_TYPE`, `CANCELLATION_REASON`, `COMPLAINT_REASON`); web và app lấy danh sách từ `api/public/lookups/...`. Mã lạ hoặc đã tắt: 400 `VALIDATION`. Lý do hủy và lý do khiếu nại chọn `OTHER` thì phải viết lý do (2026-11-02) |
-| 2.9, B14 | Khách gửi yêu cầu hỗ trợ (bảng `support_requests`); **không có màn hình Dispatcher**, Dispatcher xử lý ngoài hệ thống |
+| 2.9, B14 | **Bỏ chức năng gửi yêu cầu hỗ trợ** của khách (UC-GST-05): không có endpoint, bảng `support_requests` đã xóa (migration `DropSupportRequests`, 2026-11-18) |
 
 ## 6. Tài khoản, đăng nhập
 

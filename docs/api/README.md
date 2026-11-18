@@ -9,7 +9,7 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 - **Xác thực:** header `Authorization: Bearer <accessToken>`. Access token sống 15 phút; hết hạn thì gọi `refresh` với `refreshToken` (30 ngày, dùng một lần) để lấy cặp mới. Gọi lại một refresh token đã được đổi sang cặp mới sẽ đăng xuất tài khoản trên mọi máy; token bị thu hồi do đăng xuất hay đổi mật khẩu chỉ bị từ chối (401).
 - **JSON:** enum là chuỗi (`"Pending"`), tiền là số VND, thời gian ISO 8601 UTC, phân trang `?page=1&pageSize=20` → `{ items, pageNumber, pageSize, totalCount }`.
 - **Lỗi:** mọi lỗi là ProblemDetails `{ status, title, detail, code, traceId }`, lỗi 400 có thêm `errors` theo từng trường. Client rẽ nhánh theo `code`, không theo `detail` (tiếng Anh). App map `code` sang MSGxx tiếng Việt của SRS theo bảng cuối mục [Mã lỗi](#mã-lỗi).
-- **Giới hạn tần suất:** 10 request/phút/IP cho `api/public/auth/*`, `api/public/fareestimate`, `api/account/password` và `api/public/supportrequests`; 10 request/phút cho mỗi user trên từng endpoint với `GET api/customer/orders/{id}/tracking` và `POST api/customer/incidents` → 429 `TOO_MANY_REQUESTS`.
+- **Giới hạn tần suất:** 10 request/phút/IP cho `api/public/auth/*`, `api/public/fareestimate` và `api/account/password`; 10 request/phút cho mỗi user trên từng endpoint với `GET api/customer/orders/{id}/tracking` và `POST api/customer/incidents` → 429 `TOO_MANY_REQUESTS`.
 
 ## Endpoint đã có
 
@@ -27,7 +27,6 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | GET | `api/public/policies` | Ai cũng được | Chính sách (`code`, `name`, `description`) |
 | GET | `api/public/serviceinfo` | Ai cũng được | Giới thiệu, khu vực, lợi ích |
 | GET | `api/public/lookups/cargo-types`, `.../complaint-reasons`, `.../cancellation-reasons`, `.../banks` | Ai cũng được | Danh sách để chọn `[{ code, name, description }]`, chỉ gồm mục đang bật, do Admin quản lý ở master data. Client gửi `code` khi tạo đơn, khiếu nại, hủy đơn. `banks`: `code` là mã BIN 6 số, gửi làm `payoutAccount.bankCode` (R-01) |
-| POST | `api/public/supportrequests` | Ai cũng được | `{ fullName, contact, content }` → 204 |
 | POST | `api/public/fareestimate` | Ai cũng được | `{ vehicleTypeId, pickupAddress, dropoffAddress, weightKg, lengthCm, widthCm, heightCm, hasLoadingService, couponCode? }` → `{ distanceKm, durationMinutes, distanceFee, serviceFee, discountAmount, totalFee }`. Kích thước là của món lớn nhất, khối lượng là cả đơn |
 | GET | `api/account/profile` | Đã đăng nhập | Hồ sơ của chính mình |
 | PUT | `api/account/profile` | Đã đăng nhập | `{ fullName, phoneNumber }` → 204 |
