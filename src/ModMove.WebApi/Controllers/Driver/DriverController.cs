@@ -1,10 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Features.Drivers.Commands.SetOnlineStatus;
 using ModMove.Application.Features.Drivers.Queries.GetDriverProfile;
+using ModMove.Application.Features.Drivers.Queries.GetDriverRoute;
 using ModMove.Application.Features.Drivers.Queries.GetDriverStatus;
 using ModMove.Application.Features.Tracking.Commands.UpdateDriverLocation;
+using ModMove.WebApi.Controllers.Public;
 
 namespace ModMove.WebApi.Controllers.Driver;
 
@@ -29,6 +32,15 @@ public sealed class DriverController(ICurrentUserService currentUser) : ApiContr
     [HttpGet("status")]
     public Task<DriverStatusResponse> GetStatus(CancellationToken cancellationToken) =>
         Sender.Send(new GetDriverStatusQuery(), cancellationToken);
+
+    /// <summary>
+    /// Driving route from the driver to a point (the pickup): <c>distanceKm</c>, <c>durationMinutes</c>, encoded <c>polyline</c> (5 decimals).
+    /// Each cache miss spends a MapVina call, so it is limited per user like the customer's tracking (429 TOO_MANY_REQUESTS).
+    /// </summary>
+    [HttpGet("route")]
+    [EnableRateLimiting(AuthRateLimit.UserPolicy)]
+    public Task<DriverRouteResponse> GetRoute([FromQuery] GetDriverRouteQuery query, CancellationToken cancellationToken) =>
+        Sender.Send(query, cancellationToken);
 
     /// <summary>
     /// GB-03: <c>{ isOnline }</c> → 204. Going Online needs an Approved profile (else 422 BUSINESS_RULE);

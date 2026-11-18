@@ -5,7 +5,8 @@ namespace ModMove.Application.Common.Interfaces;
 
 public sealed record GeoPoint(decimal Latitude, decimal Longitude);
 
-public sealed record RouteInfo(decimal DistanceKm, int DurationMinutes);
+/// <param name="Polyline">Route shape as a Google-style encoded polyline (MapVina: 5 decimals, like Google), or null when the provider sent none.</param>
+public sealed record RouteInfo(decimal DistanceKm, int DurationMinutes, string? Polyline = null);
 
 public sealed record PaymentLink(string CheckoutUrl, string? QrCode);
 
