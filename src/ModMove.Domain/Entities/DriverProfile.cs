@@ -91,11 +91,28 @@ public sealed class DriverProfile : BaseAuditableEntity, IAggregateRoot
         OnlineStatus = OnlineStatus.Offline;
     }
 
-    public void UpdateLocation(decimal latitude, decimal longitude, DateTimeOffset at)
+    /// <summary>
+    /// DECISIONS B20: a mock location is refused. B19: a point less accurate than 100 m is dropped.
+    /// B21: a point not newer than the saved one (a backlog point sent late) never overwrites it.
+    /// </summary>
+    public LocationUpdateResult UpdateLocation(decimal latitude, decimal longitude, DateTimeOffset at, bool isMocked = false, decimal? accuracyMeters = null)
     {
+        EnsureRealLocation(isMocked);
+        if (accuracyMeters > Constants.BusinessRules.GpsMaxAccuracyMeters)
+            return LocationUpdateResult.Inaccurate;
+        if (at <= LastLocationAt)
+            return LocationUpdateResult.Stale;
         LastLatitude = latitude;
         LastLongitude = longitude;
         LastLocationAt = at;
+        return LocationUpdateResult.Applied;
+    }
+
+    /// <summary>DECISIONS B20: refused before any other check, so the app always learns to turn the mock app off.</summary>
+    public static void EnsureRealLocation(bool isMocked)
+    {
+        if (isMocked)
+            throw new DomainException("Turn off the mock location app to share your position.", "MOCK_LOCATION");
     }
 
     /// <summary>

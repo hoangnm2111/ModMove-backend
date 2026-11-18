@@ -128,6 +128,162 @@ public class UpdateDriverLocationTests
     [InlineData(21, -181)]
     public async Task Coordinates_must_be_real(int lat, int lng) =>
         await Assert.ThrowsAsync<ValidationException>(() => Driver().App.Sender.Send(new UpdateDriverLocationCommand(3, lat, lng)));
+
+    [Fact]
+    public async Task Accuracy_below_zero_is_invalid()
+    {
+        var s = Driver();
+
+        await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(new UpdateDriverLocationCommand(s.Driver.Id, 21m, 105m, Accuracy: -1m)));
+    }
+
+    [Fact]
+    public async Task Inaccurate_point_is_dropped_but_accepted_B19()
+    {
+        var s = Driver();
+        s.PickedUp();
+
+        await s.App.Sender.Send(new UpdateDriverLocationCommand(s.Driver.Id, 21.03m, 105.85m, Accuracy: 150m));
+
+        Assert.Null(s.Profile.LastLatitude);
+        Assert.Empty(s.App.LocationLogs.Items);
+        Assert.Empty(s.App.Realtime.Sent);
+    }
+
+    [Fact]
+    public async Task Mock_location_is_refused_with_MOCK_LOCATION_B20()
+    {
+        var s = Driver();
+        s.PickedUp();
+
+        var error = await Assert.ThrowsAsync<DomainException>(() => s.App.Sender.Send(new UpdateDriverLocationCommand(s.Driver.Id, 21.03m, 105.85m, IsMocked: true)));
+
+        Assert.Equal("MOCK_LOCATION", error.Code);
+        Assert.Null(s.Profile.LastLatitude);
+        Assert.Empty(s.App.LocationLogs.Items);
+        Assert.Empty(s.App.Realtime.Sent);
+        Assert.Equal(0, s.App.UnitOfWork.Saves);
+    }
+
+    [Theory]
+    [InlineData(31)]
+    [InlineData(-601)]
+    public async Task RecordedAt_far_in_the_future_or_older_than_10_minutes_is_invalid_B21(int secondsFromNow)
+    {
+        var s = Driver();
+
+        var error = await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(
+            new UpdateDriverLocationCommand(s.Driver.Id, 21m, 105m, RecordedAt: s.App.Time.Now.AddSeconds(secondsFromNow))));
+
+        Assert.Contains("RecordedAt", error.Errors.Keys);
+        Assert.Null(s.Profile.LastLatitude);
+    }
+
+    [Fact]
+    public async Task Past_recordedAt_inside_the_window_is_kept_as_the_point_time_B21()
+    {
+        var s = Driver();
+        var at = s.App.Time.Now.AddMinutes(-10);
+
+        await s.App.Sender.Send(new UpdateDriverLocationCommand(s.Driver.Id, 21.03m, 105.85m, RecordedAt: at));
+
+        Assert.Equal(at, s.Profile.LastLocationAt);
+        Assert.Equal(at, Assert.IsType<DriverLocationUpdate>(Assert.Single(s.App.Realtime.Sent).Payload).At);
+    }
+
+    [Fact]
+    public async Task Slightly_future_recordedAt_counts_as_server_time_so_live_points_keep_moving_the_driver_B21()
+    {
+        var s = Driver();
+        var now = s.App.Time.Now;
+
+        await s.App.Sender.Send(new UpdateDriverLocationCommand(s.Driver.Id, 21.03m, 105.85m, RecordedAt: now.AddSeconds(30)));
+        Assert.Equal(now, s.Profile.LastLocationAt);
+
+        s.App.Time.Now = now.AddSeconds(5);
+        await s.App.Sender.Send(new UpdateDriverLocationCommand(s.Driver.Id, 21.04m, 105.86m));
+
+        Assert.Equal((21.04m, now.AddSeconds(5)), (s.Profile.LastLatitude!.Value, s.Profile.LastLocationAt!.Value));
+        Assert.Equal(2, s.App.Realtime.Sent.Count);
+    }
+
+    [Fact]
+    public async Task Mock_location_wins_over_an_out_of_range_recordedAt_B20()
+    {
+        var s = Driver();
+
+        var error = await Assert.ThrowsAsync<DomainException>(() => s.App.Sender.Send(
+            new UpdateDriverLocationCommand(s.Driver.Id, 21m, 105m, IsMocked: true, RecordedAt: s.App.Time.Now.AddHours(1))));
+
+        Assert.Equal("MOCK_LOCATION", error.Code);
+    }
+
+    [Fact]
+    public async Task Backlog_point_older_than_the_last_one_is_logged_but_does_not_move_the_driver_B21()
+    {
+        var s = Driver();
+        var order = s.PickedUp();
+        s.Profile.UpdateLocation(21.10m, 105.90m, s.App.Time.Now);
+
+        await s.App.Sender.Send(new UpdateDriverLocationCommand(s.Driver.Id, 21.03m, 105.85m, RecordedAt: s.App.Time.Now.AddMinutes(-2)));
+
+        Assert.Equal((21.10m, 105.90m), (s.Profile.LastLatitude!.Value, s.Profile.LastLongitude!.Value));
+        var log = Assert.Single(s.App.LocationLogs.Items);
+        Assert.Equal(((long?)order.Id, 21.03m, s.App.Time.Now.AddMinutes(-2)), (log.OrderId, log.Latitude, log.RecordedAt));
+        Assert.Empty(s.App.Realtime.Sent);
+    }
+
+    [Fact]
+    public async Task Points_30_seconds_apart_are_logged_once_but_both_move_the_driver_B12()
+    {
+        var s = Driver();
+        s.PickedUp();
+
+        await s.App.Sender.Send(new UpdateDriverLocationCommand(s.Driver.Id, 21.03m, 105.85m));
+        s.App.Time.Now = s.App.Time.Now.AddSeconds(30);
+        await s.App.Sender.Send(new UpdateDriverLocationCommand(s.Driver.Id, 21.04m, 105.86m));
+
+        Assert.Equal(21.03m, Assert.Single(s.App.LocationLogs.Items).Latitude);
+        Assert.Equal((21.04m, s.App.Time.Now), (s.Profile.LastLatitude!.Value, s.Profile.LastLocationAt!.Value));
+        Assert.Equal(4, s.App.Realtime.Sent.Count); // order followers and dispatchers, twice
+    }
+
+    [Fact]
+    public async Task Points_60_seconds_apart_are_both_logged_B12()
+    {
+        var s = Driver();
+        s.PickedUp();
+
+        await s.App.Sender.Send(new UpdateDriverLocationCommand(s.Driver.Id, 21.03m, 105.85m));
+        s.App.Time.Now = s.App.Time.Now.AddSeconds(60);
+        await s.App.Sender.Send(new UpdateDriverLocationCommand(s.Driver.Id, 21.04m, 105.86m));
+
+        Assert.Equal([21.03m, 21.04m], s.App.LocationLogs.Items.Select(l => l.Latitude));
+    }
+
+    [Fact]
+    public async Task A_recent_point_of_another_order_does_not_hold_back_the_log_B12()
+    {
+        var s = Driver();
+        var order = s.PickedUp();
+        s.App.LocationLogs.Add(DriverLocationLog.Record(s.Profile.Id, order.Id + 100, 21m, 105m, s.App.Time.Now.AddSeconds(-10)));
+
+        await s.App.Sender.Send(new UpdateDriverLocationCommand(s.Driver.Id, 21.03m, 105.85m));
+
+        Assert.Single(s.App.LocationLogs.Items, l => l.OrderId == order.Id);
+    }
+
+    [Fact]
+    public async Task Backlog_point_older_than_the_last_log_is_not_logged_B12_B21()
+    {
+        var s = Driver();
+        var order = s.PickedUp();
+        s.App.LocationLogs.Add(DriverLocationLog.Record(s.Profile.Id, order.Id, 21m, 105m, s.App.Time.Now.AddMinutes(-1)));
+
+        await s.App.Sender.Send(new UpdateDriverLocationCommand(s.Driver.Id, 21.03m, 105.85m, RecordedAt: s.App.Time.Now.AddMinutes(-3)));
+
+        Assert.Single(s.App.LocationLogs.Items);
+    }
 }
 
 /// <summary>Who may connect and follow an order on /hubs/tracking (B12, B8, C10); rows served by FakeSql.</summary>

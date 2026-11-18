@@ -8,7 +8,13 @@ using ModMove.Application.Features.Tracking.Commands.UpdateDriverLocation;
 
 namespace ModMove.WebApi.Controllers.Driver;
 
-public sealed record UpdateDriverLocationRequest(decimal Latitude, decimal Longitude);
+/// <summary><c>accuracy</c> in meters (B19), <c>isMocked</c> (B20), <c>recordedAt</c> for a point sent late (B21): all optional.</summary>
+public sealed record UpdateDriverLocationRequest(
+    decimal Latitude,
+    decimal Longitude,
+    decimal? Accuracy = null,
+    bool IsMocked = false,
+    DateTimeOffset? RecordedAt = null);
 
 /// <summary>Driver only (RoleConvention): api/driver. Driver profile, home screen, Online/Offline state and GPS (UC-DRV-06, UC-DRV-08).</summary>
 [Route("api/driver")]
@@ -36,13 +42,16 @@ public sealed class DriverController(ICurrentUserService currentUser) : ApiContr
     }
 
     /// <summary>
-    /// Updates the driver's current GPS position. Also streamed via SignalR /hubs/tracking (SendLocation).
+    /// Updates the driver's current GPS position; the driver app's channel (B12). SignalR SendLocation does the same.
+    /// 204 also when an inaccurate point is dropped (B19); 422 MOCK_LOCATION (B20); 400 when recordedAt is out of range (B21).
     /// </summary>
     [HttpPost("location")]
     public async Task<IActionResult> UpdateLocation(UpdateDriverLocationRequest request, CancellationToken cancellationToken)
     {
         var userId = currentUser.UserId ?? throw new UnauthorizedException();
-        await Sender.Send(new UpdateDriverLocationCommand(userId, request.Latitude, request.Longitude), cancellationToken);
+        await Sender.Send(
+            new UpdateDriverLocationCommand(userId, request.Latitude, request.Longitude, request.Accuracy, request.IsMocked, request.RecordedAt),
+            cancellationToken);
         return NoContent();
     }
 }

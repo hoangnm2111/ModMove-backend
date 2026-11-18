@@ -31,4 +31,8 @@ public static class BusinessRules
     public static readonly TimeSpan ComplaintWindow = TimeSpan.FromHours(24);        // GB-18
     public static readonly TimeSpan GpsLogRetention = TimeSpan.FromDays(30);         // JOB-GPS-01
     public static readonly TimeSpan GpsDisconnectAfter = TimeSpan.FromMinutes(5);    // DECISIONS 6.4, GB-39: no GPS for this long = disconnected
+    public const decimal GpsMaxAccuracyMeters = 100m;                                // DECISIONS B19: worse points are dropped
+    public static readonly TimeSpan GpsMaxClockSkew = TimeSpan.FromSeconds(30);      // DECISIONS B21: recordedAt at most this far ahead
+    public static readonly TimeSpan GpsMaxBacklog = TimeSpan.FromMinutes(10);        // DECISIONS B21: oldest backlog point accepted
+    public static readonly TimeSpan GpsLogInterval = TimeSpan.FromSeconds(60);       // DECISIONS B12: at most one logged point per order per minute
 }
