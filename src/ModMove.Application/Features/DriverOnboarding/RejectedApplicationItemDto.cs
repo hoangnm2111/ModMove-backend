@@ -106,7 +106,7 @@ internal static class DriverOnboardingJson
         if (lower.Contains("biển số") || lower.Contains("tải trọng") || lower.Contains("loại xe") || lower.Contains("plate"))
             return new RejectedApplicationItemDto(DriverApplicationItemKeys.VehicleInfo, text);
 
-        return new RejectedApplicationItemDto(DriverApplicationItemKeys.PersonalInfo, text);
+        return new RejectedApplicationItemDto(DriverApplicationItemKeys.Other, text);
     }
 }
 

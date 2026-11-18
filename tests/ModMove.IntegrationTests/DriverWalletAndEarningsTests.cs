@@ -24,7 +24,7 @@ public class DriverWalletAndEarningsTests
         var driver = User.Create("Nguyễn Văn Tài", "0912000020", "drv20@x.vn", "h:x", UserRole.Driver, emailVerified: true);
         var app = TestApp.SignedInAs(driver);
 
-        var profile = DriverProfile.Create(driver.Id, "079000000020", "79000020", "f.jpg", "b.jpg");
+        var profile = DriverProfile.Create(driver.Id, "f.jpg", "b.jpg");
         app.DriverProfiles.Add(profile);
         if (approved)
             profile.Approve(Vehicle.Create(profile.Id, 1, "51C-202.02", 1000, "200x150x150", "f.jpg", "f.jpg", "f.jpg"));

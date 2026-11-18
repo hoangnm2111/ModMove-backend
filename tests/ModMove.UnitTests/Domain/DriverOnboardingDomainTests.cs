@@ -13,11 +13,11 @@ public class DriverOnboardingDomainTests
     private static readonly DateTimeOffset Now = new(2026, 10, 24, 10, 0, 0, TimeSpan.Zero);
 
     private static DriverProfile CreateProfile(long userId = 1) =>
-        DriverProfile.Create(userId, "079090000001", "790000000001", "https://cdn/front.jpg", "https://cdn/back.jpg");
+        DriverProfile.Create(userId, "https://cdn/front.jpg", "https://cdn/back.jpg");
 
     private static DriverApplication CreateApplication(long profileId, int version = 1) =>
         DriverApplication.Create(
-            profileId, version, 1L, "079090000001", "790000000001", "51C-123.45", 1000m,
+            profileId, version, 1L, "51C-123.45", 1000m,
             ["https://cdn/front.jpg", "https://cdn/back.jpg", "https://cdn/reg.jpg", "https://cdn/insp.jpg", "https://cdn/car.jpg"],
             Now);
 
@@ -131,10 +131,7 @@ public class DriverOnboardingDomainTests
     {
         var profile = CreateProfile();
 
-        profile.UpdateCredentials("079090999999", "790000999999", "https://cdn/f2.jpg", "https://cdn/b2.jpg");
-
-        Assert.Equal("079090999999", profile.CitizenIdNumber);
-        Assert.Equal("790000999999", profile.DriverLicenseNumber);
+        profile.UpdateCredentials("https://cdn/f2.jpg", "https://cdn/b2.jpg");
         Assert.Equal("https://cdn/f2.jpg", profile.LicenseFrontUrl);
         Assert.Equal("https://cdn/b2.jpg", profile.LicenseBackUrl);
     }

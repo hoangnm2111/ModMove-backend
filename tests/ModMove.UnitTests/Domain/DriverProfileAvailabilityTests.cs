@@ -9,7 +9,7 @@ public class DriverProfileAvailabilityTests
 {
     private static readonly DateTimeOffset Now = new(2026, 11, 3, 10, 0, 0, TimeSpan.Zero);
 
-    private static DriverProfile NewProfile() => DriverProfile.Create(1, "001", "B2-001", "front.jpg", "back.jpg");
+    private static DriverProfile NewProfile() => DriverProfile.Create(1, "front.jpg", "back.jpg");
 
     private static DriverProfile ApprovedProfile()
     {

@@ -11,7 +11,7 @@ public class DriverProfileLocationTests
 
     private static DriverProfile Located()
     {
-        var profile = DriverProfile.Create(1, "001", "B2-001", "front.jpg", "back.jpg");
+        var profile = DriverProfile.Create(1, "front.jpg", "back.jpg");
         profile.UpdateLocation(21.00m, 105.80m, Now);
         return profile;
     }
@@ -64,7 +64,7 @@ public class DriverProfileLocationTests
     [Fact]
     public void First_point_is_applied()
     {
-        var profile = DriverProfile.Create(1, "001", "B2-001", "front.jpg", "back.jpg");
+        var profile = DriverProfile.Create(1, "front.jpg", "back.jpg");
 
         Assert.Equal(LocationUpdateResult.Applied, profile.UpdateLocation(21.03m, 105.85m, Now));
     }

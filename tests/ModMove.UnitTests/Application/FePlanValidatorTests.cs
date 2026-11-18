@@ -34,6 +34,12 @@ public class FePlanValidatorTests
             RejectedItems: [new("UnknownKey", "Lý do")]))
             .ShouldHaveAnyValidationError();
 
+        // D2: drivers send no id numbers any more, so there is nothing for the Administrator to reject there.
+        validator.TestValidate(new RejectDriverApplicationCommand(
+            1,
+            RejectedItems: [new("PersonalInfo", "Số CCCD sai")]))
+            .ShouldHaveAnyValidationError();
+
         validator.TestValidate(new RejectDriverApplicationCommand(1, [], []))
             .ShouldHaveAnyValidationError();
     }

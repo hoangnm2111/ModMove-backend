@@ -115,8 +115,6 @@ public class DriverApplicationApprovalTests
         detailDt.Columns.Add("FullName", typeof(string));
         detailDt.Columns.Add("PhoneNumber", typeof(string));
         detailDt.Columns.Add("Email", typeof(string));
-        detailDt.Columns.Add("CitizenIdNumber", typeof(string));
-        detailDt.Columns.Add("DriverLicenseNumber", typeof(string));
         detailDt.Columns.Add("VehicleTypeId", typeof(long));
         detailDt.Columns.Add("VehicleTypeName", typeof(string));
         detailDt.Columns.Add("LicensePlate", typeof(string));
@@ -140,7 +138,7 @@ public class DriverApplicationApprovalTests
 
         detailDt.Rows.Add(
             10L, 1L, app.DriverUser.Id, "Nguyễn Văn Lái", "0911222333", "driver@x.vn",
-            "079090000001", "790000000001", 1L, "Xe tải 1 tấn", "51C-111.22", 1000m,
+            1L, "Xe tải 1 tấn", "51C-111.22", 1000m,
             2, "Pending", TestApp.Start.AddDays(1), null, null, docsJson, null);
 
         var historyDt = new DataTable();
@@ -197,11 +195,11 @@ public class DriverApplicationApprovalTests
         var app = new DriverOnboardingApp();
 
         // Setup driver profile and pending application
-        var profile = DriverProfile.Create(app.DriverUser.Id, "079090000001", "790000000001", "front.jpg", "back.jpg");
+        var profile = DriverProfile.Create(app.DriverUser.Id, "front.jpg", "back.jpg");
         TestIds.Set(profile, 1);
 
         var application = DriverApplication.Create(
-            profile.Id, 1, 1L, "079090000001", "790000000001", "51C-999.88", 1000m,
+            profile.Id, 1, 1L, "51C-999.88", 1000m,
             ["front.jpg", "back.jpg", "reg.jpg", "insp.jpg", "veh.jpg"], TestApp.Start);
         TestIds.Set(application, 10);
         profile.Submit(application);
@@ -245,11 +243,11 @@ public class DriverApplicationApprovalTests
     {
         var app = new DriverOnboardingApp();
 
-        var profile = DriverProfile.Create(app.DriverUser.Id, "079090000001", "790000000001", "front.jpg", "back.jpg");
+        var profile = DriverProfile.Create(app.DriverUser.Id, "front.jpg", "back.jpg");
         TestIds.Set(profile, 1);
 
         var application = DriverApplication.Create(
-            profile.Id, 1, 1L, "079090000001", "790000000001", "51C-999.88", 1000m,
+            profile.Id, 1, 1L, "51C-999.88", 1000m,
             ["front.jpg", "back.jpg", "reg.jpg", "insp.jpg", "veh.jpg"], TestApp.Start);
         TestIds.Set(application, 10);
         profile.Submit(application);
@@ -280,11 +278,11 @@ public class DriverApplicationApprovalTests
     {
         var app = new DriverOnboardingApp();
 
-        var profile = DriverProfile.Create(app.DriverUser.Id, "079090000001", "790000000001", "front.jpg", "back.jpg");
+        var profile = DriverProfile.Create(app.DriverUser.Id, "front.jpg", "back.jpg");
         TestIds.Set(profile, 1);
 
         var application = DriverApplication.Create(
-            profile.Id, 1, 1L, "079090000001", "790000000001", "51C-999.88", 1000m,
+            profile.Id, 1, 1L, "51C-999.88", 1000m,
             ["front.jpg", "back.jpg", "reg.jpg", "insp.jpg", "veh.jpg"], TestApp.Start);
         TestIds.Set(application, 10);
         profile.Submit(application);
@@ -337,8 +335,6 @@ public class DriverApplicationApprovalTests
         detailDt.Columns.Add("FullName", typeof(string));
         detailDt.Columns.Add("PhoneNumber", typeof(string));
         detailDt.Columns.Add("Email", typeof(string));
-        detailDt.Columns.Add("CitizenIdNumber", typeof(string));
-        detailDt.Columns.Add("DriverLicenseNumber", typeof(string));
         detailDt.Columns.Add("VehicleTypeId", typeof(long));
         detailDt.Columns.Add("VehicleTypeName", typeof(string));
         detailDt.Columns.Add("LicensePlate", typeof(string));
@@ -358,7 +354,7 @@ public class DriverApplicationApprovalTests
 
         detailDt.Rows.Add(
             10L, 1L, app.DriverUser.Id, "Nguyễn Văn Lái", "0911222333", "driver@x.vn",
-            DBNull.Value, DBNull.Value, 1L, "Xe tải 1 tấn", "51C-111.22", 1000m,
+            1L, "Xe tải 1 tấn", "51C-111.22", 1000m,
             1, "Rejected", mysqlUtcWallClock, app.Admin.Id, mysqlUtcWallClock,
             JsonSerializer.Serialize(new[] { "a.jpg" }),
             JsonSerializer.Serialize(new[] { "Ảnh đăng ký mờ" }),
@@ -381,8 +377,6 @@ public class DriverApplicationApprovalTests
 
         Assert.Equal(new DateTimeOffset(2026, 11, 17, 7, 0, 0, TimeSpan.Zero), detail.SubmittedAt);
         Assert.Equal(TimeSpan.Zero, detail.SubmittedAt.Offset);
-        Assert.Null(detail.CitizenIdNumber);
-        Assert.Null(detail.DriverLicenseNumber);
         var item = Assert.Single(detail.RejectedItems!);
         Assert.Equal((DriverApplicationItemKeys.VehicleRegistration, "Ảnh đăng ký mờ"), (item.Key, item.Reason));
         Assert.Single(detail.History[0].RejectedItems!);
@@ -392,11 +386,11 @@ public class DriverApplicationApprovalTests
     public async Task Admin_can_reject_with_structured_rejected_items_only()
     {
         var app = new DriverOnboardingApp();
-        var profile = DriverProfile.Create(app.DriverUser.Id, null, null, "front.jpg", "back.jpg");
+        var profile = DriverProfile.Create(app.DriverUser.Id, "front.jpg", "back.jpg");
         TestIds.Set(profile, 1);
 
         var application = DriverApplication.Create(
-            profile.Id, 1, 1L, null, null, "51C-999.88", 1000m,
+            profile.Id, 1, 1L, "51C-999.88", 1000m,
             ["front.jpg", "back.jpg", "reg.jpg", "insp.jpg", "veh.jpg", "cid-f.jpg", "cid-b.jpg"], TestApp.Start);
         TestIds.Set(application, 10);
         profile.Submit(application);

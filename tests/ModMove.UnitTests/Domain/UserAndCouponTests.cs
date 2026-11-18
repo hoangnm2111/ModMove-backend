@@ -123,7 +123,7 @@ public class UserAndCouponTests
     [Fact]
     public void Driver_cannot_go_online_before_approval_GB03()
     {
-        var profile = DriverProfile.Create(1, "id", "lic", "f", "b");
+        var profile = DriverProfile.Create(1, "f", "b");
 
         Assert.Throws<DomainException>(profile.GoOnline);
     }
@@ -131,17 +131,17 @@ public class UserAndCouponTests
     [Fact]
     public void Only_one_driver_application_can_be_pending()
     {
-        var profile = DriverProfile.Create(1, "id", "lic", "f", "b");
-        profile.Submit(DriverApplication.Create(0, 1, 1, "id", "lic", "51C-1", 500, ["d"], Now));
+        var profile = DriverProfile.Create(1, "f", "b");
+        profile.Submit(DriverApplication.Create(0, 1, 1, "51C-1", 500, ["d"], Now));
 
         Assert.Throws<DomainException>(() =>
-            profile.Submit(DriverApplication.Create(0, 2, 1, "id", "lic", "51C-1", 500, ["d"], Now)));
+            profile.Submit(DriverApplication.Create(0, 2, 1, "51C-1", 500, ["d"], Now)));
     }
 
     [Fact]
     public void Rejecting_an_application_needs_a_reason()
     {
-        var application = DriverApplication.Create(0, 1, 1, "id", "lic", "51C-1", 500, ["d"], Now);
+        var application = DriverApplication.Create(0, 1, 1, "51C-1", 500, ["d"], Now);
 
         Assert.Throws<DomainException>(() => application.Reject(2, [], Now));
     }
@@ -149,7 +149,7 @@ public class UserAndCouponTests
     [Fact]
     public void Approving_a_newer_version_updates_the_existing_vehicle()
     {
-        var profile = DriverProfile.Create(1, "id", "lic", "f", "b");
+        var profile = DriverProfile.Create(1, "f", "b");
         profile.Approve(Vehicle.Create(1, 1, "51C-1", 500, "1x1x1", "r", "i", "p"));
         var original = profile.Vehicle;
 

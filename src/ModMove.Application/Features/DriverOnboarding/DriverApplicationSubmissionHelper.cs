@@ -13,10 +13,6 @@ namespace ModMove.Application.Features.DriverOnboarding;
 internal static class DriverApplicationSubmissionHelper
 {
     private const string DuplicateSql = """
-        SELECT 'CitizenIdNumber' FROM driver_profiles WHERE @CitizenIdNumber IS NOT NULL AND citizen_id_number = @CitizenIdNumber AND user_id <> @UserId
-        UNION
-        SELECT 'DriverLicenseNumber' FROM driver_profiles WHERE @DriverLicenseNumber IS NOT NULL AND driver_license_number = @DriverLicenseNumber AND user_id <> @UserId
-        UNION
         SELECT 'LicensePlate' FROM vehicles v JOIN driver_profiles dp ON dp.id = v.driver_profile_id
             WHERE v.license_plate = @LicensePlate AND dp.user_id <> @UserId
         UNION
@@ -55,22 +51,11 @@ internal static class DriverApplicationSubmissionHelper
         return vehicleType;
     }
 
-    public static (string? CitizenId, string? LicenseNumber, string Plate) NormalizeCredentials(
-        string? citizenIdNumber,
-        string? driverLicenseNumber,
-        string licensePlate)
-    {
-        var citizenId = string.IsNullOrWhiteSpace(citizenIdNumber) ? null : citizenIdNumber.Trim();
-        var licenseNumber = string.IsNullOrWhiteSpace(driverLicenseNumber) ? null : driverLicenseNumber.Trim().ToUpperInvariant();
-        var plate = licensePlate.Trim().ToUpperInvariant();
-        return (citizenId, licenseNumber, plate);
-    }
+    public static string NormalizePlate(string licensePlate) => licensePlate.Trim().ToUpperInvariant();
 
     public static async Task EnsureNoDuplicatesAsync(
         ISqlConnectionFactory connectionFactory,
         long userId,
-        string? citizenId,
-        string? licenseNumber,
         string plate,
         CancellationToken cancellationToken)
     {
@@ -79,8 +64,6 @@ internal static class DriverApplicationSubmissionHelper
             DuplicateSql,
             new
             {
-                CitizenIdNumber = citizenId,
-                DriverLicenseNumber = licenseNumber,
                 LicensePlate = plate,
                 UserId = userId,
             },

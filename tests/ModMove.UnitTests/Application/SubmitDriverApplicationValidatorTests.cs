@@ -12,7 +12,7 @@ public class SubmitDriverApplicationValidatorTests
          "https://res.cloudinary.com/demo/image/upload/f.jpg", "https://res.cloudinary.com/demo/image/upload/g.jpg"];
 
     private static SubmitDriverApplicationCommand Valid() =>
-        new(1, "012345678901", "B2123456789", "51C-111.22", 900m, Docs);
+        new(1, "51C-111.22", 900m, Docs);
 
     private sealed class TeamStorage : IFileStorage
     {
@@ -27,29 +27,6 @@ public class SubmitDriverApplicationValidatorTests
 
     [Fact]
     public void Valid_command_passes() => Check(Valid()).ShouldNotHaveAnyValidationErrors();
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("   ")]
-    public void Blank_citizen_id_and_license_number_are_optional_and_pass(string? blank)
-    {
-        var result = Check(Valid() with { CitizenIdNumber = blank, DriverLicenseNumber = blank });
-        result.ShouldNotHaveAnyValidationErrors();
-    }
-
-    [Theory]
-    [InlineData("12345")]
-    [InlineData("12345678901234")]
-    [InlineData("12345678A")]
-    public void Bad_citizen_id_fails(string id) =>
-        Check(Valid() with { CitizenIdNumber = id }).ShouldHaveValidationErrorFor(x => x.CitizenIdNumber);
-
-    [Theory]
-    [InlineData("short")]
-    [InlineData("has space 1234")]
-    public void Bad_license_number_fails(string number) =>
-        Check(Valid() with { DriverLicenseNumber = number }).ShouldHaveValidationErrorFor(x => x.DriverLicenseNumber);
 
     [Fact]
     public void Missing_back_document_url_fails_validation()

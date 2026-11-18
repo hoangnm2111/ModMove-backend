@@ -402,7 +402,7 @@ public class AdminRefundsTests
         var s = Build();
         var driverUser = User.Create("Tài xế", "0900000009", "drv@x.vn", "h", UserRole.Driver, emailVerified: true);
         s.App.Users.Add(driverUser);
-        var profile = DriverProfile.Create(driverUser.Id, "001", "B2", "f.jpg", "b.jpg");
+        var profile = DriverProfile.Create(driverUser.Id, "f.jpg", "b.jpg");
         profile.Approve(Vehicle.Create(1, 1, "29A-12345", 1000, "200x150x150", "r.jpg", "i.jpg", "v.jpg"));
         s.App.DriverProfiles.Add(profile);
         var wallet = DriverWallet.Create(profile.Id);

@@ -27,7 +27,7 @@ public class AdminWithdrawalsTests
 
         var app = TestApp.SignedInAs(admin, driverUser);
 
-        var profile = DriverProfile.Create(driverUser.Id, "079090000001", "790000000001", "front.jpg", "back.jpg");
+        var profile = DriverProfile.Create(driverUser.Id, "front.jpg", "back.jpg");
         app.DriverProfiles.Add(profile);
 
         var wallet = DriverWallet.Create(profile.Id);

@@ -43,7 +43,7 @@ public class AcceptOrderTests
             App.Settings.Add(PlatformSetting.Create(SettingKeys.RequiredDeposit, "200000", Now));
             App.Settings.Add(PlatformSetting.Create(SettingKeys.CommissionRate, "0.10", Now));
 
-            Profile = DriverProfile.Create(Driver.Id, "001", "B2-001", "front.jpg", "back.jpg");
+            Profile = DriverProfile.Create(Driver.Id, "front.jpg", "back.jpg");
             if (approved)
             {
                 Profile.Approve(Vehicle.Create(1, vehicleTypeId, "51C-12345", 1000, "250x160x160", "r", "i", "p"));
@@ -161,7 +161,7 @@ public class AcceptOrderTests
         // Second driver tries to accept the same order
         var driver2 = User.Create("Tài 2", "0900000004", "tai2@x.vn", "h", UserRole.Driver, emailVerified: true);
         s.App.Users.Add(driver2);
-        var profile2 = DriverProfile.Create(driver2.Id, "002", "B2-002", "f.jpg", "b.jpg");
+        var profile2 = DriverProfile.Create(driver2.Id, "f.jpg", "b.jpg");
         profile2.Approve(Vehicle.Create(2, 1L, "51C-99999", 1000, "250x160x160", "r", "i", "p"));
         profile2.GoOnline();
         profile2.UpdateLocation(21.0290m, 105.8545m, Now);

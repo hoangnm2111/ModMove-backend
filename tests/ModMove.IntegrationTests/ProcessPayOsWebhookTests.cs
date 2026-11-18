@@ -95,7 +95,7 @@ public class ProcessPayOsWebhookTests
         driverUser.SetFcmToken("fcm-drv-nearby");
         s.App.Users.Add(driverUser);
 
-        var profile = DriverProfile.Create(driverUser.Id, "079090000001", "790000000001", "f.jpg", "b.jpg");
+        var profile = DriverProfile.Create(driverUser.Id, "f.jpg", "b.jpg");
         TestIds.Set(profile, 11);
         var vehicle = Vehicle.Create(profile.Id, 1, "51C-123.45", 1000m, "250x160x160", "r.jpg", "i.jpg", "v.jpg");
         TestIds.Set(vehicle, 11);

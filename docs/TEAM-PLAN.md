@@ -30,6 +30,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 | `Infrastructure/BackgroundJobs` | Hoàng (PAY, MATCH, ORDER), Hiếu (GPS) | Job chỉ gửi Command qua `Sender` |
 | `Domain/Entities`, `Domain/Enums`, `Persistence/Migrations` | Dùng chung | Đổi entity người khác đang dùng: PR riêng, báo nhóm |
 | GPS và bản đồ: action `UpdateLocation` (`POST api/driver/location`) trong `Controllers/Driver/DriverController.cs`; phần GPS của app tài xế; bản đồ realtime của web khách và Dispatcher | Hiếu | **Ngoại lệ** nhóm đồng ý 2026-11-18 (DECISIONS B12, B18–B21). Phần còn lại của `Controllers/Driver` vẫn của Hoàng. Plan: `docs/plans/2026-11-17-gps-tracking-improvements.md` |
+| Bỏ nhập số CCCD/GPLX: phần số trong `Features/DriverOnboarding`, `Features/Drivers/Queries/GetDriverProfile`, `Domain/Entities/DriverProfile`, `DriverApplication`; app tài xế; web hồ sơ tài xế và duyệt hồ sơ | Hiếu | **Ngoại lệ** nhóm đồng ý 2026-11-18 (DECISIONS D2). Plan: `docs/plans/2026-11-18-remove-id-numbers.md` |
 
 ## 3. Nền móng dùng chung (đã xong)
 

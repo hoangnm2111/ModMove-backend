@@ -28,7 +28,7 @@ public class AutoCompleteDeliveredOrdersJobTests
         var driver = User.Create("Tài", "0900000003", "tai@x.vn", "h", UserRole.Driver, emailVerified: true);
         var app = new TestApp(signedInUserId: null, customer, driver);
 
-        var profile = DriverProfile.Create(driver.Id, "079090000001", "B2-001", "front.jpg", "back.jpg");
+        var profile = DriverProfile.Create(driver.Id, "front.jpg", "back.jpg");
         app.DriverProfiles.Add(profile);
 
         var wallet = DriverWallet.Create(profile.Id);

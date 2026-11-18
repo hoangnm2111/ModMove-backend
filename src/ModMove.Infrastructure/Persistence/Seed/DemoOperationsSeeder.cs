@@ -33,13 +33,13 @@ internal static class DemoOperationsSeeder
         await EnsureExtraDriverAsync(
             db, admin, vehicleType, driverUser.PasswordHash,
             "Tài xế Thay thế", "0900000005", "driver2@modmove.local",
-            "079090000002", "790000000002", "51C-222.22",
+            "51C-222.22",
             10.8050m, 106.7150m, now.AddMinutes(-1), now, ct);
 
         await EnsureExtraDriverAsync(
             db, admin, vehicleType, driverUser.PasswordHash,
             "Tài xế Mất GPS", "0900000006", "driver3@modmove.local",
-            "079090000003", "790000000003", "51C-333.33",
+            "51C-333.33",
             10.8030m, 106.7140m, now.AddMinutes(-12), now, ct);
 
         await db.SaveChangesAsync(ct);
@@ -114,7 +114,7 @@ internal static class DemoOperationsSeeder
     private static async Task EnsureExtraDriverAsync(
         ApplicationDbContext db, User admin, VehicleType vehicleType, string passwordHash,
         string fullName, string phone, string email,
-        string citizenId, string licenseNo, string plate,
+        string plate,
         decimal latitude, decimal longitude, DateTimeOffset locationAt, DateTimeOffset now, CancellationToken ct)
     {
         var user = await db.Set<User>().FirstOrDefaultAsync(u => u.Email == email || u.PhoneNumber == phone, ct);
@@ -132,7 +132,7 @@ internal static class DemoOperationsSeeder
 
         if (profile is null)
         {
-            profile = DriverProfile.Create(user.Id, citizenId, licenseNo, Photo, Photo);
+            profile = DriverProfile.Create(user.Id, Photo, Photo);
             db.Add(profile);
             await db.SaveChangesAsync(ct);
         }
@@ -140,7 +140,7 @@ internal static class DemoOperationsSeeder
         if (profile.Vehicle is null)
         {
             var application = DriverApplication.Create(
-                profile.Id, profile.NextVersionNumber(), vehicleType.Id, citizenId, licenseNo,
+                profile.Id, profile.NextVersionNumber(), vehicleType.Id,
                 plate, vehicleType.MaxLoadWeightKg, Enumerable.Repeat(Photo, 5), now);
             profile.Submit(application);
             application.Approve(admin.Id, now);

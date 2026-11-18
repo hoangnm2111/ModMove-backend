@@ -7,8 +7,6 @@ public sealed record DriverApplicationDetailsResponse(
     string FullName,
     string PhoneNumber,
     string Email,
-    string? CitizenIdNumber,
-    string? DriverLicenseNumber,
     long VehicleTypeId,
     string VehicleTypeName,
     string LicensePlate,

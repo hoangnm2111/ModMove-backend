@@ -9,8 +9,6 @@ internal sealed class DriverProfileConfiguration : IEntityTypeConfiguration<Driv
     public void Configure(EntityTypeBuilder<DriverProfile> builder)
     {
         builder.ToTable("driver_profiles");
-        builder.Property(d => d.CitizenIdNumber).HasMaxLength(20).IsRequired(false);
-        builder.Property(d => d.DriverLicenseNumber).HasMaxLength(20).IsRequired(false);
         builder.Property(d => d.LicenseFrontUrl).HasMaxLength(500);
         builder.Property(d => d.LicenseBackUrl).HasMaxLength(500);
         builder.Property(d => d.OnlineStatus).HasMaxLength(10);
@@ -21,8 +19,6 @@ internal sealed class DriverProfileConfiguration : IEntityTypeConfiguration<Driv
         builder.Property(d => d.BankAccountHolder).HasMaxLength(100);
 
         builder.HasIndex(d => d.UserId).IsUnique();
-        builder.HasIndex(d => d.CitizenIdNumber).IsUnique();
-        builder.HasIndex(d => d.DriverLicenseNumber).IsUnique();
 
         builder.HasOne<User>().WithMany().HasForeignKey(d => d.UserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasMany(d => d.Applications).WithOne().HasForeignKey(a => a.DriverProfileId).OnDelete(DeleteBehavior.Cascade);

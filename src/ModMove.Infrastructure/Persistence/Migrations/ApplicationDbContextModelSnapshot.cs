@@ -167,11 +167,6 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(20)")
                         .HasColumnName("application_status");
 
-                    b.Property<string>("CitizenIdNumber")
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
-                        .HasColumnName("citizen_id_number");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("created_at");
@@ -180,11 +175,6 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasColumnType("json")
                         .HasColumnName("document_urls");
-
-                    b.Property<string>("DriverLicenseNumber")
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
-                        .HasColumnName("driver_license_number");
 
                     b.Property<long>("DriverProfileId")
                         .HasColumnType("bigint")
@@ -321,19 +311,9 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnType("varchar(100)")
                         .HasColumnName("bank_name");
 
-                    b.Property<string>("CitizenIdNumber")
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
-                        .HasColumnName("citizen_id_number");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("created_at");
-
-                    b.Property<string>("DriverLicenseNumber")
-                        .HasMaxLength(20)
-                        .HasColumnType("varchar(20)")
-                        .HasColumnName("driver_license_number");
 
                     b.Property<decimal?>("LastLatitude")
                         .HasPrecision(9, 6)
@@ -376,12 +356,6 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnName("user_id");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("CitizenIdNumber")
-                        .IsUnique();
-
-                    b.HasIndex("DriverLicenseNumber")
-                        .IsUnique();
 
                     b.HasIndex("UserId")
                         .IsUnique();

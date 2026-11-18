@@ -25,7 +25,7 @@ internal sealed class DispatcherSetup
         Customer = User.Create("An", "0900000001", "an@x.vn", "h", UserRole.Customer, emailVerified: true);
         Driver = User.Create("Tài", "0900000003", "tai@x.vn", "h", UserRole.Driver, emailVerified: true);
         App = TestApp.SignedInAs(Dispatcher, Customer, Driver);
-        Profile = DriverProfile.Create(Driver.Id, "001", "B2-001", "front.jpg", "back.jpg");
+        Profile = DriverProfile.Create(Driver.Id, "front.jpg", "back.jpg");
         App.DriverProfiles.Add(Profile);
         Wallet = DriverWallet.Create(Profile.Id);
         Wallet.TopUpDeposit(300_000);
@@ -49,7 +49,7 @@ internal sealed class DispatcherSetup
         var user = User.Create($"Tài {suffix}", $"09000001{suffix}", $"tai{suffix}@x.vn", "h", UserRole.Driver, emailVerified: true);
         App.Users.Add(user);
 
-        var profile = DriverProfile.Create(user.Id, $"CCCD-{suffix}", $"B2-{suffix}", "f.jpg", "b.jpg");
+        var profile = DriverProfile.Create(user.Id, "f.jpg", "b.jpg");
         App.DriverProfiles.Add(profile);
         if (approved)
         {

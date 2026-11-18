@@ -22,8 +22,6 @@ public sealed record DriverOnboardingStatusResponse(
     string? VehicleTypeName,
     string? LicensePlate,
     decimal? MaxLoadWeightKg,
-    string? CitizenIdNumber,
-    string? DriverLicenseNumber,
     IReadOnlyList<string> DocumentUrls,
     IReadOnlyList<string>? RejectionReasons,
     IReadOnlyList<RejectedApplicationItemDto>? RejectedItems = null);

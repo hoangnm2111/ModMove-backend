@@ -22,8 +22,7 @@ internal sealed class SubmitDriverApplicationCommandHandler(
         var vehicleType = await DriverApplicationSubmissionHelper.ValidateVehicleTypeAndLoadAsync(
             vehicleTypes, request.VehicleTypeId, request.MaxLoadWeightKg, cancellationToken);
 
-        var (citizenId, licenseNumber, plate) = DriverApplicationSubmissionHelper.NormalizeCredentials(
-            request.CitizenIdNumber, request.DriverLicenseNumber, request.LicensePlate);
+        var plate = DriverApplicationSubmissionHelper.NormalizePlate(request.LicensePlate);
 
         var profile = await driverProfiles.GetByUserIdWithApplicationsAndVehicleAsync(user.Id, cancellationToken);
 
@@ -34,18 +33,18 @@ internal sealed class SubmitDriverApplicationCommandHandler(
                 "A driver application is already pending review or approved.", "APPLICATION_NOT_EDITABLE");
 
         await DriverApplicationSubmissionHelper.EnsureNoDuplicatesAsync(
-            connectionFactory, user.Id, citizenId, licenseNumber, plate, cancellationToken);
+            connectionFactory, user.Id, plate, cancellationToken);
 
         var urls = request.DocumentUrls.Select(u => u.Trim()).ToList();
         var isNewProfile = profile is null;
 
         if (profile is null)
-            profile = DriverProfile.Create(user.Id, citizenId, licenseNumber, urls[0], urls[1]);
+            profile = DriverProfile.Create(user.Id, urls[0], urls[1]);
         else
-            profile.UpdateCredentials(citizenId, licenseNumber, urls[0], urls[1]);
+            profile.UpdateCredentials(urls[0], urls[1]);
 
         var application = DriverApplication.Create(
-            profile.Id, profile.NextVersionNumber(), vehicleType.Id, citizenId, licenseNumber, plate,
+            profile.Id, profile.NextVersionNumber(), vehicleType.Id, plate,
             request.MaxLoadWeightKg, urls, clock.GetUtcNow());
 
         profile.Submit(application); // one Pending at a time; ProfileApprovalStatus becomes Pending

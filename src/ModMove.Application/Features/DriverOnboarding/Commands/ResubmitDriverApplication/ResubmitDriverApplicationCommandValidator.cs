@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using FluentValidation;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Domain.Constants;
@@ -11,7 +10,7 @@ internal sealed class ResubmitDriverApplicationCommandValidator : AbstractValida
     {
         RuleFor(x => x)
             .Must(HasAnyPayload)
-            .WithMessage("Provide at least one updated document item, vehicle update, or personal info update.");
+            .WithMessage("Provide at least one updated document item or vehicle update.");
 
         RuleForEach(x => x.Items)
             .ChildRules(item =>
@@ -50,26 +49,12 @@ internal sealed class ResubmitDriverApplicationCommandValidator : AbstractValida
                 .LessThanOrEqualTo(100_000m)
                 .When(x => x.Vehicle!.MaxLoadWeightKg is not null);
         });
-
-        When(x => x.PersonalInfo is not null, () =>
-        {
-            RuleFor(x => x.PersonalInfo!.CitizenIdNumber)
-                .Must(v => Regex.IsMatch(v!.Trim(), "^[0-9]{9,12}$"))
-                .WithMessage("Citizen ID must be 9 to 12 digits.")
-                .When(x => !string.IsNullOrWhiteSpace(x.PersonalInfo!.CitizenIdNumber));
-
-            RuleFor(x => x.PersonalInfo!.DriverLicenseNumber)
-                .Must(v => Regex.IsMatch(v!.Trim(), "^[0-9A-Za-z]{8,20}$"))
-                .WithMessage("Driver licence number must be 8 to 20 letters or digits.")
-                .When(x => !string.IsNullOrWhiteSpace(x.PersonalInfo!.DriverLicenseNumber));
-        });
     }
 
     private static bool HasAnyPayload(ResubmitDriverApplicationCommand command) =>
         command.Items is { Count: > 0 }
         || command.Vehicle is { VehicleTypeId: not null }
         || command.Vehicle is { LicensePlate: not null }
-        || command.Vehicle is { MaxLoadWeightKg: not null }
-        || command.PersonalInfo is not null;
+        || command.Vehicle is { MaxLoadWeightKg: not null };
 }
 

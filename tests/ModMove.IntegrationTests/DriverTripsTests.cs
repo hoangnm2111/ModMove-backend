@@ -45,12 +45,12 @@ public class DriverTripsTests
 
             App = TestApp.SignedInAs(Driver, OtherDriver, Customer);
 
-            Profile = DriverProfile.Create(Driver.Id, "079000000001", "79000001", Photo1, Photo2);
+            Profile = DriverProfile.Create(Driver.Id, Photo1, Photo2);
             App.DriverProfiles.Add(Profile);
             if (approved)
                 Profile.Approve(Vehicle.Create(Profile.Id, 1, "51C-123.45", 1000, "200x150x150", Photo1, Photo1, Photo1));
 
-            OtherProfile = DriverProfile.Create(OtherDriver.Id, "079000000002", "79000002", Photo1, Photo2);
+            OtherProfile = DriverProfile.Create(OtherDriver.Id, Photo1, Photo2);
             App.DriverProfiles.Add(OtherProfile);
             OtherProfile.Approve(Vehicle.Create(OtherProfile.Id, 1, "51C-999.99", 1000, "200x150x150", Photo1, Photo1, Photo1));
 

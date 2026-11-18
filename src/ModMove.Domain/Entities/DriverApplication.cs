@@ -12,8 +12,6 @@ public sealed class DriverApplication : BaseAuditableEntity
     public long DriverProfileId { get; private set; }
     public int VersionNumber { get; private set; }
     public long VehicleTypeId { get; private set; }
-    public string? CitizenIdNumber { get; private set; }
-    public string? DriverLicenseNumber { get; private set; }
     public string LicensePlate { get; private set; } = null!;
     public decimal MaxLoadWeightKg { get; private set; }
 
@@ -33,16 +31,14 @@ public sealed class DriverApplication : BaseAuditableEntity
     public DateTimeOffset SubmittedAt { get; private set; }
 
     public static DriverApplication Create(
-        long driverProfileId, int versionNumber, long vehicleTypeId, string? citizenIdNumber,
-        string? driverLicenseNumber, string licensePlate, decimal maxLoadWeightKg,
+        long driverProfileId, int versionNumber, long vehicleTypeId,
+        string licensePlate, decimal maxLoadWeightKg,
         IEnumerable<string> documentUrls, DateTimeOffset submittedAt) =>
         new()
         {
             DriverProfileId = driverProfileId,
             VersionNumber = versionNumber,
             VehicleTypeId = vehicleTypeId,
-            CitizenIdNumber = citizenIdNumber,
-            DriverLicenseNumber = driverLicenseNumber,
             LicensePlate = licensePlate,
             MaxLoadWeightKg = maxLoadWeightKg,
             DocumentUrls = [.. documentUrls],
