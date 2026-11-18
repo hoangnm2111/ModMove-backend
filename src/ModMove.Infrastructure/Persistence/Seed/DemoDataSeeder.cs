@@ -32,7 +32,7 @@ internal static class DemoDataSeeder
 
         if (profile is null)
         {
-            profile = DriverProfile.Create(driverUser.Id, "079090000001", "790000000001", PlaceholderImage, PlaceholderImage);
+            profile = DriverProfile.Create(driverUser.Id, PlaceholderImage, PlaceholderImage);
             db.Add(profile);
             await db.SaveChangesAsync(ct);
         }
@@ -42,7 +42,7 @@ internal static class DemoDataSeeder
             var vehicleType = await db.Set<VehicleType>().OrderBy(v => v.MaxLoadWeightKg).FirstAsync(ct);
 
             var application = DriverApplication.Create(
-                profile.Id, profile.NextVersionNumber(), vehicleType.Id, profile.CitizenIdNumber, profile.DriverLicenseNumber,
+                profile.Id, profile.NextVersionNumber(), vehicleType.Id,
                 "51C-123.45", vehicleType.MaxLoadWeightKg, Enumerable.Repeat(PlaceholderImage, 5), now);
             profile.Submit(application);
             application.Approve(admin.Id, now);

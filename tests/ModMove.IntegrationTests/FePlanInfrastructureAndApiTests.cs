@@ -150,12 +150,13 @@ public class FePlanInfrastructureAndApiTests
     {
         var items = DriverOnboardingJson.ParseRejectedItems(
             null,
-            ["LicenseFront: Ảnh mờ", "Ảnh CCCD mặt sau bị chói", "Biển số xe không khớp"]);
+            ["LicenseFront: Ảnh mờ", "Ảnh CCCD mặt sau bị chói", "Biển số xe không khớp", "Thông tin không khớp"]);
 
         Assert.NotNull(items);
-        Assert.Equal(3, items!.Count);
+        Assert.Equal(4, items!.Count);
         Assert.Equal((DriverApplicationItemKeys.LicenseFront, "Ảnh mờ"), (items[0].Key, items[0].Reason));
         Assert.Equal(DriverApplicationItemKeys.CitizenIdBack, items[1].Key);
         Assert.Equal(DriverApplicationItemKeys.VehicleInfo, items[2].Key);
+        Assert.Equal(DriverApplicationItemKeys.Other, items[3].Key); // D2: no personal-info key any more; a reason naming no item is "Other"
     }
 }

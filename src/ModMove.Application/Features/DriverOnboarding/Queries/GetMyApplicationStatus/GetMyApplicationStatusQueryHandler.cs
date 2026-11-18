@@ -19,7 +19,6 @@ internal sealed class GetMyApplicationStatusQueryHandler(ISqlConnectionFactory c
                da.submitted_at AS SubmittedAt, da.reviewed_at AS ReviewedAt,
                da.vehicle_type_id AS VehicleTypeId, vt.name AS VehicleTypeName,
                da.license_plate AS LicensePlate, da.max_load_weight_kg AS MaxLoadWeightKg,
-               da.citizen_id_number AS CitizenIdNumber, da.driver_license_number AS DriverLicenseNumber,
                da.document_urls AS DocumentUrlsJson, da.rejection_reasons AS RejectionReasonsJson,
                da.rejected_items AS RejectedItemsJson
         FROM driver_applications da
@@ -45,7 +44,7 @@ internal sealed class GetMyApplicationStatusQueryHandler(ISqlConnectionFactory c
             new CommandDefinition(LatestSql, new { UserId = userId }, cancellationToken: cancellationToken));
 
         if (row is null)
-            return new DriverOnboardingStatusResponse(false, true, null, null, null, null, null, null, null, null, null, null, null, [], null, null);
+            return new DriverOnboardingStatusResponse(false, true, null, null, null, null, null, null, null, null, null, [], null, null);
 
         var isRejected = row.ApplicationStatus == nameof(ApprovalStatus.Rejected);
         var rejectionReasons = isRejected ? DriverOnboardingJson.ParseNullableList(row.RejectionReasonsJson) : null;
@@ -62,8 +61,6 @@ internal sealed class GetMyApplicationStatusQueryHandler(ISqlConnectionFactory c
             VehicleTypeName: row.VehicleTypeName,
             LicensePlate: row.LicensePlate,
             MaxLoadWeightKg: row.MaxLoadWeightKg,
-            CitizenIdNumber: row.CitizenIdNumber,
-            DriverLicenseNumber: row.DriverLicenseNumber,
             DocumentUrls: DriverOnboardingJson.ParseList(row.DocumentUrlsJson),
             RejectionReasons: rejectionReasons,
             RejectedItems: isRejected ? DriverOnboardingJson.ParseRejectedItems(row.RejectedItemsJson, rejectionReasons) : null);
@@ -80,8 +77,6 @@ internal sealed class GetMyApplicationStatusQueryHandler(ISqlConnectionFactory c
         public string VehicleTypeName { get; set; } = "";
         public string LicensePlate { get; set; } = "";
         public decimal MaxLoadWeightKg { get; set; }
-        public string? CitizenIdNumber { get; set; }
-        public string? DriverLicenseNumber { get; set; }
         public string? DocumentUrlsJson { get; set; }
         public string? RejectionReasonsJson { get; set; }
         public string? RejectedItemsJson { get; set; }

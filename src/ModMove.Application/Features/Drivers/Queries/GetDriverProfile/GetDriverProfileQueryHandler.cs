@@ -23,8 +23,6 @@ internal sealed class GetDriverProfileQueryHandler(
                dp.id AS DriverProfileId,
                dp.approval_status AS ApprovalStatus,
                dp.online_status AS OnlineStatus,
-               dp.citizen_id_number AS CitizenIdNumber,
-               dp.driver_license_number AS DriverLicenseNumber,
                dp.license_front_url AS LicenseFrontUrl,
                dp.license_back_url AS LicenseBackUrl,
                dp.bank_name AS BankName,
@@ -104,7 +102,7 @@ internal sealed class GetDriverProfileQueryHandler(
             ? Math.Round(avg, 2, MidpointRounding.AwayFromZero)
             : (decimal?)null;
 
-        // D2: CCCD photos are the last two documents of the latest version, the one citizen_id_number came from.
+        // D2: CCCD photos are the last two documents of the latest version.
         // Applications sent before D2 have five documents, so both are null.
         var documents = SqlHelpers.ParseJsonList(row.DocumentUrlsJson);
 
@@ -119,8 +117,6 @@ internal sealed class GetDriverProfileQueryHandler(
             row.DriverProfileId,
             row.ApprovalStatus,
             row.OnlineStatus,
-            row.CitizenIdNumber,
-            row.DriverLicenseNumber,
             row.LicenseFrontUrl,
             row.LicenseBackUrl,
             documents.ElementAtOrDefault(5),
@@ -144,8 +140,6 @@ internal sealed class GetDriverProfileQueryHandler(
         public long? DriverProfileId { get; init; }
         public string? ApprovalStatus { get; init; }
         public string? OnlineStatus { get; init; }
-        public string? CitizenIdNumber { get; init; }
-        public string? DriverLicenseNumber { get; init; }
         public string? LicenseFrontUrl { get; init; }
         public string? LicenseBackUrl { get; init; }
         public string? BankName { get; init; }

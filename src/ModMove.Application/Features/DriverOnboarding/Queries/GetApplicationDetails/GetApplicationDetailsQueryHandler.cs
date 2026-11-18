@@ -16,8 +16,6 @@ internal sealed class GetApplicationDetailsQueryHandler(ISqlConnectionFactory co
             u.full_name AS FullName,
             u.phone_number AS PhoneNumber,
             u.email AS Email,
-            da.citizen_id_number AS CitizenIdNumber,
-            da.driver_license_number AS DriverLicenseNumber,
             da.vehicle_type_id AS VehicleTypeId,
             vt.name AS VehicleTypeName,
             da.license_plate AS LicensePlate,
@@ -87,8 +85,6 @@ internal sealed class GetApplicationDetailsQueryHandler(ISqlConnectionFactory co
             row.FullName,
             row.PhoneNumber,
             row.Email,
-            row.CitizenIdNumber,
-            row.DriverLicenseNumber,
             row.VehicleTypeId,
             row.VehicleTypeName,
             row.LicensePlate,
@@ -112,8 +108,6 @@ internal sealed class GetApplicationDetailsQueryHandler(ISqlConnectionFactory co
         public string FullName { get; set; } = "";
         public string PhoneNumber { get; set; } = "";
         public string Email { get; set; } = "";
-        public string? CitizenIdNumber { get; set; }
-        public string? DriverLicenseNumber { get; set; }
         public long VehicleTypeId { get; set; }
         public string VehicleTypeName { get; set; } = "";
         public string LicensePlate { get; set; } = "";

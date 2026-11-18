@@ -27,7 +27,7 @@ internal sealed class TripSetup
         Driver = User.Create("Tài", "0900000003", "tai@x.vn", "h", UserRole.Driver, emailVerified: true);
         Customer.ChangeStatus(status);
         App = TestApp.SignedInAs(Customer, Other, Driver);
-        Profile = DriverProfile.Create(Driver.Id, "001", "B2-001", "front.jpg", "back.jpg");
+        Profile = DriverProfile.Create(Driver.Id, "front.jpg", "back.jpg");
         App.DriverProfiles.Add(Profile);
         Wallet = DriverWallet.Create(Profile.Id);
         Wallet.TopUpDeposit(300_000);

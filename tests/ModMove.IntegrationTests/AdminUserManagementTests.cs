@@ -205,8 +205,8 @@ public class AdminUserManagementTests
     public async Task Locking_active_online_driver_sets_driver_offline()
     {
         var app = new AdminUsersApp();
-        var profile = DriverProfile.Create(app.Driver.Id, "079090000002", "790000000002", "https://cdn/f.jpg", "https://cdn/b.jpg");
-        var app1 = DriverApplication.Create(profile.Id, 1, 1L, "079090000002", "790000000002", "51C-222.22", 1000m,
+        var profile = DriverProfile.Create(app.Driver.Id, "https://cdn/f.jpg", "https://cdn/b.jpg");
+        var app1 = DriverApplication.Create(profile.Id, 1, 1L, "51C-222.22", 1000m,
             ["https://cdn/1.jpg", "https://cdn/2.jpg", "https://cdn/3.jpg", "https://cdn/4.jpg", "https://cdn/5.jpg"], TestApp.Start);
         profile.Submit(app1);
         app1.Approve(app.Admin.Id, TestApp.Start);
@@ -233,7 +233,7 @@ public class AdminUserManagementTests
     public async Task A_driver_with_a_running_order_cannot_be_locked_B8(AccountStatus status)
     {
         var app = new AdminUsersApp();
-        var profile = DriverProfile.Create(app.Driver.Id, "079090000002", "790000000002", "https://cdn/f.jpg", "https://cdn/b.jpg");
+        var profile = DriverProfile.Create(app.Driver.Id, "https://cdn/f.jpg", "https://cdn/b.jpg");
         app.DriverProfiles.Add(profile);
         var order = OrderOf(app.Customer);
         order.Accept(profile.Id, app.Driver.Id, TestApp.Start);

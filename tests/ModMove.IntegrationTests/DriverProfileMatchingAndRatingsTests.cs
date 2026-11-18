@@ -32,8 +32,6 @@ public class DriverProfileMatchingAndRatingsTests
         dt.Columns.Add("DriverProfileId", typeof(long));
         dt.Columns.Add("ApprovalStatus", typeof(string));
         dt.Columns.Add("OnlineStatus", typeof(string));
-        dt.Columns.Add("CitizenIdNumber", typeof(string));
-        dt.Columns.Add("DriverLicenseNumber", typeof(string));
         dt.Columns.Add("LicenseFrontUrl", typeof(string));
         dt.Columns.Add("LicenseBackUrl", typeof(string));
         dt.Columns.Add("BankName", typeof(string));
@@ -59,7 +57,7 @@ public class DriverProfileMatchingAndRatingsTests
 
         dt.Rows.Add(
             driver.Id, "Nguyễn Văn Tài", "0912000001", "driver@x.vn", true, "Active", TestApp.Start.UtcDateTime,
-            10L, "Approved", "Online", "079000000001", "79000001", "https://cdn/f.jpg", "https://cdn/b.jpg",
+            10L, "Approved", "Online", "https://cdn/f.jpg", "https://cdn/b.jpg",
             "Vietcombank", "0071001234567", "NGUYEN VAN TAI",
             20L, 1L, "Xe tải 1 tấn", "51C-123.45", 1000m, 300, 160, 170, "300x160x170",
             "https://cdn/reg.jpg", "https://cdn/ins.jpg", "https://cdn/veh.jpg", "Active",

@@ -21,7 +21,7 @@ public class TopUpDepositTests
         driver.ChangeStatus(status);
         var app = TestApp.SignedInAs(driver);
 
-        var profile = DriverProfile.Create(driver.Id, "079090000001", "790000000001", "front.jpg", "back.jpg");
+        var profile = DriverProfile.Create(driver.Id, "front.jpg", "back.jpg");
         app.DriverProfiles.Add(profile);
         if (approved)
         {

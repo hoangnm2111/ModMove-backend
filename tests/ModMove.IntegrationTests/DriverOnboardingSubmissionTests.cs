@@ -76,7 +76,7 @@ public class DriverOnboardingSubmissionTests
     }
 
     private static SubmitDriverApplicationCommand Command(string plate = "51C-111.22", decimal weight = 900m, long typeId = 1) =>
-        new(typeId, "012345678901", "B2123456789", plate, weight, Docs);
+        new(typeId, plate, weight, Docs);
 
     // ---------- UC-DRV-03: first submission ----------
 
@@ -117,14 +117,12 @@ public class DriverOnboardingSubmissionTests
     }
 
     [Fact]
-    public async Task Duplicate_citizen_id_or_plate_returns_conflict_and_saves_nothing()
+    public async Task Duplicate_plate_returns_conflict_and_saves_nothing()
     {
         var app = new App();
-        app.DuplicatesFound("CitizenIdNumber", "LicensePlate");
+        app.DuplicatesFound("LicensePlate");
 
         var ex = await Assert.ThrowsAsync<ConflictException>(() => app.DriverSender.Send(Command()));
-
-        Assert.Contains("CitizenIdNumber", ex.Message);
         Assert.Contains("LicensePlate", ex.Message);
         Assert.Empty(app.Profiles.Items);
         Assert.Equal(0, app.UnitOfWork.Saves);
@@ -232,7 +230,7 @@ public class DriverOnboardingSubmissionTests
         app.Time.Now = TestApp.Start.AddDays(1);
         var newDocs = Docs.ToArray();
         newDocs[3] = "https://res.cloudinary.com/demo/image/upload/insp-new.jpg";
-        await app.DriverSender.Send(Command() with { DocumentUrls = newDocs, DriverLicenseNumber = "B2999999999" });
+        await app.DriverSender.Send(Command() with { DocumentUrls = newDocs });
 
         Assert.Equal(ApprovalStatus.Pending, profile.ApprovalStatus);
         Assert.Equal(2, profile.Applications.Count);
@@ -242,7 +240,6 @@ public class DriverOnboardingSubmissionTests
         Assert.Equal(ApprovalStatus.Pending, second.ApplicationStatus);
         Assert.Equal("https://res.cloudinary.com/demo/image/upload/insp-new.jpg", second.DocumentUrls[3]);
         Assert.Equal(TestApp.Start.AddDays(1), second.SubmittedAt);
-        Assert.Equal("B2999999999", profile.DriverLicenseNumber);                // credentials follow the latest version
         Assert.Single(app.Profiles.Items);                                       // no second profile
     }
 
@@ -260,12 +257,10 @@ public class DriverOnboardingSubmissionTests
         dt.Columns.Add("VehicleTypeName", typeof(string));
         dt.Columns.Add("LicensePlate", typeof(string));
         dt.Columns.Add("MaxLoadWeightKg", typeof(decimal));
-        dt.Columns.Add("CitizenIdNumber", typeof(string));
-        dt.Columns.Add("DriverLicenseNumber", typeof(string));
         dt.Columns.Add("DocumentUrlsJson", typeof(string));
         dt.Columns.Add("RejectionReasonsJson", typeof(string));
         dt.Rows.Add(7L, 2, status, TestApp.Start, (object?)reviewedAt ?? DBNull.Value, 1L, "Xe tai 1 tan", "51C-111.22", 900m,
-            "012345678901", "B2123456789", JsonSerializer.Serialize(Docs), (object?)reasons ?? DBNull.Value);
+            JsonSerializer.Serialize(Docs), (object?)reasons ?? DBNull.Value);
         return dt;
     }
 
@@ -331,23 +326,18 @@ public class DriverOnboardingSubmissionTests
     }
 
     [Fact]
-    public async Task Submission_without_citizen_id_and_license_number_succeeds_and_skips_null_duplicate_checks()
+    public async Task Submission_has_no_id_numbers_and_the_duplicate_check_looks_only_at_the_plate_D2()
     {
         var app = new App();
         app.NoDuplicates();
 
-        await app.DriverSender.Send(new SubmitDriverApplicationCommand(1, null, "   ", "51c-222.33", 900m, Docs));
+        await app.DriverSender.Send(new SubmitDriverApplicationCommand(1, "51c-222.33", 900m, Docs));
 
-        var profile = Assert.Single(app.Profiles.Items);
-        Assert.Null(profile.CitizenIdNumber);
-        Assert.Null(profile.DriverLicenseNumber);
-        var application = Assert.Single(profile.Applications);
-        Assert.Null(application.CitizenIdNumber);
-        Assert.Null(application.DriverLicenseNumber);
-        Assert.Equal(DBNull.Value, app.Sql.LastParameters["CitizenIdNumber"]);
-        Assert.Equal(DBNull.Value, app.Sql.LastParameters["DriverLicenseNumber"]);
-        Assert.Contains("@CitizenIdNumber IS NOT NULL", app.Sql.LastSql);
-        Assert.Contains("@DriverLicenseNumber IS NOT NULL", app.Sql.LastSql);
+        var application = Assert.Single(Assert.Single(app.Profiles.Items).Applications);
+        Assert.Equal("51C-222.33", application.LicensePlate);
+        Assert.False(app.Sql.LastParameters.ContainsKey("CitizenIdNumber"));
+        Assert.DoesNotContain("citizen_id_number", app.Sql.LastSql);
+        Assert.DoesNotContain("driver_license_number", app.Sql.LastSql);
     }
 
     [Fact]
@@ -367,8 +357,6 @@ public class DriverOnboardingSubmissionTests
         dt.Columns.Add("VehicleTypeName", typeof(string));
         dt.Columns.Add("LicensePlate", typeof(string));
         dt.Columns.Add("MaxLoadWeightKg", typeof(decimal));
-        dt.Columns.Add("CitizenIdNumber", typeof(string));
-        dt.Columns.Add("DriverLicenseNumber", typeof(string));
         dt.Columns.Add("DocumentUrlsJson", typeof(string));
         dt.Columns.Add("RejectionReasonsJson", typeof(string));
         dt.Columns.Add("RejectedItemsJson", typeof(string));
@@ -378,7 +366,7 @@ public class DriverOnboardingSubmissionTests
             new JsonSerializerOptions(JsonSerializerDefaults.Web));
 
         dt.Rows.Add(7L, 1, "Rejected", mysqlUtcWallClock, DBNull.Value, 1L, "Xe tai 1 tan", "51C-111.22", 900m,
-            DBNull.Value, DBNull.Value, JsonSerializer.Serialize(Docs),
+            JsonSerializer.Serialize(Docs),
             JsonSerializer.Serialize(new[] { "Ảnh mờ" }), rejectedItemsJson);
 
         RouteStatusQueries(app, dt);
@@ -387,8 +375,6 @@ public class DriverOnboardingSubmissionTests
 
         Assert.Equal(new DateTimeOffset(2026, 11, 17, 7, 0, 0, TimeSpan.Zero), status.SubmittedAt);
         Assert.Equal(TimeSpan.Zero, status.SubmittedAt!.Value.Offset);
-        Assert.Null(status.CitizenIdNumber);
-        Assert.Null(status.DriverLicenseNumber);
         var rejectedItem = Assert.Single(status.RejectedItems!);
         Assert.Equal((DriverApplicationItemKeys.CitizenIdBack, "Ảnh mờ"), (rejectedItem.Key, rejectedItem.Reason));
     }

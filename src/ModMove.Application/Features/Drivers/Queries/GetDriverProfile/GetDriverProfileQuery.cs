@@ -19,8 +19,6 @@ public sealed record DriverProfileDetailResponse(
     long? DriverProfileId,
     string? ApprovalStatus,
     string? OnlineStatus,
-    string? CitizenIdNumber,
-    string? DriverLicenseNumber,
     string? LicenseFrontUrl,
     string? LicenseBackUrl,
     string? CitizenIdFrontUrl,

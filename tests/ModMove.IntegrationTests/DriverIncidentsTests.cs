@@ -25,7 +25,7 @@ public class DriverIncidentsTests
         customer.SetFcmToken("fcm-cus-10");
         var app = TestApp.SignedInAs(driver, customer);
 
-        var profile = DriverProfile.Create(driver.Id, "079000000010", "79000010", Photo, Photo);
+        var profile = DriverProfile.Create(driver.Id, Photo, Photo);
         app.DriverProfiles.Add(profile);
         profile.Approve(Vehicle.Create(profile.Id, 1, "51C-888.88", 1000, "200x150x150", Photo, Photo, Photo));
         profile.UpdateLocation(10.7950m, 106.7210m, TestApp.Start);

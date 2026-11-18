@@ -12,8 +12,6 @@ public sealed class DriverProfile : BaseAuditableEntity, IAggregateRoot
     private DriverProfile() { }
 
     public long UserId { get; private set; }
-    public string? CitizenIdNumber { get; private set; }
-    public string? DriverLicenseNumber { get; private set; }
     public string LicenseFrontUrl { get; private set; } = null!;
     public string LicenseBackUrl { get; private set; } = null!;
     public ApprovalStatus ApprovalStatus { get; private set; } = ApprovalStatus.Pending;
@@ -28,23 +26,19 @@ public sealed class DriverProfile : BaseAuditableEntity, IAggregateRoot
     public Vehicle? Vehicle { get; private set; }
     public IReadOnlyCollection<DriverApplication> Applications => _applications;
 
-    public static DriverProfile Create(long userId, string? citizenIdNumber, string? driverLicenseNumber, string licenseFrontUrl, string licenseBackUrl) =>
+    public static DriverProfile Create(long userId, string licenseFrontUrl, string licenseBackUrl) =>
         new()
         {
             UserId = userId,
-            CitizenIdNumber = citizenIdNumber,
-            DriverLicenseNumber = driverLicenseNumber,
             LicenseFrontUrl = licenseFrontUrl,
             LicenseBackUrl = licenseBackUrl,
         };
 
     public int NextVersionNumber() => _applications.Count == 0 ? 1 : _applications.Max(a => a.VersionNumber) + 1;
 
-    /// <summary>UC-DRV-05: a resubmission replaces the personal credentials kept on the profile.</summary>
-    public void UpdateCredentials(string? citizenIdNumber, string? driverLicenseNumber, string licenseFrontUrl, string licenseBackUrl)
+    /// <summary>UC-DRV-05: a resubmission replaces the licence photos kept on the profile.</summary>
+    public void UpdateCredentials(string licenseFrontUrl, string licenseBackUrl)
     {
-        CitizenIdNumber = citizenIdNumber;
-        DriverLicenseNumber = driverLicenseNumber;
         LicenseFrontUrl = licenseFrontUrl;
         LicenseBackUrl = licenseBackUrl;
     }
@@ -91,11 +85,28 @@ public sealed class DriverProfile : BaseAuditableEntity, IAggregateRoot
         OnlineStatus = OnlineStatus.Offline;
     }
 
-    public void UpdateLocation(decimal latitude, decimal longitude, DateTimeOffset at)
+    /// <summary>
+    /// DECISIONS B20: a mock location is refused. B19: a point less accurate than 100 m is dropped.
+    /// B21: a point not newer than the saved one (a backlog point sent late) never overwrites it.
+    /// </summary>
+    public LocationUpdateResult UpdateLocation(decimal latitude, decimal longitude, DateTimeOffset at, bool isMocked = false, decimal? accuracyMeters = null)
     {
+        EnsureRealLocation(isMocked);
+        if (accuracyMeters > Constants.BusinessRules.GpsMaxAccuracyMeters)
+            return LocationUpdateResult.Inaccurate;
+        if (at <= LastLocationAt)
+            return LocationUpdateResult.Stale;
         LastLatitude = latitude;
         LastLongitude = longitude;
         LastLocationAt = at;
+        return LocationUpdateResult.Applied;
+    }
+
+    /// <summary>DECISIONS B20: refused before any other check, so the app always learns to turn the mock app off.</summary>
+    public static void EnsureRealLocation(bool isMocked)
+    {
+        if (isMocked)
+            throw new DomainException("Turn off the mock location app to share your position.", "MOCK_LOCATION");
     }
 
     /// <summary>

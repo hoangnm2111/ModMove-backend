@@ -91,27 +91,20 @@ internal sealed class ResubmitDriverApplicationCommandHandler(
         var licensePlateInput = canUpdateVehicle && request.Vehicle?.LicensePlate is { } newPlate ? newPlate : latest.LicensePlate;
         var maxLoadWeightKg = canUpdateVehicle && request.Vehicle?.MaxLoadWeightKg is { } newLoad ? newLoad : latest.MaxLoadWeightKg;
 
-        var canUpdatePersonal = rejectedKeys is null || rejectedKeys.Count == 0 || rejectedKeys.Contains(DriverApplicationItemKeys.PersonalInfo);
-        var rawCitizenId = canUpdatePersonal && request.PersonalInfo is not null ? request.PersonalInfo.CitizenIdNumber : latest.CitizenIdNumber;
-        var rawLicenseNumber = canUpdatePersonal && request.PersonalInfo is not null ? request.PersonalInfo.DriverLicenseNumber : latest.DriverLicenseNumber;
-
         var vehicleType = await DriverApplicationSubmissionHelper.ValidateVehicleTypeAndLoadAsync(
             vehicleTypes, vehicleTypeId, maxLoadWeightKg, cancellationToken);
 
-        var (citizenId, licenseNumber, plate) = DriverApplicationSubmissionHelper.NormalizeCredentials(
-            rawCitizenId, rawLicenseNumber, licensePlateInput);
+        var plate = DriverApplicationSubmissionHelper.NormalizePlate(licensePlateInput);
 
         await DriverApplicationSubmissionHelper.EnsureNoDuplicatesAsync(
-            connectionFactory, user.Id, citizenId, licenseNumber, plate, cancellationToken);
+            connectionFactory, user.Id, plate, cancellationToken);
 
-        profile.UpdateCredentials(citizenId, licenseNumber, urls[0], urls[1]);
+        profile.UpdateCredentials(urls[0], urls[1]);
 
         var application = DriverApplication.Create(
             profile.Id,
             profile.NextVersionNumber(),
             vehicleType.Id,
-            citizenId,
-            licenseNumber,
             plate,
             maxLoadWeightKg,
             urls,

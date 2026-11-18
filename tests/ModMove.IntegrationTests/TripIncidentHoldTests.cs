@@ -37,11 +37,11 @@ public class TripIncidentHoldTests
             Customer = User.Create("Khách", "0909000001", "customer@x.vn", "h:x", UserRole.Customer, emailVerified: true);
             App = TestApp.SignedInAs(Driver, PreviousDriver, Customer);
 
-            Profile = DriverProfile.Create(Driver.Id, "079000000001", "79000001", Photo, Photo);
+            Profile = DriverProfile.Create(Driver.Id, Photo, Photo);
             App.DriverProfiles.Add(Profile);
             Profile.Approve(Vehicle.Create(Profile.Id, 1, "51C-123.45", 1000, "200x150x150", Photo, Photo, Photo));
 
-            PreviousProfile = DriverProfile.Create(PreviousDriver.Id, "079000000002", "79000002", Photo, Photo);
+            PreviousProfile = DriverProfile.Create(PreviousDriver.Id, Photo, Photo);
             App.DriverProfiles.Add(PreviousProfile);
 
             App.Settings.Add(PlatformSetting.Create(SettingKeys.CommissionRate, "0.10", Now));

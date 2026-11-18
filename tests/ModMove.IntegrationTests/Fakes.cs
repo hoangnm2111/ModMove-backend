@@ -177,6 +177,9 @@ internal sealed class InMemoryLocationLogs : IDriverLocationLogRepository
     public Task<int> DeleteRecordedBeforeAsync(DateTimeOffset cutoff, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.RemoveAll(l => l.RecordedAt < cutoff));
 
+    public Task<DateTimeOffset?> GetLastRecordedAtAsync(long orderId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(Items.Where(l => l.OrderId == orderId).Max(l => (DateTimeOffset?)l.RecordedAt));
+
     public Task<DriverLocationLog?> GetByIdAsync(long id, CancellationToken cancellationToken = default) =>
         Task.FromResult(Items.FirstOrDefault(l => l.Id == id));
 

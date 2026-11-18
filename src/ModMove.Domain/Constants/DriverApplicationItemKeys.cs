@@ -14,7 +14,9 @@ public static class DriverApplicationItemKeys
     public const string CitizenIdBack = "CitizenIdBack";
     public const string Portrait = "Portrait";
     public const string VehicleInfo = "VehicleInfo";
-    public const string PersonalInfo = "PersonalInfo";
+
+    /// <summary>Catch-all for an old free-text reason that names no item. Not in <see cref="All"/>: the Administrator cannot pick it and a resubmit ignores it.</summary>
+    public const string Other = "Other";
 
     /// <summary>Maps each document item key to its fixed 0-based position in <c>DriverApplication.DocumentUrls</c> (D2).</summary>
     public static readonly IReadOnlyDictionary<string, int> DocumentIndexByKey =
@@ -31,7 +33,7 @@ public static class DriverApplicationItemKeys
 
     public static readonly IReadOnlySet<string> All =
         new HashSet<string>(
-            DocumentIndexByKey.Keys.Concat([Portrait, VehicleInfo, PersonalInfo]),
+            DocumentIndexByKey.Keys.Concat([Portrait, VehicleInfo]),
             StringComparer.OrdinalIgnoreCase);
 
     private static readonly IReadOnlyDictionary<string, string> Aliases =

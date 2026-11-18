@@ -24,7 +24,7 @@ public class SetOnlineStatusTests
             if (!hasProfile)
                 return;
 
-            Profile = DriverProfile.Create(Driver.Id, "001", "B2-001", "front.jpg", "back.jpg");
+            Profile = DriverProfile.Create(Driver.Id, "front.jpg", "back.jpg");
             if (approved)
                 Profile.Approve(Vehicle.Create(1, 1, "51C-1", 1000, "250x160x160", "r", "i", "p"));
             App.DriverProfiles.Add(Profile);

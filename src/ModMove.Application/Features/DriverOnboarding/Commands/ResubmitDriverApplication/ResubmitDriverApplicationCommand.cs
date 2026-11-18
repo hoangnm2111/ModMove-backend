@@ -9,16 +9,11 @@ public sealed record ResubmitVehicleInfo(
     string? LicensePlate = null,
     decimal? MaxLoadWeightKg = null);
 
-public sealed record ResubmitPersonalInfo(
-    string? CitizenIdNumber = null,
-    string? DriverLicenseNumber = null);
-
 /// <summary>
 /// Resubmits only the rejected parts of a Rejected driver application, merging them with the previously
 /// accepted documents and info to create a new Pending version.
 /// </summary>
 public sealed record ResubmitDriverApplicationCommand(
     IReadOnlyList<ResubmitDocumentItem>? Items = null,
-    ResubmitVehicleInfo? Vehicle = null,
-    ResubmitPersonalInfo? PersonalInfo = null) : ICommand<long>;
+    ResubmitVehicleInfo? Vehicle = null) : ICommand<long>;
 
