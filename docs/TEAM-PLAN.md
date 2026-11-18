@@ -29,6 +29,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 | `Features/Incidents`, `Features/Refunds`, `Controllers/Dispatcher` | Huy | **Dùng chung**: Hiếu thêm use case phía khách, Hoàng thêm use case Admin duyệt; mỗi người chỉ tạo thư mục use case của mình |
 | `Infrastructure/BackgroundJobs` | Hoàng (PAY, MATCH, ORDER), Hiếu (GPS) | Job chỉ gửi Command qua `Sender` |
 | `Domain/Entities`, `Domain/Enums`, `Persistence/Migrations` | Dùng chung | Đổi entity người khác đang dùng: PR riêng, báo nhóm |
+| GPS và bản đồ: action `UpdateLocation` (`POST api/driver/location`) trong `Controllers/Driver/DriverController.cs`; phần GPS của app tài xế; bản đồ realtime của web khách và Dispatcher | Hiếu | **Ngoại lệ** nhóm đồng ý 2026-11-18 (DECISIONS B12, B18–B21). Phần còn lại của `Controllers/Driver` vẫn của Hoàng. Plan: `docs/plans/2026-11-17-gps-tracking-improvements.md` |
 
 ## 3. Nền móng dùng chung (đã xong)
 

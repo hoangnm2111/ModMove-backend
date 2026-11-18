@@ -2,7 +2,7 @@ using ModMove.Domain.Common;
 
 namespace ModMove.Domain.Entities;
 
-/// <summary>GPS point streamed by a driver while Online. Purged after 30 days (JOB-GPS-01).</summary>
+/// <summary>GPS point of a driver who has an order, at most one per minute per order (B12). Purged after 30 days (JOB-GPS-01).</summary>
 public sealed class DriverLocationLog : BaseCreatedEntity, IAggregateRoot
 {
     private DriverLocationLog() { }
