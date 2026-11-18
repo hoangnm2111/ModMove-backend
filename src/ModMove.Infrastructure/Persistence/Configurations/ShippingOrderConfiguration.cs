@@ -33,6 +33,7 @@ internal sealed class ShippingOrderConfiguration : IEntityTypeConfiguration<Ship
 
         builder.HasIndex(o => o.OrderCode).IsUnique();
         builder.HasIndex(o => o.OrderStatus);
+        builder.HasIndex(o => o.CreatedAt); // order code counts the day's orders (9.5); reports filter by date
 
         builder.HasOne<User>().WithMany().HasForeignKey(o => o.CustomerId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<DriverProfile>().WithMany().HasForeignKey(o => o.DriverProfileId).OnDelete(DeleteBehavior.Restrict);

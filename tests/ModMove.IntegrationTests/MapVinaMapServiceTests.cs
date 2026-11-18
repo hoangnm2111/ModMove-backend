@@ -108,6 +108,18 @@ public class MapVinaMapServiceTests
     }
 
     [Fact]
+    public async Task Route_keeps_the_overview_polyline_for_the_driver_map()
+    {
+        var (maps, _) = Create("""
+            {"status":"OK","routes":[{"overview_polyline":{"points":"abc~"},"legs":[{"distance":{"value":1000},"duration":{"value":60}}]}]}
+            """);
+
+        var route = await maps.GetRouteAsync(HoanKiem, CauGiay, CancellationToken.None);
+
+        Assert.Equal(new RouteInfo(1m, 1, "abc~"), route);
+    }
+
+    [Fact]
     public async Task Route_adds_up_every_leg()
     {
         var (maps, _) = Create("""

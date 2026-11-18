@@ -48,7 +48,9 @@ public sealed class MapVinaMapService(HttpClient http, MapVinaOptions options) :
             meters += leg.GetProperty("distance").GetProperty("value").GetDecimal();
             seconds += leg.GetProperty("duration").GetProperty("value").GetDecimal();
         }
-        return new RouteInfo(Math.Round(meters / 1000m, 2, MidpointRounding.AwayFromZero), (int)Math.Ceiling(seconds / 60m));
+        var polyline = routes[0].TryGetProperty("overview_polyline", out var overview) && overview.TryGetProperty("points", out var points)
+            ? points.GetString() : null;
+        return new RouteInfo(Math.Round(meters / 1000m, 2, MidpointRounding.AwayFromZero), (int)Math.Ceiling(seconds / 60m), polyline);
     }
 
     private async Task<JsonDocument> GetAsync(string url, CancellationToken cancellationToken)

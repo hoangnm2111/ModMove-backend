@@ -63,6 +63,15 @@ public class InfrastructureWiringTests
     }
 
     [Fact]
+    public void Refresh_token_cleanup_job_is_registered_JOB_AUTH_01()
+    {
+        var services = new ServiceCollection().AddLogging().AddApplication().AddInfrastructure(Config());
+
+        Assert.Contains(services, d => d.ServiceType == typeof(Microsoft.Extensions.Hosting.IHostedService)
+            && d.ImplementationType == typeof(ModMove.Infrastructure.BackgroundJobs.RefreshTokenCleanupJob));
+    }
+
+    [Fact]
     public void App_starts_without_maps_or_cloudinary_keys()
     {
         var services = new ServiceCollection().AddLogging().AddApplication().AddInfrastructure(Config());
@@ -122,6 +131,7 @@ public class InfrastructureWiringTests
     [InlineData(typeof(ModMove.WebApi.Controllers.Customer.OrdersController), nameof(ModMove.WebApi.Controllers.Customer.OrdersController.GetTracking))]
     [InlineData(typeof(ModMove.WebApi.Controllers.Customer.OrdersController), nameof(ModMove.WebApi.Controllers.Customer.OrdersController.CreatePayment))]
     [InlineData(typeof(ModMove.WebApi.Controllers.Customer.IncidentsController), nameof(ModMove.WebApi.Controllers.Customer.IncidentsController.Report))]
+    [InlineData(typeof(ModMove.WebApi.Controllers.Driver.DriverController), nameof(ModMove.WebApi.Controllers.Driver.DriverController.GetRoute))] // MapVina quota
     public void Costly_customer_endpoints_are_rate_limited_per_user(Type controller, string action) =>
         Assert.Equal(AuthRateLimit.UserPolicy, controller.GetMethod(action)!.GetCustomAttribute<EnableRateLimitingAttribute>()?.PolicyName);
 

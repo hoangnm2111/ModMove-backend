@@ -21,6 +21,7 @@ internal sealed class PaymentTransactionConfiguration : IEntityTypeConfiguration
         builder.Property(p => p.TransactionStatus).IsConcurrencyToken();
 
         builder.HasIndex(p => p.PayosOrderCode).IsUnique();
+        builder.HasIndex(p => p.TransactionStatus); // JOB-PAY-01 scans the Pending ones
 
         builder.HasOne<ShippingOrder>().WithMany().HasForeignKey(p => p.OrderId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<DriverWallet>().WithMany().HasForeignKey(p => p.WalletId).OnDelete(DeleteBehavior.Restrict);

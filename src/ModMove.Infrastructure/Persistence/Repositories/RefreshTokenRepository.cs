@@ -13,4 +13,7 @@ public sealed class RefreshTokenRepository(ApplicationDbContext dbContext)
     public Task RevokeAllForUserAsync(long userId, DateTimeOffset now, CancellationToken cancellationToken = default) =>
         Set.Where(t => t.UserId == userId && t.RevokedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, now), cancellationToken);
+
+    public Task<int> DeleteExpiredAsync(DateTimeOffset now, CancellationToken cancellationToken = default) =>
+        Set.Where(t => t.ExpiresAt <= now).ExecuteDeleteAsync(cancellationToken);
 }

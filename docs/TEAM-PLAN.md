@@ -29,7 +29,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 | `Features/Incidents`, `Features/Refunds`, `Controllers/Dispatcher` | Huy | **Dùng chung**: Hiếu thêm use case phía khách, Hoàng thêm use case Admin duyệt; mỗi người chỉ tạo thư mục use case của mình |
 | `Infrastructure/BackgroundJobs` | Hoàng (PAY, MATCH, ORDER), Hiếu (GPS) | Job chỉ gửi Command qua `Sender` |
 | `Domain/Entities`, `Domain/Enums`, `Persistence/Migrations` | Dùng chung | Đổi entity người khác đang dùng: PR riêng, báo nhóm |
-| GPS và bản đồ: action `UpdateLocation` (`POST api/driver/location`) trong `Controllers/Driver/DriverController.cs`; phần GPS của app tài xế; bản đồ realtime của web khách và Dispatcher | Hiếu | **Ngoại lệ** nhóm đồng ý 2026-11-18 (DECISIONS B12, B18–B21). Phần còn lại của `Controllers/Driver` vẫn của Hoàng. Plan: `docs/plans/2026-11-17-gps-tracking-improvements.md` |
+| GPS và bản đồ: action `UpdateLocation` (`POST api/driver/location`), `GetRoute` (`GET api/driver/route`, query `Features/Drivers/Queries/GetDriverRoute`) trong `Controllers/Driver/DriverController.cs`; phần GPS của app tài xế; bản đồ realtime của web khách và Dispatcher | Hiếu | **Ngoại lệ** nhóm đồng ý 2026-11-18 (DECISIONS B12, B18–B21). Phần còn lại của `Controllers/Driver` vẫn của Hoàng. Plan: `docs/plans/2026-11-17-gps-tracking-improvements.md` |
 | Bỏ nhập số CCCD/GPLX: phần số trong `Features/DriverOnboarding`, `Features/Drivers/Queries/GetDriverProfile`, `Domain/Entities/DriverProfile`, `DriverApplication`; app tài xế; web hồ sơ tài xế và duyệt hồ sơ | Hiếu | **Ngoại lệ** nhóm đồng ý 2026-11-18 (DECISIONS D2). Plan: `docs/plans/2026-11-18-remove-id-numbers.md` |
 
 ## 3. Nền móng dùng chung (đã xong)
@@ -69,6 +69,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [x] Danh mục `api/public/lookups/...`, mã loại hàng và mã lý do khi tạo đơn, hủy, khiếu nại; danh sách coupon cho khách (GST-10, 14, CUS-21, 29)
 - [x] Khách thấy lý do quyết định hoàn tiền (CUS-23); tài xế nhận `INCIDENT_REPORTED`, `RATING_RECEIVED`
 - [x] JOB-GPS-01 (xóa GPS log quá 30 ngày): `GpsLogCleanupJob` chạy mỗi 24 giờ; job của Hoàng kế thừa `PeriodicCommandJob`
+- [ ] JOB-AUTH-01 (xóa refresh token đã hết hạn, giữ token xoay vòng còn hạn để vẫn bắt được token dùng lại, 9.1): `RefreshTokenCleanupJob` chạy mỗi 24 giờ; migration `AddQueryIndexes` thêm index cho đơn theo ngày, rút tiền, PayOS `Pending`, FCM token và `refresh_tokens.expires_at`
 - [x] Tài khoản nhận hoàn tiền (R-01): khai kèm khiếu nại/hoàn sự cố, `PUT api/customer/refunds/{id}/payout-account`, khách xem số đã che, `GET api/public/lookups/banks`, nhắc khi hủy đơn đã trả (`REFUND_BANK_INFO_REQUIRED`), gợi ý tài khoản PayOS (`useSuggested`, `suggestedPayoutAccount`)
 - [ ] Bảng mã lỗi cho frontend trong `api/README.md` đủ cho mọi endpoint (9.4)
 

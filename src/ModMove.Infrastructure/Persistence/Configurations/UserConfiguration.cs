@@ -24,5 +24,6 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.HasIndex(u => u.PhoneNumber).IsUnique(); // GB-01
         builder.HasIndex(u => u.Email).IsUnique();       // GB-01
+        builder.HasIndex(u => u.FcmToken);               // 9.2: a token registered on a new account is cleared from the old one
     }
 }
