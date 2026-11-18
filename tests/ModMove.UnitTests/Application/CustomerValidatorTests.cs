@@ -25,7 +25,6 @@ using ModMove.Application.Features.Refunds.Commands.WithdrawRefund;
 using ModMove.Application.Features.Tracking.Commands.UpdateDriverLocation;
 using ModMove.Application.Features.Tracking.Queries.CanFollowOrder;
 using ModMove.Application.Features.Tracking.Queries.GetOrderTracking;
-using ModMove.Application.Features.Users.Commands.SubmitSupportRequest;
 using ModMove.Application.Features.Users.Commands.UpdateFcmToken;
 using ModMove.Application.Features.Users.Commands.UpdateMyProfile;
 using ModMove.Domain.Enums;
@@ -255,22 +254,6 @@ public class CustomerValidatorTests
     public void Update_profile_checks_name_and_phone_UC_CUS_06(string name, string phone, bool valid)
     {
         var result = new UpdateMyProfileCommandValidator().TestValidate(new UpdateMyProfileCommand(name, phone));
-
-        if (valid) result.ShouldNotHaveAnyValidationErrors();
-        else result.ShouldHaveAnyValidationError();
-    }
-
-    [Theory]
-    [InlineData(100, 100, 1000, true)]
-    [InlineData(101, 100, 1000, false)]
-    [InlineData(100, 101, 1000, false)]
-    [InlineData(100, 100, 1001, false)]
-    [InlineData(0, 100, 1000, false)]
-    [InlineData(100, 100, 0, false)]
-    public void Support_request_limits_UC_GST_05(int nameLength, int contactLength, int contentLength, bool valid)
-    {
-        var command = new SubmitSupportRequestCommand(Chars(nameLength), Chars(contactLength), Chars(contentLength));
-        var result = new SubmitSupportRequestCommandValidator().TestValidate(command);
 
         if (valid) result.ShouldNotHaveAnyValidationErrors();
         else result.ShouldHaveAnyValidationError();

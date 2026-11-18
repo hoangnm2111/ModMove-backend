@@ -654,7 +654,6 @@ internal sealed class TestApp
     public InMemoryOtps Otps { get; } = new();
     public InMemoryOrders Orders { get; } = new();
     public InMemoryRefreshTokens RefreshTokens { get; } = new();
-    public InMemoryRepository<SupportRequest> SupportRequests { get; } = new();
     public InMemoryRefunds Refunds { get; } = new();
     public InMemoryDriverProfiles DriverProfiles { get; } = new();
     public InMemoryDriverWallets DriverWallets { get; } = new();
@@ -698,7 +697,6 @@ internal sealed class TestApp
             .AddSingleton<IOtpRepository>(Otps)
             .AddSingleton<IShippingOrderRepository>(Orders)
             .AddSingleton<IRefreshTokenRepository>(RefreshTokens)
-            .AddSingleton<IRepository<SupportRequest>>(SupportRequests)
             .AddSingleton<IRepository<Refund>>(Refunds)
             .AddSingleton<IRefundRepository>(Refunds)
             .AddSingleton<IDriverProfileRepository>(DriverProfiles)

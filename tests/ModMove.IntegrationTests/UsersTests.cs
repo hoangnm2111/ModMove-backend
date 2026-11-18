@@ -1,7 +1,6 @@
 using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Features.Auth.Commands.Login;
 using ModMove.Application.Features.Users.Commands.DeleteMyAccount;
-using ModMove.Application.Features.Users.Commands.SubmitSupportRequest;
 using ModMove.Application.Features.Users.Commands.UpdateFcmToken;
 using ModMove.Application.Features.Users.Commands.UpdateMyProfile;
 using ModMove.Domain.Entities;
@@ -10,7 +9,7 @@ using ModMove.Domain.Exceptions;
 
 namespace ModMove.IntegrationTests;
 
-/// <summary>Profile, account deletion and support requests through the real pipeline with fakes.</summary>
+/// <summary>Profile and account deletion through the real pipeline with fakes.</summary>
 public class UsersTests
 {
     private static User Customer(string phone = "0900000001") =>
@@ -105,27 +104,6 @@ public class UsersTests
         Assert.Equal("ACCOUNT_HAS_OPEN_REFUNDS", error.Code);
         Assert.Equal(AccountStatus.Active, user.AccountStatus);
         Assert.Equal("device-1", user.FcmToken);
-    }
-
-    [Fact]
-    public async Task Support_request_is_stored_as_new_B14()
-    {
-        var app = new TestApp();
-
-        await app.Sender.Send(new SubmitSupportRequestCommand("An", "0900000009", "Xe tải 1 tấn chở được tủ lạnh không?"));
-
-        var saved = Assert.Single(app.SupportRequests.Items);
-        Assert.Equal(SupportRequestStatus.New, saved.Status);
-        Assert.Equal(1, app.UnitOfWork.Saves);
-    }
-
-    [Fact]
-    public async Task Support_request_longer_than_the_column_is_a_400_not_a_database_error()
-    {
-        var app = new TestApp();
-
-        await Assert.ThrowsAsync<ValidationException>(() =>
-            app.Sender.Send(new SubmitSupportRequestCommand("An", "0900000009", new string('x', 1001))));
     }
 
     [Fact]

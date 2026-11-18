@@ -160,24 +160,6 @@ public class UserAndCouponTests
         Assert.Equal(2, profile.Vehicle.VehicleTypeId);
     }
 
-    [Theory]
-    [InlineData("", "0900000009", "Hỏi giá")]
-    [InlineData("An", " ", "Hỏi giá")]
-    [InlineData("An", "0900000009", "")]
-    public void Support_request_needs_name_contact_and_question_B14(string name, string contact, string content)
-    {
-        Assert.Throws<DomainException>(() => SupportRequest.Submit(name, contact, content));
-    }
-
-    [Fact]
-    public void Support_request_starts_as_new()
-    {
-        var request = SupportRequest.Submit(" An ", "0900000009", "Xe tải 1 tấn chở được tủ lạnh không?");
-
-        Assert.Equal(SupportRequestStatus.New, request.Status);
-        Assert.Equal("An", request.FullName);
-    }
-
     [Fact]
     public void Rating_is_allowed_within_one_day_of_completion_7_5()
     {
