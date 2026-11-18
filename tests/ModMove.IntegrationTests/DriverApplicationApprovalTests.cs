@@ -6,13 +6,16 @@ using ModMove.Application;
 using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
+using ModMove.Application.Features.DriverOnboarding;
 using ModMove.Application.Features.DriverOnboarding.Commands.ApproveDriverApplication;
 using ModMove.Application.Features.DriverOnboarding.Commands.RejectDriverApplication;
 using ModMove.Application.Features.DriverOnboarding.Queries.GetApplicationDetails;
 using ModMove.Application.Features.DriverOnboarding.Queries.GetPendingApplications;
+using ModMove.Domain.Constants;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 using ModMove.Domain.Exceptions;
+using ModMove.Infrastructure.Persistence;
 
 namespace ModMove.IntegrationTests;
 
@@ -318,5 +321,100 @@ public class DriverApplicationApprovalTests
         // Act & Assert: ValidationBehavior rejects empty reasons
         await Assert.ThrowsAsync<ValidationException>(() =>
             app.Sender.Send(new RejectDriverApplicationCommand(10, [])));
+    }
+
+    [Fact]
+    public async Task Admin_queries_return_submittedAt_as_UTC_without_7h_offset_and_structured_rejected_items()
+    {
+        SqlConnectionFactory.EnsureTypeHandlersRegistered();
+        var app = new DriverOnboardingApp();
+        var mysqlUtcWallClock = new DateTime(2026, 11, 17, 7, 0, 0, DateTimeKind.Unspecified); // 14:00 VN
+
+        var detailDt = new DataTable();
+        detailDt.Columns.Add("ApplicationId", typeof(long));
+        detailDt.Columns.Add("DriverProfileId", typeof(long));
+        detailDt.Columns.Add("UserId", typeof(long));
+        detailDt.Columns.Add("FullName", typeof(string));
+        detailDt.Columns.Add("PhoneNumber", typeof(string));
+        detailDt.Columns.Add("Email", typeof(string));
+        detailDt.Columns.Add("CitizenIdNumber", typeof(string));
+        detailDt.Columns.Add("DriverLicenseNumber", typeof(string));
+        detailDt.Columns.Add("VehicleTypeId", typeof(long));
+        detailDt.Columns.Add("VehicleTypeName", typeof(string));
+        detailDt.Columns.Add("LicensePlate", typeof(string));
+        detailDt.Columns.Add("MaxLoadWeightKg", typeof(decimal));
+        detailDt.Columns.Add("VersionNumber", typeof(int));
+        detailDt.Columns.Add("ApplicationStatus", typeof(string));
+        detailDt.Columns.Add("SubmittedAt", typeof(DateTime));
+        detailDt.Columns.Add("ReviewedBy", typeof(long));
+        detailDt.Columns.Add("ReviewedAt", typeof(DateTime));
+        detailDt.Columns.Add("DocumentUrlsJson", typeof(string));
+        detailDt.Columns.Add("RejectionReasonsJson", typeof(string));
+        detailDt.Columns.Add("RejectedItemsJson", typeof(string));
+
+        var rejectedItemsJson = JsonSerializer.Serialize(
+            new[] { new RejectedApplicationItemDto(DriverApplicationItemKeys.VehicleRegistration, "Ảnh đăng ký mờ") },
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        detailDt.Rows.Add(
+            10L, 1L, app.DriverUser.Id, "Nguyễn Văn Lái", "0911222333", "driver@x.vn",
+            DBNull.Value, DBNull.Value, 1L, "Xe tải 1 tấn", "51C-111.22", 1000m,
+            1, "Rejected", mysqlUtcWallClock, app.Admin.Id, mysqlUtcWallClock,
+            JsonSerializer.Serialize(new[] { "a.jpg" }),
+            JsonSerializer.Serialize(new[] { "Ảnh đăng ký mờ" }),
+            rejectedItemsJson);
+
+        var historyDt = new DataTable();
+        historyDt.Columns.Add("ApplicationId", typeof(long));
+        historyDt.Columns.Add("VersionNumber", typeof(int));
+        historyDt.Columns.Add("ApplicationStatus", typeof(string));
+        historyDt.Columns.Add("SubmittedAt", typeof(DateTime));
+        historyDt.Columns.Add("ReviewedAt", typeof(DateTime));
+        historyDt.Columns.Add("RejectionReasonsJson", typeof(string));
+        historyDt.Columns.Add("RejectedItemsJson", typeof(string));
+        historyDt.Rows.Add(10L, 1, "Rejected", mysqlUtcWallClock, mysqlUtcWallClock,
+            JsonSerializer.Serialize(new[] { "Ảnh đăng ký mờ" }), rejectedItemsJson);
+
+        app.Sql.CustomQuery = (sql, _) => sql.Contains("WHERE da.id = @ApplicationId") ? detailDt : historyDt;
+
+        var detail = await app.Sender.Send(new GetApplicationDetailsQuery(10));
+
+        Assert.Equal(new DateTimeOffset(2026, 11, 17, 7, 0, 0, TimeSpan.Zero), detail.SubmittedAt);
+        Assert.Equal(TimeSpan.Zero, detail.SubmittedAt.Offset);
+        Assert.Null(detail.CitizenIdNumber);
+        Assert.Null(detail.DriverLicenseNumber);
+        var item = Assert.Single(detail.RejectedItems!);
+        Assert.Equal((DriverApplicationItemKeys.VehicleRegistration, "Ảnh đăng ký mờ"), (item.Key, item.Reason));
+        Assert.Single(detail.History[0].RejectedItems!);
+    }
+
+    [Fact]
+    public async Task Admin_can_reject_with_structured_rejected_items_only()
+    {
+        var app = new DriverOnboardingApp();
+        var profile = DriverProfile.Create(app.DriverUser.Id, null, null, "front.jpg", "back.jpg");
+        TestIds.Set(profile, 1);
+
+        var application = DriverApplication.Create(
+            profile.Id, 1, 1L, null, null, "51C-999.88", 1000m,
+            ["front.jpg", "back.jpg", "reg.jpg", "insp.jpg", "veh.jpg", "cid-f.jpg", "cid-b.jpg"], TestApp.Start);
+        TestIds.Set(application, 10);
+        profile.Submit(application);
+        app.DriverProfiles.Add(profile);
+
+        await app.Sender.Send(new RejectDriverApplicationCommand(
+            10,
+            RejectedItems:
+            [
+                new("citizenIdFront", "CCCD mặt trước bị mất góc"),
+                new("vehicleInfo", "Sai tải trọng xe"),
+            ]));
+
+        Assert.Equal(ApprovalStatus.Rejected, application.ApplicationStatus);
+        Assert.NotNull(application.RejectedItems);
+        Assert.Equal(2, application.RejectedItems!.Count);
+        Assert.Equal(DriverApplicationItemKeys.CitizenIdFront, application.RejectedItems[0].Key);
+        Assert.Equal(DriverApplicationItemKeys.VehicleInfo, application.RejectedItems[1].Key);
+        Assert.Equal(["CCCD mặt trước bị mất góc", "Sai tải trọng xe"], application.RejectionReasons!);
     }
 }

@@ -62,7 +62,12 @@ builder.Services.PostConfigure<JwtBearerOptions>(JwtBearerDefaults.Authenticatio
 
 // Enums travel as their names ("Pending"), the same form the database stores.
 builder.Services.AddControllers(options => options.Conventions.Add(new RoleConvention()))
-    .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new PayoutRejectionReasonCodeJsonConverter());
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        options.JsonSerializerOptions.Converters.Add(new UtcDateTimeOffsetJsonConverter());
+    })
     // Malformed JSON is rejected by MVC before our pipeline; give it the same shape as every other 400.
     .ConfigureApiBehaviorOptions(options => options.InvalidModelStateResponseFactory = context =>
     {
@@ -98,7 +103,12 @@ builder.Services.AddSwaggerGen(options =>
         }
     });
 });
-builder.Services.AddSignalR();
+builder.Services.AddSignalR()
+    .AddJsonProtocol(options =>
+    {
+        options.PayloadSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+        options.PayloadSerializerOptions.Converters.Add(new UtcDateTimeOffsetJsonConverter());
+    });
 builder.Services.AddSingleton<IRealtimeNotifier, SignalRRealtimeNotifier>();
 builder.Services.AddHealthChecks().AddCheck<DatabaseHealthCheck>("database");
 
@@ -108,6 +118,7 @@ builder.Services.AddCors(options => options.AddPolicy(ClientCorsPolicy, policy =
     .WithOrigins(allowedOrigins)
     .AllowAnyHeader()
     .AllowAnyMethod()
+    .WithExposedHeaders("Content-Disposition")
     .AllowCredentials()));
 
 var app = builder.Build();

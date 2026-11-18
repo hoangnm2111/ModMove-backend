@@ -12,12 +12,12 @@ public sealed class DriverApplication : BaseAuditableEntity
     public long DriverProfileId { get; private set; }
     public int VersionNumber { get; private set; }
     public long VehicleTypeId { get; private set; }
-    public string CitizenIdNumber { get; private set; } = null!;
-    public string DriverLicenseNumber { get; private set; } = null!;
+    public string? CitizenIdNumber { get; private set; }
+    public string? DriverLicenseNumber { get; private set; }
     public string LicensePlate { get; private set; } = null!;
     public decimal MaxLoadWeightKg { get; private set; }
 
-    /// <summary>License front/back, registration, inspection, vehicle photo.</summary>
+    /// <summary>License front/back, registration, inspection, vehicle photo, citizen ID front/back (D2).</summary>
     public List<string> DocumentUrls { get; private set; } = [];
 
     public ApprovalStatus ApplicationStatus { get; private set; } = ApprovalStatus.Pending;
@@ -25,13 +25,16 @@ public sealed class DriverApplication : BaseAuditableEntity
     /// <summary>Reason per rejected item (UC-ADM-09).</summary>
     public List<string>? RejectionReasons { get; private set; }
 
+    /// <summary>Structured rejection reasons keyed by item name (CitizenIdFront, LicenseFront, etc.).</summary>
+    public List<RejectedApplicationItem>? RejectedItems { get; private set; }
+
     public long? ReviewedBy { get; private set; }
     public DateTimeOffset? ReviewedAt { get; private set; }
     public DateTimeOffset SubmittedAt { get; private set; }
 
     public static DriverApplication Create(
-        long driverProfileId, int versionNumber, long vehicleTypeId, string citizenIdNumber,
-        string driverLicenseNumber, string licensePlate, decimal maxLoadWeightKg,
+        long driverProfileId, int versionNumber, long vehicleTypeId, string? citizenIdNumber,
+        string? driverLicenseNumber, string licensePlate, decimal maxLoadWeightKg,
         IEnumerable<string> documentUrls, DateTimeOffset submittedAt) =>
         new()
         {
@@ -54,15 +57,24 @@ public sealed class DriverApplication : BaseAuditableEntity
         ReviewedAt = now;
     }
 
-    public void Reject(long adminId, IEnumerable<string> reasons, DateTimeOffset now)
+    public void Reject(
+        long adminId,
+        IEnumerable<string> reasons,
+        DateTimeOffset now,
+        IEnumerable<RejectedApplicationItem>? rejectedItems = null)
     {
         EnsurePending();
-        var list = reasons.ToList();
-        if (list.Count == 0)
+        var items = rejectedItems?.ToList();
+        var reasonList = reasons.ToList();
+        if (reasonList.Count == 0 && (items is null || items.Count == 0))
             throw new DomainException("A rejection needs at least one reason.");
 
+        if (reasonList.Count == 0 && items is not null)
+            reasonList = items.Select(i => i.Reason).ToList();
+
         ApplicationStatus = ApprovalStatus.Rejected;
-        RejectionReasons = list;
+        RejectionReasons = reasonList;
+        RejectedItems = items is { Count: > 0 } ? items : null;
         ReviewedBy = adminId;
         ReviewedAt = now;
     }

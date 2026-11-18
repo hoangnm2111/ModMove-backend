@@ -170,6 +170,16 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
         RowVersion++;
     }
 
+    /// <summary>Records a wrong bank account notice while the refund is still Requested, keeping it open for the customer to fix.</summary>
+    public void MarkPayoutAccountNeedsUpdate(string reason)
+    {
+        EnsureStatus(RefundStatus.Requested);
+        if (!HasPayoutAccount)
+            throw new WrongBankAccountException("The customer has not given a bank account to receive this refund.");
+        PayoutFailureReason = reason;
+        RowVersion++;
+    }
+
     /// <summary>R-01: Requested/Approved/Failed; Failed goes back to Approved so the Admin can pay again (UC-ADM-18 5a).</summary>
     public void SetPayoutAccount(string bankCode, string bankName, string accountNumber, string accountHolder, DateTimeOffset now)
     {
@@ -183,10 +193,10 @@ public sealed class Refund : BaseAuditableEntity, IAggregateRoot
 
         (PayoutBankCode, PayoutBankName, PayoutAccountNumber, PayoutAccountHolder) = (bankCode, bankName, accountNumber, accountHolder);
         PayoutInfoUpdatedAt = now;
+        PayoutFailureReason = null;
         if (RefundStatus == RefundStatus.Failed)
         {
             RefundStatus = RefundStatus.Approved;
-            PayoutFailureReason = null;
         }
 
         RowVersion++;

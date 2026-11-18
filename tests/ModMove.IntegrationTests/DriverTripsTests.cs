@@ -160,7 +160,7 @@ public class DriverTripsTests
     [Fact]
     public async Task Cash_order_delivery_supports_both_two_step_CollectCash_and_inline_CashCollected_DRV16_DRV17()
     {
-        // Case 1: Receiver cash order without collecting cash first -> 422 CASH_NOT_COLLECTED, then inline CashCollected = true succeeds
+        // Case 1: Receiver cash order without collecting cash first -> 422 CASH_NOT_COLLECTED; after arrive-dropoff, inline CashCollected = true with dropoff coordinates succeeds
         var s1 = new Setup();
         var receiverCashOrder = s1.AcceptedOrder(PaymentMethod.Cash, PayerRole.Receiver);
         receiverCashOrder.ConfirmArrival(s1.Driver.Id, TestApp.Start);
@@ -172,7 +172,17 @@ public class DriverTripsTests
         Assert.Equal("CASH_NOT_COLLECTED", missingCash.Code);
         Assert.Equal(OrderStatus.InTransit, receiverCashOrder.OrderStatus);
 
-        await s1.App.Sender.Send(new DeliverTripCommand(receiverCashOrder.Id, PodPhoto, CashCollected: true));
+        // Must arrive at dropoff and be within 500 m before collecting cash
+        await s1.App.Sender.Send(new NotifyArrivalAtDropoffCommand(receiverCashOrder.Id));
+        Assert.NotNull(receiverCashOrder.ArrivedAtDropoffAt);
+
+        var wrongLocation = await Assert.ThrowsAsync<DomainException>(() =>
+            s1.App.Sender.Send(new CollectCashCommand(receiverCashOrder.Id, receiverCashOrder.PickupLatitude, receiverCashOrder.PickupLongitude)));
+        Assert.Equal("COLLECT_CASH_WRONG_LOCATION", wrongLocation.Code);
+
+        await s1.App.Sender.Send(new DeliverTripCommand(
+            receiverCashOrder.Id, PodPhoto, CashCollected: true,
+            receiverCashOrder.DropoffLatitude, receiverCashOrder.DropoffLongitude));
 
         Assert.Equal(OrderStatus.Delivered, receiverCashOrder.OrderStatus);
         Assert.Equal(PaymentStatus.Paid, receiverCashOrder.PaymentStatus);
@@ -184,13 +194,18 @@ public class DriverTripsTests
             m.EventName == RealtimeEvents.NotificationReceived &&
             ((Notification)m.Payload).Type == "ORDER_DELIVERED");
 
-        // Case 2: Sender cash order collected at Arrived via CollectCashCommand, then delivered with CashCollected = false
+        // Case 2: Sender cash order collected at Arrived within 500 m via CollectCashCommand, duplicate rejected, then delivered with CashCollected = false
         var s2 = new Setup();
         var senderCashOrder = s2.AcceptedOrder(PaymentMethod.Cash, PayerRole.Sender);
         senderCashOrder.ConfirmArrival(s2.Driver.Id, TestApp.Start);
 
-        await s2.App.Sender.Send(new CollectCashCommand(senderCashOrder.Id));
+        await s2.App.Sender.Send(new CollectCashCommand(senderCashOrder.Id, senderCashOrder.PickupLatitude, senderCashOrder.PickupLongitude));
         Assert.Equal(PaymentStatus.Paid, senderCashOrder.PaymentStatus);
+        Assert.Single(s2.App.Payments.Items);
+
+        var duplicate = await Assert.ThrowsAsync<DomainException>(() =>
+            s2.App.Sender.Send(new CollectCashCommand(senderCashOrder.Id, senderCashOrder.PickupLatitude, senderCashOrder.PickupLongitude)));
+        Assert.Equal("ORDER_ALREADY_PAID", duplicate.Code);
         Assert.Single(s2.App.Payments.Items);
 
         senderCashOrder.ConfirmPickup([Photo1, Photo2], s2.Driver.Id, TestApp.Start);

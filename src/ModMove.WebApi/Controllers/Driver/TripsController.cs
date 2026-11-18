@@ -60,11 +60,12 @@ public sealed class TripsController : ApiControllerBase
         return NoContent();
     }
 
-    /// <summary>Confirm cash collection on a Cash order (UC-DRV-17): from Arrived when Sender pays, or InTransit when Receiver pays.</summary>
+    /// <summary>Confirm cash collection on a Cash order (UC-DRV-17): at pickup (Arrived/PickedUp) when Sender pays, or at drop-off (InTransit after arrive-dropoff) when Receiver pays, within 500 m.</summary>
     [HttpPost("{id:long}/collect-cash")]
-    public async Task<IActionResult> CollectCash(long id, CancellationToken cancellationToken)
+    public async Task<IActionResult> CollectCash(
+        long id, CollectCashRequest request, CancellationToken cancellationToken)
     {
-        await Sender.Send(new CollectCashCommand(id), cancellationToken);
+        await Sender.Send(new CollectCashCommand(id, request.Latitude, request.Longitude), cancellationToken);
         return NoContent();
     }
 
@@ -73,7 +74,7 @@ public sealed class TripsController : ApiControllerBase
     public async Task<IActionResult> Deliver(
         long id, DeliverTripRequest request, CancellationToken cancellationToken)
     {
-        await Sender.Send(new DeliverTripCommand(id, request.DeliveryPhotoUrl, request.CashCollected), cancellationToken);
+        await Sender.Send(new DeliverTripCommand(id, request.DeliveryPhotoUrl, request.CashCollected, request.Latitude, request.Longitude), cancellationToken);
         return NoContent();
     }
 }

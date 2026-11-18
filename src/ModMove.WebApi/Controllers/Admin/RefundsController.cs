@@ -38,12 +38,13 @@ public sealed class RefundsController : ApiControllerBase
         return NoContent();
     }
 
-    /// <summary>UC-ADM-19 (DECISIONS CUS-23): reject a refund request with an optional note visible to the customer.</summary>
+    /// <summary>UC-ADM-19 (DECISIONS CUS-23): reject a refund request or flag a wrong bank account for customer update.</summary>
     [HttpPost("{id:long}/reject")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Reject(long id, RejectRefundRequest? body, CancellationToken cancellationToken)
     {
-        await Sender.Send(new RejectRefundCommand(id, body?.Note), cancellationToken);
+        var effectiveNote = string.IsNullOrWhiteSpace(body?.Note) ? body?.Reason : body?.Note;
+        await Sender.Send(new RejectRefundCommand(id, effectiveNote, body?.ReasonCode), cancellationToken);
         return NoContent();
     }
 

@@ -31,4 +31,5 @@ public static class BusinessRules
     public static readonly TimeSpan ComplaintWindow = TimeSpan.FromHours(24);        // GB-18
     public static readonly TimeSpan GpsLogRetention = TimeSpan.FromDays(30);         // JOB-GPS-01
     public static readonly TimeSpan GpsDisconnectAfter = TimeSpan.FromMinutes(5);    // DECISIONS 6.4, GB-39: no GPS for this long = disconnected
+    public const double ArrivalRadiusMeters = 500.0;                                 // Cash collection location check radius (500 m)
 }

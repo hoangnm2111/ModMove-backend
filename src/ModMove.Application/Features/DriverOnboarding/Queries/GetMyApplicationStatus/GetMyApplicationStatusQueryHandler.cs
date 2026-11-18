@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Dapper;
 using ModMove.Application.Common;
 using ModMove.Application.Common.Exceptions;
@@ -21,7 +20,8 @@ internal sealed class GetMyApplicationStatusQueryHandler(ISqlConnectionFactory c
                da.vehicle_type_id AS VehicleTypeId, vt.name AS VehicleTypeName,
                da.license_plate AS LicensePlate, da.max_load_weight_kg AS MaxLoadWeightKg,
                da.citizen_id_number AS CitizenIdNumber, da.driver_license_number AS DriverLicenseNumber,
-               da.document_urls AS DocumentUrlsJson, da.rejection_reasons AS RejectionReasonsJson
+               da.document_urls AS DocumentUrlsJson, da.rejection_reasons AS RejectionReasonsJson,
+               da.rejected_items AS RejectedItemsJson
         FROM driver_applications da
         JOIN driver_profiles dp ON dp.id = da.driver_profile_id
         JOIN vehicle_types vt ON vt.id = da.vehicle_type_id
@@ -45,11 +45,14 @@ internal sealed class GetMyApplicationStatusQueryHandler(ISqlConnectionFactory c
             new CommandDefinition(LatestSql, new { UserId = userId }, cancellationToken: cancellationToken));
 
         if (row is null)
-            return new DriverOnboardingStatusResponse(false, true, null, null, null, null, null, null, null, null, null, null, null, [], null);
+            return new DriverOnboardingStatusResponse(false, true, null, null, null, null, null, null, null, null, null, null, null, [], null, null);
+
+        var isRejected = row.ApplicationStatus == nameof(ApprovalStatus.Rejected);
+        var rejectionReasons = isRejected ? DriverOnboardingJson.ParseNullableList(row.RejectionReasonsJson) : null;
 
         return new DriverOnboardingStatusResponse(
             HasApplication: true,
-            CanSubmit: row.ApplicationStatus == nameof(ApprovalStatus.Rejected),
+            CanSubmit: isRejected,
             ProfileApprovalStatus: row.ApplicationStatus,
             ApplicationId: row.ApplicationId,
             LatestVersionNumber: row.VersionNumber,
@@ -61,22 +64,9 @@ internal sealed class GetMyApplicationStatusQueryHandler(ISqlConnectionFactory c
             MaxLoadWeightKg: row.MaxLoadWeightKg,
             CitizenIdNumber: row.CitizenIdNumber,
             DriverLicenseNumber: row.DriverLicenseNumber,
-            DocumentUrls: ParseList(row.DocumentUrlsJson) ?? [],
-            RejectionReasons: row.ApplicationStatus == nameof(ApprovalStatus.Rejected) ? ParseList(row.RejectionReasonsJson) : null);
-    }
-
-    private static List<string>? ParseList(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-            return null;
-        try
-        {
-            return JsonSerializer.Deserialize<List<string>>(json);
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
+            DocumentUrls: DriverOnboardingJson.ParseList(row.DocumentUrlsJson),
+            RejectionReasons: rejectionReasons,
+            RejectedItems: isRejected ? DriverOnboardingJson.ParseRejectedItems(row.RejectedItemsJson, rejectionReasons) : null);
     }
 
     private sealed class Row
@@ -90,10 +80,11 @@ internal sealed class GetMyApplicationStatusQueryHandler(ISqlConnectionFactory c
         public string VehicleTypeName { get; set; } = "";
         public string LicensePlate { get; set; } = "";
         public decimal MaxLoadWeightKg { get; set; }
-        public string CitizenIdNumber { get; set; } = "";
-        public string DriverLicenseNumber { get; set; } = "";
+        public string? CitizenIdNumber { get; set; }
+        public string? DriverLicenseNumber { get; set; }
         public string? DocumentUrlsJson { get; set; }
         public string? RejectionReasonsJson { get; set; }
+        public string? RejectedItemsJson { get; set; }
     }
 }
 

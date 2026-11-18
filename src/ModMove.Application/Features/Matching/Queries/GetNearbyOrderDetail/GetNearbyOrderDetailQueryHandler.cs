@@ -8,6 +8,7 @@ using ModMove.Domain.Constants;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 using ModMove.Domain.Exceptions;
+using ModMove.Domain.Services;
 
 namespace ModMove.Application.Features.Matching.Queries.GetNearbyOrderDetail;
 

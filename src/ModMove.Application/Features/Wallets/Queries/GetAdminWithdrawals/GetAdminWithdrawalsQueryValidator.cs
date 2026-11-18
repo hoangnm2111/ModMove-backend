@@ -15,7 +15,7 @@ internal sealed class GetAdminWithdrawalsQueryValidator : AbstractValidator<GetA
 
         RuleFor(x => x.Status)
             .Must(s => s is null || Enum.TryParse<WalletTransactionStatus>(s, ignoreCase: true, out _))
-            .WithMessage("Trạng thái giao dịch rút tiền không hợp lệ (Pending, Completed, Rejected).");
+            .WithMessage("Trạng thái giao dịch rút tiền không hợp lệ (Pending, Completed, Failed, Rejected).");
     }
 }
 

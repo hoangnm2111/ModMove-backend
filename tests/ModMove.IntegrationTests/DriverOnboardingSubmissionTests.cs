@@ -6,12 +6,16 @@ using ModMove.Application;
 using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
+using ModMove.Application.Features.DriverOnboarding;
 using ModMove.Application.Features.DriverOnboarding.Commands.RejectDriverApplication;
+using ModMove.Application.Features.DriverOnboarding.Commands.ResubmitDriverApplication;
 using ModMove.Application.Features.DriverOnboarding.Commands.SubmitDriverApplication;
 using ModMove.Application.Features.DriverOnboarding.Queries.GetMyApplicationStatus;
+using ModMove.Domain.Constants;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 using ModMove.Domain.Exceptions;
+using ModMove.Infrastructure.Persistence;
 
 namespace ModMove.IntegrationTests;
 
@@ -324,6 +328,133 @@ public class DriverOnboardingSubmissionTests
 
         var ex = await Assert.ThrowsAsync<ForbiddenAccessException>(() => app.DriverSender.Send(new GetMyApplicationStatusQuery()));
         Assert.Equal("ACCOUNT_INACTIVE", ex.Code);
+    }
+
+    [Fact]
+    public async Task Submission_without_citizen_id_and_license_number_succeeds_and_skips_null_duplicate_checks()
+    {
+        var app = new App();
+        app.NoDuplicates();
+
+        await app.DriverSender.Send(new SubmitDriverApplicationCommand(1, null, "   ", "51c-222.33", 900m, Docs));
+
+        var profile = Assert.Single(app.Profiles.Items);
+        Assert.Null(profile.CitizenIdNumber);
+        Assert.Null(profile.DriverLicenseNumber);
+        var application = Assert.Single(profile.Applications);
+        Assert.Null(application.CitizenIdNumber);
+        Assert.Null(application.DriverLicenseNumber);
+        Assert.Equal(DBNull.Value, app.Sql.LastParameters["CitizenIdNumber"]);
+        Assert.Equal(DBNull.Value, app.Sql.LastParameters["DriverLicenseNumber"]);
+        Assert.Contains("@CitizenIdNumber IS NOT NULL", app.Sql.LastSql);
+        Assert.Contains("@DriverLicenseNumber IS NOT NULL", app.Sql.LastSql);
+    }
+
+    [Fact]
+    public async Task Status_submittedAt_from_unspecified_mysql_datetime_returns_UTC_without_7h_shift()
+    {
+        SqlConnectionFactory.EnsureTypeHandlersRegistered();
+        var app = new App();
+        var mysqlUtcWallClock = new DateTime(2026, 11, 17, 7, 0, 0, DateTimeKind.Unspecified); // 14:00 VN stored as 07:00 UTC
+
+        var dt = new DataTable();
+        dt.Columns.Add("ApplicationId", typeof(long));
+        dt.Columns.Add("VersionNumber", typeof(int));
+        dt.Columns.Add("ApplicationStatus", typeof(string));
+        dt.Columns.Add("SubmittedAt", typeof(DateTime));
+        dt.Columns.Add("ReviewedAt", typeof(DateTime));
+        dt.Columns.Add("VehicleTypeId", typeof(long));
+        dt.Columns.Add("VehicleTypeName", typeof(string));
+        dt.Columns.Add("LicensePlate", typeof(string));
+        dt.Columns.Add("MaxLoadWeightKg", typeof(decimal));
+        dt.Columns.Add("CitizenIdNumber", typeof(string));
+        dt.Columns.Add("DriverLicenseNumber", typeof(string));
+        dt.Columns.Add("DocumentUrlsJson", typeof(string));
+        dt.Columns.Add("RejectionReasonsJson", typeof(string));
+        dt.Columns.Add("RejectedItemsJson", typeof(string));
+
+        var rejectedItemsJson = JsonSerializer.Serialize(
+            new[] { new RejectedApplicationItemDto(DriverApplicationItemKeys.CitizenIdBack, "Ảnh mờ") },
+            new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        dt.Rows.Add(7L, 1, "Rejected", mysqlUtcWallClock, DBNull.Value, 1L, "Xe tai 1 tan", "51C-111.22", 900m,
+            DBNull.Value, DBNull.Value, JsonSerializer.Serialize(Docs),
+            JsonSerializer.Serialize(new[] { "Ảnh mờ" }), rejectedItemsJson);
+
+        RouteStatusQueries(app, dt);
+
+        var status = await app.DriverSender.Send(new GetMyApplicationStatusQuery());
+
+        Assert.Equal(new DateTimeOffset(2026, 11, 17, 7, 0, 0, TimeSpan.Zero), status.SubmittedAt);
+        Assert.Equal(TimeSpan.Zero, status.SubmittedAt!.Value.Offset);
+        Assert.Null(status.CitizenIdNumber);
+        Assert.Null(status.DriverLicenseNumber);
+        var rejectedItem = Assert.Single(status.RejectedItems!);
+        Assert.Equal((DriverApplicationItemKeys.CitizenIdBack, "Ảnh mờ"), (rejectedItem.Key, rejectedItem.Reason));
+    }
+
+    [Fact]
+    public async Task Resubmit_rejected_items_merges_with_accepted_docs_and_resets_rejection_reasons()
+    {
+        var app = new App();
+        app.NoDuplicates();
+        await app.DriverSender.Send(Command());
+        var profile = app.Profiles.Items[0];
+        var v1 = profile.Applications.Single();
+        TestIds.Set(v1, 10);
+
+        var adminSender = new ServiceCollection()
+            .AddLogging().AddApplication()
+            .AddSingleton<IUserRepository>(new InMemoryUsers(app.Admin, app.DriverUser))
+            .AddSingleton<IDriverProfileRepository>(app.Profiles)
+            .AddSingleton<IUnitOfWork>(app.UnitOfWork)
+            .AddSingleton<ICurrentUserService>(new FakeCurrentUser(app.Admin.Id))
+            .AddSingleton<TimeProvider>(app.Time)
+            .BuildServiceProvider().GetRequiredService<ISender>();
+
+        await adminSender.Send(new RejectDriverApplicationCommand(
+            10,
+            RejectedItems:
+            [
+                new(DriverApplicationItemKeys.LicenseFront, "Ảnh GPLX mờ"),
+                new(DriverApplicationItemKeys.CitizenIdBack, "CCCD mặt sau bị chói"),
+            ]));
+
+        Assert.Equal(ApprovalStatus.Rejected, profile.ApprovalStatus);
+        Assert.Equal(2, v1.RejectedItems!.Count);
+
+        // Missing one rejected item -> RESUBMIT_MISSING_REJECTED_ITEMS
+        var missingErr = await Assert.ThrowsAsync<DomainException>(() => app.DriverSender.Send(
+            new ResubmitDriverApplicationCommand(
+                [new(DriverApplicationItemKeys.LicenseFront, "https://res.cloudinary.com/demo/image/upload/new-lic-front.jpg")])));
+        Assert.Equal("RESUBMIT_MISSING_REJECTED_ITEMS", missingErr.Code);
+
+        // Submit the 2 rejected items (+ an extra non-rejected item that should be ignored)
+        app.Time.Now = TestApp.Start.AddHours(6);
+        await app.DriverSender.Send(new ResubmitDriverApplicationCommand(
+        [
+            new(DriverApplicationItemKeys.LicenseFront, "https://res.cloudinary.com/demo/image/upload/new-lic-front.jpg"),
+            new(DriverApplicationItemKeys.CitizenIdBack, "https://res.cloudinary.com/demo/image/upload/new-cccd-back.jpg"),
+            new(DriverApplicationItemKeys.VehiclePhoto, "https://res.cloudinary.com/demo/image/upload/ignored.jpg"),
+        ]));
+
+        Assert.Equal(ApprovalStatus.Pending, profile.ApprovalStatus);
+        Assert.Equal(2, profile.Applications.Count);
+        var v2 = profile.Applications.Single(a => a.VersionNumber == 2);
+        Assert.Equal(ApprovalStatus.Pending, v2.ApplicationStatus);
+        Assert.Null(v2.RejectedItems);
+        Assert.Null(v2.RejectionReasons);
+        Assert.Equal(7, v2.DocumentUrls.Count);
+        Assert.Equal("https://res.cloudinary.com/demo/image/upload/new-lic-front.jpg", v2.DocumentUrls[0]);
+        Assert.Equal(Docs[4], v2.DocumentUrls[4]); // non-rejected photo preserved!
+        Assert.Equal("https://res.cloudinary.com/demo/image/upload/new-cccd-back.jpg", v2.DocumentUrls[6]);
+        Assert.Equal(TestApp.Start.AddHours(6), v2.SubmittedAt);
+
+        // Cannot resubmit again while Pending
+        var notEditable = await Assert.ThrowsAsync<DomainException>(() => app.DriverSender.Send(
+            new ResubmitDriverApplicationCommand(
+                [new(DriverApplicationItemKeys.LicenseFront, "https://res.cloudinary.com/demo/image/upload/x.jpg")])));
+        Assert.Equal("APPLICATION_NOT_EDITABLE", notEditable.Code);
     }
 }
 

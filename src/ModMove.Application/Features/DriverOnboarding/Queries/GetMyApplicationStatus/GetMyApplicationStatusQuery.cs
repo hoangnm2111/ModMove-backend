@@ -25,5 +25,6 @@ public sealed record DriverOnboardingStatusResponse(
     string? CitizenIdNumber,
     string? DriverLicenseNumber,
     IReadOnlyList<string> DocumentUrls,
-    IReadOnlyList<string>? RejectionReasons);
+    IReadOnlyList<string>? RejectionReasons,
+    IReadOnlyList<RejectedApplicationItemDto>? RejectedItems = null);
 

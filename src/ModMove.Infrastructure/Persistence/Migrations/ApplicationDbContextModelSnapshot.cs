@@ -168,7 +168,6 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnName("application_status");
 
                     b.Property<string>("CitizenIdNumber")
-                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)")
                         .HasColumnName("citizen_id_number");
@@ -183,7 +182,6 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnName("document_urls");
 
                     b.Property<string>("DriverLicenseNumber")
-                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)")
                         .HasColumnName("driver_license_number");
@@ -202,6 +200,10 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasPrecision(8, 2)
                         .HasColumnType("decimal(8,2)")
                         .HasColumnName("max_load_weight_kg");
+
+                    b.Property<string>("RejectedItems")
+                        .HasColumnType("json")
+                        .HasColumnName("rejected_items");
 
                     b.Property<string>("RejectionReasons")
                         .HasColumnType("json")
@@ -320,7 +322,6 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnName("bank_name");
 
                     b.Property<string>("CitizenIdNumber")
-                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)")
                         .HasColumnName("citizen_id_number");
@@ -330,7 +331,6 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnName("created_at");
 
                     b.Property<string>("DriverLicenseNumber")
-                        .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("varchar(20)")
                         .HasColumnName("driver_license_number");
@@ -1168,6 +1168,10 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("AcceptedAt")
                         .HasColumnType("datetime(6)")
                         .HasColumnName("accepted_at");
+
+                    b.Property<DateTimeOffset?>("ArrivedAtDropoffAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("arrived_at_dropoff_at");
 
                     b.Property<string>("CancellationReason")
                         .HasMaxLength(500)

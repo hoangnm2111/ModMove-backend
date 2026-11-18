@@ -66,4 +66,11 @@ public sealed class WalletTransaction : BaseAuditableEntity
         ProcessedBy = adminId;
         ProcessedAt = now;
     }
+
+    internal void Fail(long adminId, DateTimeOffset now)
+    {
+        TransactionStatus = WalletTransactionStatus.Failed;
+        ProcessedBy = adminId;
+        ProcessedAt = now;
+    }
 }
