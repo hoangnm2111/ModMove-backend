@@ -188,13 +188,23 @@ public sealed class DriverWallet : BaseAuditableEntity, IAggregateRoot
     /// <summary>
     /// UC-ADM-24, GB-32: each held part goes back to the balance it came from (never all into earnings), then the deposit is refilled
     /// if it ended up below <paramref name="requiredDeposit"/> while earnings are above 0.
+    /// When <paramref name="wrongBankAccount"/> is true, the transaction enters <see cref="WalletTransactionStatus.Failed"/>
+    /// so the driver updates their bank account and submits a new withdrawal.
     /// </summary>
-    public void RejectWithdrawal(WalletTransaction withdrawal, long adminId, DateTimeOffset now, decimal requiredDeposit = 200_000m)
+    public void RejectWithdrawal(
+        WalletTransaction withdrawal,
+        long adminId,
+        DateTimeOffset now,
+        decimal requiredDeposit = 200_000m,
+        bool wrongBankAccount = false)
     {
         EnsurePendingWithdrawal(withdrawal);
         EarningsBalance += withdrawal.EarningsAmount;
         DepositBalance += withdrawal.DepositAmount;
-        withdrawal.Reject(adminId, now);
+        if (wrongBankAccount)
+            withdrawal.Fail(adminId, now);
+        else
+            withdrawal.Reject(adminId, now);
         RowVersion++;
         RefillDepositFromEarnings(requiredDeposit);
     }

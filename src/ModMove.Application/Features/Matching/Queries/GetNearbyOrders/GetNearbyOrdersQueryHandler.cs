@@ -6,6 +6,7 @@ using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
 using ModMove.Domain.Constants;
 using ModMove.Domain.Enums;
+using ModMove.Domain.Services;
 
 namespace ModMove.Application.Features.Matching.Queries.GetNearbyOrders;
 

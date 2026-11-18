@@ -10,12 +10,13 @@ internal sealed class DriverApplicationConfiguration : IEntityTypeConfiguration<
     public void Configure(EntityTypeBuilder<DriverApplication> builder)
     {
         builder.ToTable("driver_applications");
-        builder.Property(a => a.CitizenIdNumber).HasMaxLength(20);
-        builder.Property(a => a.DriverLicenseNumber).HasMaxLength(20);
+        builder.Property(a => a.CitizenIdNumber).HasMaxLength(20).IsRequired(false);
+        builder.Property(a => a.DriverLicenseNumber).HasMaxLength(20).IsRequired(false);
         builder.Property(a => a.LicensePlate).HasMaxLength(15);
         builder.Property(a => a.MaxLoadWeightKg).HasPrecision(8, 2);
         builder.Property(a => a.DocumentUrls).HasJsonList();
         builder.Property(a => a.RejectionReasons).HasJsonList();
+        builder.Property(a => a.RejectedItems).HasJsonList<RejectedApplicationItem>();
         // Two Administrators approving and rejecting the same application at once: the later save is a 409.
         builder.Property(a => a.ApplicationStatus).IsConcurrencyToken();
 

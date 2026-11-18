@@ -12,11 +12,15 @@ internal sealed class SubmitDriverApplicationCommandValidator : AbstractValidato
     {
         RuleFor(x => x.VehicleTypeId).GreaterThan(0);
 
-        RuleFor(x => x.CitizenIdNumber).NotEmpty().Matches("^[0-9]{9,12}$")
-            .WithMessage("Citizen ID must be 9 to 12 digits.");
+        RuleFor(x => x.CitizenIdNumber)
+            .Must(v => System.Text.RegularExpressions.Regex.IsMatch(v!.Trim(), "^[0-9]{9,12}$"))
+            .WithMessage("Citizen ID must be 9 to 12 digits.")
+            .When(x => !string.IsNullOrWhiteSpace(x.CitizenIdNumber));
 
-        RuleFor(x => x.DriverLicenseNumber).NotEmpty().Matches("^[0-9A-Za-z]{8,20}$")
-            .WithMessage("Driver licence number must be 8 to 20 letters or digits.");
+        RuleFor(x => x.DriverLicenseNumber)
+            .Must(v => System.Text.RegularExpressions.Regex.IsMatch(v!.Trim(), "^[0-9A-Za-z]{8,20}$"))
+            .WithMessage("Driver licence number must be 8 to 20 letters or digits.")
+            .When(x => !string.IsNullOrWhiteSpace(x.DriverLicenseNumber));
 
         RuleFor(x => x.LicensePlate).NotEmpty().MaximumLength(15).Matches(@"^[0-9A-Za-z.\- ]{5,15}$")
             .WithMessage("License plate has an invalid format.");

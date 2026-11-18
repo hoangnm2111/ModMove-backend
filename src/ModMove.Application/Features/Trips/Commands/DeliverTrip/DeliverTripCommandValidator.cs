@@ -12,6 +12,15 @@ internal sealed class DeliverTripCommandValidator : AbstractValidator<DeliverTri
             .NotEmpty()
             .Must(url => !string.IsNullOrWhiteSpace(url) && storage.IsOwnedUrl(url))
             .WithMessage("Upload the proof-of-delivery photo through POST api/driver/uploads first.");
+        RuleFor(x => x.Latitude)
+            .InclusiveBetween(-90m, 90m)
+            .When(x => x.Latitude is not null);
+        RuleFor(x => x.Longitude)
+            .InclusiveBetween(-180m, 180m)
+            .When(x => x.Longitude is not null);
+        RuleFor(x => x)
+            .Must(x => (x.Latitude is null) == (x.Longitude is null))
+            .WithMessage("Provide both latitude and longitude or neither.");
     }
 }
 

@@ -58,7 +58,7 @@ internal sealed class RefundRow
         : new PayoutAccountView(PayoutBankCode ?? "", PayoutBankName ?? "", PayoutAccountView.Mask(PayoutAccountNumber), PayoutAccountHolder ?? "");
 
     /// <summary>A Dispatcher's proposal is not final; the customer sees an amount once an Administrator approved it.</summary>
-    public decimal? ApprovedAmount => RefundStatus is "Approved" or "Processed" ? ProposedAmount : null;
+    public decimal? ApprovedAmount => RefundStatus is "Approved" or "Processed" or "Failed" ? ProposedAmount : null;
 
     public bool WaitingForReply => RefundStatus == "Requested" && InfoRequestNote is not null && CustomerReply is null;
 }

@@ -1,9 +1,9 @@
 using System.Globalization;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
-using ModMove.Application.Features.Matching;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
+using ModMove.Domain.Services;
 
 namespace ModMove.Application.Common.Notifications;
 
@@ -279,7 +279,7 @@ public static class DriverNotifications
             cancellationToken);
     }
 
-    /// <summary>Sends <c>WITHDRAWAL_DECIDED</c> when an Administrator rejects a withdrawal request (Table 8.3).</summary>
+    /// <summary>Sends <c>WITHDRAWAL_DECIDED</c> when an Administrator rejects or fails a withdrawal request (Table 8.3).</summary>
     public static Task NotifyWithdrawalRejectedAsync(
         this INotificationService notifications,
         long driverUserId,
@@ -288,7 +288,8 @@ public static class DriverNotifications
         decimal amount,
         string status,
         string? reason,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool wrongBankAccount = false)
     {
         var reasonText = string.IsNullOrWhiteSpace(reason)
             ? string.Empty
@@ -300,14 +301,17 @@ public static class DriverNotifications
             ["walletId"] = walletId.ToString(CultureInfo.InvariantCulture),
             ["status"] = status,
         };
+        if (wrongBankAccount)
+            data["reasonCode"] = "WRONG_BANK_ACCOUNT";
+
+        var title = wrongBankAccount ? "Sai thông tin tài khoản rút tiền" : "Yêu cầu rút tiền bị từ chối";
+        var body = wrongBankAccount
+            ? $"Yêu cầu rút {amount:N0} VND không thể thực hiện do sai thông tin tài khoản nhận. Số tiền đã được hoàn lại vào ví, vui lòng cập nhật lại tài khoản ngân hàng.{reasonText}"
+            : $"Yêu cầu rút {amount:N0} VND đã bị từ chối và số tiền đã được hoàn lại vào ví.{reasonText}";
 
         return notifications.NotifyAsync(
             driverUserId,
-            new Notification(
-                WithdrawalDecidedType,
-                "Yêu cầu rút tiền bị từ chối",
-                $"Yêu cầu rút {amount:N0} VND đã bị từ chối và số tiền đã được hoàn lại vào ví.{reasonText}",
-                data),
+            new Notification(WithdrawalDecidedType, title, body, data),
             cancellationToken);
     }
 }

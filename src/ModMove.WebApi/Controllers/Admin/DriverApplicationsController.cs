@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using ModMove.Application.Common.Models;
+using ModMove.Application.Features.DriverOnboarding;
 using ModMove.Application.Features.DriverOnboarding.Commands.ApproveDriverApplication;
 using ModMove.Application.Features.DriverOnboarding.Commands.RejectDriverApplication;
 using ModMove.Application.Features.DriverOnboarding.Queries.GetApplicationDetails;
@@ -30,13 +31,15 @@ public sealed class DriverApplicationsController : ApiControllerBase
         return NoContent();
     }
 
-    /// <summary>UC-ADM-09: reject driver application with reason per item.</summary>
+    /// <summary>UC-ADM-09: reject driver application with structured rejected items and/or legacy reasons.</summary>
     [HttpPost("{id:long}/reject")]
     public async Task<IActionResult> Reject(long id, RejectDriverApplicationRequest body, CancellationToken cancellationToken)
     {
-        await Sender.Send(new RejectDriverApplicationCommand(id, body.Reasons), cancellationToken);
+        await Sender.Send(new RejectDriverApplicationCommand(id, body.Reasons, body.RejectedItems), cancellationToken);
         return NoContent();
     }
 }
 
-public sealed record RejectDriverApplicationRequest(IReadOnlyList<string> Reasons);
+public sealed record RejectDriverApplicationRequest(
+    IReadOnlyList<string>? Reasons = null,
+    IReadOnlyList<RejectedApplicationItemDto>? RejectedItems = null);

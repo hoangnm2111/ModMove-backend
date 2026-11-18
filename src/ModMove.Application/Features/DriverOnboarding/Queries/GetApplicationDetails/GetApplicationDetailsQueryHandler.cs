@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Dapper;
 using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces.Persistence;
@@ -29,7 +28,8 @@ internal sealed class GetApplicationDetailsQueryHandler(ISqlConnectionFactory co
             da.reviewed_by AS ReviewedBy,
             da.reviewed_at AS ReviewedAt,
             da.document_urls AS DocumentUrlsJson,
-            da.rejection_reasons AS RejectionReasonsJson
+            da.rejection_reasons AS RejectionReasonsJson,
+            da.rejected_items AS RejectedItemsJson
         FROM driver_applications da
         JOIN driver_profiles dp ON dp.id = da.driver_profile_id
         JOIN users u ON u.id = dp.user_id
@@ -44,7 +44,8 @@ internal sealed class GetApplicationDetailsQueryHandler(ISqlConnectionFactory co
             application_status AS ApplicationStatus,
             submitted_at AS SubmittedAt,
             reviewed_at AS ReviewedAt,
-            rejection_reasons AS RejectionReasonsJson
+            rejection_reasons AS RejectionReasonsJson,
+            rejected_items AS RejectedItemsJson
         FROM driver_applications
         WHERE driver_profile_id = @DriverProfileId
         ORDER BY version_number DESC
@@ -62,16 +63,22 @@ internal sealed class GetApplicationDetailsQueryHandler(ISqlConnectionFactory co
         var historyRows = await connection.QueryAsync<HistoryRow>(
             new CommandDefinition(HistorySql, new { row.DriverProfileId }, cancellationToken: cancellationToken));
 
-        var documentUrls = DeserializeList(row.DocumentUrlsJson);
-        var rejectionReasons = DeserializeNullableList(row.RejectionReasonsJson);
+        var documentUrls = DriverOnboardingJson.ParseList(row.DocumentUrlsJson);
+        var rejectionReasons = DriverOnboardingJson.ParseNullableList(row.RejectionReasonsJson);
+        var rejectedItems = DriverOnboardingJson.ParseRejectedItems(row.RejectedItemsJson, rejectionReasons);
 
-        var history = historyRows.Select(h => new ApplicationHistoryDto(
-            h.ApplicationId,
-            h.VersionNumber,
-            h.ApplicationStatus,
-            h.SubmittedAt,
-            h.ReviewedAt,
-            DeserializeNullableList(h.RejectionReasonsJson))).ToList();
+        var history = historyRows.Select(h =>
+        {
+            var histReasons = DriverOnboardingJson.ParseNullableList(h.RejectionReasonsJson);
+            return new ApplicationHistoryDto(
+                h.ApplicationId,
+                h.VersionNumber,
+                h.ApplicationStatus,
+                h.SubmittedAt,
+                h.ReviewedAt,
+                histReasons,
+                DriverOnboardingJson.ParseRejectedItems(h.RejectedItemsJson, histReasons));
+        }).ToList();
 
         return new DriverApplicationDetailsResponse(
             row.ApplicationId,
@@ -93,35 +100,8 @@ internal sealed class GetApplicationDetailsQueryHandler(ISqlConnectionFactory co
             row.ReviewedAt,
             documentUrls,
             rejectionReasons,
-            history);
-    }
-
-    private static IReadOnlyList<string> DeserializeList(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-            return [];
-        try
-        {
-            return JsonSerializer.Deserialize<List<string>>(json) ?? [];
-        }
-        catch
-        {
-            return [];
-        }
-    }
-
-    private static IReadOnlyList<string>? DeserializeNullableList(string? json)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-            return null;
-        try
-        {
-            return JsonSerializer.Deserialize<List<string>>(json);
-        }
-        catch
-        {
-            return null;
-        }
+            history,
+            rejectedItems);
     }
 
     private sealed class DetailRow
@@ -132,8 +112,8 @@ internal sealed class GetApplicationDetailsQueryHandler(ISqlConnectionFactory co
         public string FullName { get; set; } = "";
         public string PhoneNumber { get; set; } = "";
         public string Email { get; set; } = "";
-        public string CitizenIdNumber { get; set; } = "";
-        public string DriverLicenseNumber { get; set; } = "";
+        public string? CitizenIdNumber { get; set; }
+        public string? DriverLicenseNumber { get; set; }
         public long VehicleTypeId { get; set; }
         public string VehicleTypeName { get; set; } = "";
         public string LicensePlate { get; set; } = "";
@@ -145,6 +125,7 @@ internal sealed class GetApplicationDetailsQueryHandler(ISqlConnectionFactory co
         public DateTimeOffset? ReviewedAt { get; set; }
         public string? DocumentUrlsJson { get; set; }
         public string? RejectionReasonsJson { get; set; }
+        public string? RejectedItemsJson { get; set; }
     }
 
     private sealed class HistoryRow
@@ -155,5 +136,6 @@ internal sealed class GetApplicationDetailsQueryHandler(ISqlConnectionFactory co
         public DateTimeOffset SubmittedAt { get; set; }
         public DateTimeOffset? ReviewedAt { get; set; }
         public string? RejectionReasonsJson { get; set; }
+        public string? RejectedItemsJson { get; set; }
     }
 }

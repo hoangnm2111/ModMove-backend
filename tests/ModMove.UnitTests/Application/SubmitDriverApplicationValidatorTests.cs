@@ -29,7 +29,16 @@ public class SubmitDriverApplicationValidatorTests
     public void Valid_command_passes() => Check(Valid()).ShouldNotHaveAnyValidationErrors();
 
     [Theory]
+    [InlineData(null)]
     [InlineData("")]
+    [InlineData("   ")]
+    public void Blank_citizen_id_and_license_number_are_optional_and_pass(string? blank)
+    {
+        var result = Check(Valid() with { CitizenIdNumber = blank, DriverLicenseNumber = blank });
+        result.ShouldNotHaveAnyValidationErrors();
+    }
+
+    [Theory]
     [InlineData("12345")]
     [InlineData("12345678901234")]
     [InlineData("12345678A")]
@@ -37,11 +46,19 @@ public class SubmitDriverApplicationValidatorTests
         Check(Valid() with { CitizenIdNumber = id }).ShouldHaveValidationErrorFor(x => x.CitizenIdNumber);
 
     [Theory]
-    [InlineData("")]
     [InlineData("short")]
     [InlineData("has space 1234")]
     public void Bad_license_number_fails(string number) =>
         Check(Valid() with { DriverLicenseNumber = number }).ShouldHaveValidationErrorFor(x => x.DriverLicenseNumber);
+
+    [Fact]
+    public void Missing_back_document_url_fails_validation()
+    {
+        var withEmptyBack = Docs.ToArray();
+        withEmptyBack[6] = "";
+        Check(Valid() with { DocumentUrls = withEmptyBack })
+            .ShouldHaveValidationErrorFor("DocumentUrls[6]");
+    }
 
     [Theory]
     [InlineData("")]

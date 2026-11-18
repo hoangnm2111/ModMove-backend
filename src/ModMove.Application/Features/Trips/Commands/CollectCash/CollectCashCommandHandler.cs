@@ -26,7 +26,7 @@ internal sealed class CollectCashCommandHandler(
 
         order.EnsureDriver(profile.Id);
         await IncidentGuard.EnsureDriverHasNoOpenIncidentAsync(incidents, order.Id, driver.Id, cancellationToken); // 7.6
-        var transaction = order.CollectCash(profile.Id, clock.GetUtcNow());
+        var transaction = order.CollectCash(profile.Id, request.Latitude!.Value, request.Longitude!.Value, clock.GetUtcNow());
         payments.Add(transaction);
         await unitOfWork.SaveChangesAsync(cancellationToken);
     }

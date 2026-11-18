@@ -2,6 +2,7 @@ using ModMove.Domain.Common;
 using ModMove.Domain.Constants;
 using ModMove.Domain.Enums;
 using ModMove.Domain.Exceptions;
+using ModMove.Domain.Services;
 
 namespace ModMove.Domain.Entities;
 
@@ -58,6 +59,7 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
 
     public DateTimeOffset WarrantyAcceptedAt { get; private set; }
     public DateTimeOffset? AcceptedAt { get; private set; }
+    public DateTimeOffset? ArrivedAtDropoffAt { get; private set; }
 
     /// <summary>When the PayOS payment was confirmed; the matching timer of a PayOS order starts here (DECISIONS 3.2).</summary>
     public DateTimeOffset? PaidAt { get; private set; }
@@ -226,11 +228,23 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
             throw new DomainException("This order is not assigned to you.", "ORDER_NOT_YOURS");
     }
 
+    /// <summary>UC-DRV-15: records that the driver has arrived at the drop-off point while InTransit.</summary>
+    public void MarkArrivedAtDropoff(long driverProfileId, DateTimeOffset now)
+    {
+        EnsureDriver(driverProfileId);
+        if (OrderStatus != OrderStatus.InTransit)
+            throw new DomainException($"Order in {OrderStatus} status cannot confirm arrival at drop-off.");
+
+        ArrivedAtDropoffAt ??= now;
+    }
+
     /// <summary>
-    /// UC-DRV-17: the assigned driver confirms collecting cash for a Cash order (from Arrived to InTransit when Sender pays,
-    /// or while InTransit when Receiver pays). Marks the order Paid and returns the cash PaymentTransaction to persist.
+    /// UC-DRV-17: the assigned driver confirms collecting cash for a Cash order at the pickup point (Arrived/PickedUp)
+    /// when Sender pays, or at the drop-off point (InTransit after arriving at drop-off) when Receiver pays, within 500 m.
+    /// Marks the order Paid and returns the cash PaymentTransaction to persist.
     /// </summary>
-    public PaymentTransaction CollectCash(long driverProfileId, DateTimeOffset now)
+    public PaymentTransaction CollectCash(
+        long driverProfileId, decimal driverLatitude, decimal driverLongitude, DateTimeOffset now)
     {
         EnsureDriver(driverProfileId);
         if (OrderStatus == OrderStatus.Cancelled)
@@ -241,15 +255,27 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
             throw new DomainException("Cash has already been collected for this order.", "ORDER_ALREADY_PAID");
 
         var allowed = payer == Enums.PayerRole.Sender
-            ? OrderStatus is OrderStatus.Arrived or OrderStatus.PickedUp or OrderStatus.InTransit
-            : OrderStatus == OrderStatus.InTransit;
+            ? OrderStatus is OrderStatus.Arrived or OrderStatus.PickedUp
+            : OrderStatus == OrderStatus.InTransit && ArrivedAtDropoffAt is not null;
         if (!allowed)
         {
             throw new DomainException(
                 payer == Enums.PayerRole.Sender
-                    ? "Sender cash payment can be collected once you arrive at the pickup point until delivery."
-                    : "Receiver cash payment can only be collected while in transit at the drop-off point.",
+                    ? "Sender cash payment can only be collected at the pickup point before transit starts."
+                    : "Receiver cash payment can only be collected after arriving at the drop-off point.",
                 "CASH_COLLECTION_NOT_ALLOWED");
+        }
+
+        var (targetLat, targetLon) = payer == Enums.PayerRole.Sender
+            ? (PickupLatitude, PickupLongitude)
+            : (DropoffLatitude, DropoffLongitude);
+
+        var distanceMeters = GeoDistance.HaversineKm(driverLatitude, driverLongitude, targetLat, targetLon) * 1000.0;
+        if (distanceMeters > BusinessRules.ArrivalRadiusMeters)
+        {
+            throw new DomainException(
+                $"You must be within {BusinessRules.ArrivalRadiusMeters:0} m of the {(payer == Enums.PayerRole.Sender ? "pickup" : "drop-off")} location to collect cash.",
+                "COLLECT_CASH_WRONG_LOCATION");
         }
 
         MarkPaid(now);
@@ -492,6 +518,7 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         var from = OrderStatus;
         DriverProfileId = newDriverProfileId;
         OrderStatus = OrderStatus.Accepted;
+        ArrivedAtDropoffAt = null;
         Proof?.ResetPickupSubmissions();
         RowVersion++;
         _statusHistories.Add(OrderStatusHistory.Create(from, OrderStatus.Accepted, ChangedByRole.Dispatcher, dispatcherId, note));

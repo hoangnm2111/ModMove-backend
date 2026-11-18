@@ -293,4 +293,48 @@ public class AdminWithdrawalsTests
         await Assert.ThrowsAsync<ValidationException>(() =>
             s.App.Sender.Send(new RejectWithdrawalCommand(0, "Lý do")));
     }
+
+    [Fact]
+    public async Task Admin_rejecting_withdrawal_with_WrongBankAccount_marks_Failed_restores_balance_and_notifies_driver()
+    {
+        var s = Build();
+        s.Profile.LinkBankAccount("Vietcombank", "0071001234567", "NGUYEN VAN TAI");
+        s.Wallet.TopUpDeposit(200_000m);
+        s.Wallet.CreditTripEarning(orderId: 10, fare: 500_000m, commission: 50_000m); // 450,000
+        var withdrawal = s.Wallet.RequestWithdrawal(300_000m);
+        s.App.DriverWallets.Update(s.Wallet);
+
+        await s.App.Sender.Send(new RejectWithdrawalCommand(
+            withdrawal.Id,
+            ReasonCode: PayoutRejectionReasonCode.WrongBankAccount,
+            Note: "Số tài khoản không tồn tại"));
+
+        Assert.Equal(WalletTransactionStatus.Failed, withdrawal.TransactionStatus);
+        Assert.False(s.Wallet.HasPendingWithdrawal);
+        Assert.Equal((450_000m, 200_000m), (s.Wallet.EarningsBalance, s.Wallet.DepositBalance));
+
+        var signalR = Assert.Single(s.App.Realtime.Sent, m => m.EventName == RealtimeEvents.NotificationReceived);
+        var payload = Assert.IsType<Notification>(signalR.Payload);
+        Assert.Equal("WITHDRAWAL_DECIDED", payload.Type);
+        Assert.Equal("WRONG_BANK_ACCOUNT", payload.Data!["reasonCode"]);
+        Assert.Equal("Failed", payload.Data["status"]);
+        Assert.Contains("cập nhật lại tài khoản ngân hàng", payload.Body);
+    }
+
+    [Fact]
+    public async Task Admin_approving_withdrawal_with_malformed_bank_account_throws_WRONG_BANK_ACCOUNT()
+    {
+        var s = Build();
+        s.Profile.LinkBankAccount("Vietcombank", "12", "NGUYEN VAN TAI"); // invalid short account number
+        s.Wallet.CreditTripEarning(orderId: 10, fare: 500_000m, commission: 50_000m);
+        var withdrawal = s.Wallet.RequestWithdrawal(100_000m);
+        s.App.DriverWallets.Update(s.Wallet);
+
+        var ex = await Assert.ThrowsAsync<WrongBankAccountException>(() =>
+            s.App.Sender.Send(new ApproveWithdrawalCommand(withdrawal.Id, "FT12345")));
+
+        Assert.Equal("WRONG_BANK_ACCOUNT", ex.Code);
+        Assert.Equal(WalletTransactionStatus.Pending, withdrawal.TransactionStatus);
+        Assert.Equal(0, s.App.UnitOfWork.Saves);
+    }
 }

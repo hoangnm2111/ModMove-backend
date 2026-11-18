@@ -9,8 +9,8 @@ internal sealed class DriverProfileConfiguration : IEntityTypeConfiguration<Driv
     public void Configure(EntityTypeBuilder<DriverProfile> builder)
     {
         builder.ToTable("driver_profiles");
-        builder.Property(d => d.CitizenIdNumber).HasMaxLength(20);
-        builder.Property(d => d.DriverLicenseNumber).HasMaxLength(20);
+        builder.Property(d => d.CitizenIdNumber).HasMaxLength(20).IsRequired(false);
+        builder.Property(d => d.DriverLicenseNumber).HasMaxLength(20).IsRequired(false);
         builder.Property(d => d.LicenseFrontUrl).HasMaxLength(500);
         builder.Property(d => d.LicenseBackUrl).HasMaxLength(500);
         builder.Property(d => d.OnlineStatus).HasMaxLength(10);

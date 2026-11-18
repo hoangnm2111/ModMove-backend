@@ -38,7 +38,7 @@ public sealed class WithdrawalsController : ApiControllerBase
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public async Task<IActionResult> Reject(long id, RejectWithdrawalRequest? body, CancellationToken cancellationToken)
     {
-        await Sender.Send(new RejectWithdrawalCommand(id, body?.Reason), cancellationToken);
+        await Sender.Send(new RejectWithdrawalCommand(id, body?.Reason, body?.ReasonCode, body?.Note), cancellationToken);
         return NoContent();
     }
 }

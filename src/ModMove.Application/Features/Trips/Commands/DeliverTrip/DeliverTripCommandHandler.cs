@@ -46,7 +46,16 @@ internal sealed class DeliverTripCommandHandler(
             }
             else if (request.CashCollected)
             {
-                var cashTx = order.CollectCash(profile.Id, now);
+                var lat = request.Latitude ?? (profile.HasFreshLocation(now) ? profile.LastLatitude : null);
+                var lon = request.Longitude ?? (profile.HasFreshLocation(now) ? profile.LastLongitude : null);
+                if (lat is null || lon is null)
+                {
+                    throw new DomainException(
+                        "Current GPS location is required to confirm cash collection at delivery.",
+                        "COLLECT_CASH_WRONG_LOCATION");
+                }
+
+                var cashTx = order.CollectCash(profile.Id, lat.Value, lon.Value, now);
                 payments.Add(cashTx);
             }
             else

@@ -3,10 +3,10 @@ using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
-using ModMove.Application.Features.Matching;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 using ModMove.Domain.Exceptions;
+using ModMove.Domain.Services;
 
 namespace ModMove.Application.Features.Incidents.Commands.ReassignIncidentDriver;
 
