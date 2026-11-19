@@ -9,7 +9,7 @@ namespace ModMove.WebApi.Controllers.Admin;
 /// Admin only (RoleConvention): api/admin/reports.
 /// Screen #38: Revenue report (total commission of Completed orders in Vietnam time) and Excel (.xlsx) export
 /// (UC-ADM-21, UC-ADM-22, UC-ADM-23, DECISIONS B16, 8.1, 9.5).
-/// Also provides unified batch payout export for bank transfers (UC-ADM-20, UC-ADM-24, GB-27).
+/// Also provides unified batch payout export for bank transfers (UC-ADM-24, GB-27).
 /// </summary>
 public sealed class ReportsController : ApiControllerBase
 {
@@ -33,7 +33,7 @@ public sealed class ReportsController : ApiControllerBase
 
     /// <summary>
     /// Exports all approved payout requests (driver withdrawals and customer refunds)
-    /// as a standard bank-ready Office Open XML (.xlsx) file for batch payout processing (UC-ADM-20, UC-ADM-23, UC-ADM-24, GB-27).
+    /// as a standard bank-ready Office Open XML (.xlsx) file for batch payout processing (UC-ADM-23, UC-ADM-24, GB-27).
     /// </summary>
     [HttpGet("payouts/export")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]

@@ -107,6 +107,7 @@ public class SetOnlineStatusTests
             PaymentMethod.Cash, PayerRole.Sender, CargoDetail.Create("FURNITURE", 1, 50, 100, 50, 50, ["a.jpg"], null), TestApp.Start);
         order.Accept(s.Profile!.Id, s.Driver.Id, TestApp.Start);
         if (status >= OrderStatus.Arrived) order.ConfirmArrival(s.Driver.Id, TestApp.Start);
+        if (status >= OrderStatus.PickedUp) order.CollectSenderCash(TestApp.Start);
         if (status >= OrderStatus.PickedUp) order.ConfirmPickup(["1.jpg", "2.jpg"], s.Driver.Id, TestApp.Start);
         if (status >= OrderStatus.InTransit) order.ApprovePickupEvidence(77, TestApp.Start);
         if (status >= OrderStatus.Delivered) order.Deliver("pod.jpg", s.Driver.Id, TestApp.Start);

@@ -790,7 +790,8 @@ public class ShippingOrderTests
     [Fact]
     public void Sender_cash_collection_is_blocked_once_in_transit()
     {
-        var order = NewOrder(PaymentMethod.Cash, PayerRole.Sender);
+        // DECISIONS 5.4: only a zero-fee sender order can still reach InTransit unpaid; any other is stopped at pickup.
+        var order = NewOrder(PaymentMethod.Cash, PayerRole.Sender, distanceFee: 20_000);
         order.Accept(5, 9, Now);
         order.ConfirmArrival(9, Now);
         order.ConfirmPickup(["1.jpg", "2.jpg"], 9, Now);
@@ -862,5 +863,70 @@ public class ShippingOrderTests
             Assert.Null(error);
         else
             Assert.Equal("INCIDENT_NOT_ALLOWED", Assert.IsType<DomainException>(error).Code);
+    }
+
+    private static ShippingOrder ArrivedCashOrder(PayerRole payer, decimal distanceFee = 200_000)
+    {
+        var order = NewOrder(PaymentMethod.Cash, payer, distanceFee);
+        order.Accept(driverProfileId: 5, driverUserId: 9, Now);
+        order.ConfirmArrival(9, Now);
+        return order;
+    }
+
+    [Fact]
+    public void Sender_cash_order_cannot_be_picked_up_before_cash_is_collected_DRV13()
+    {
+        var order = ArrivedCashOrder(PayerRole.Sender);
+
+        var error = Assert.Throws<DomainException>(() => order.ConfirmPickup(["1.jpg", "2.jpg"], 9, Now));
+
+        Assert.Equal("CASH_NOT_COLLECTED", error.Code);
+        Assert.Equal(OrderStatus.Arrived, order.OrderStatus);
+    }
+
+    [Fact]
+    public void Sender_cash_order_is_picked_up_after_collect_cash_DRV13()
+    {
+        var order = ArrivedCashOrder(PayerRole.Sender);
+        order.CollectCash(5, order.PickupLatitude, order.PickupLongitude, Now);
+
+        order.ConfirmPickup(["1.jpg", "2.jpg"], 9, Now);
+
+        Assert.Equal(OrderStatus.PickedUp, order.OrderStatus);
+    }
+
+    [Fact]
+    public void Receiver_cash_order_is_picked_up_without_collecting()
+    {
+        var order = ArrivedCashOrder(PayerRole.Receiver);
+
+        order.ConfirmPickup(["1.jpg", "2.jpg"], 9, Now);
+
+        Assert.Equal(OrderStatus.PickedUp, order.OrderStatus);
+    }
+
+    [Fact]
+    public void Zero_fee_sender_cash_order_can_be_picked_up_without_collecting()
+    {
+        var order = ArrivedCashOrder(PayerRole.Sender, distanceFee: 20_000); // the 20 000 discount covers it all
+        Assert.Equal(0, order.TotalFee);
+
+        order.ConfirmPickup(["1.jpg", "2.jpg"], 9, Now);
+
+        Assert.Equal(OrderStatus.PickedUp, order.OrderStatus);
+    }
+
+    [Fact]
+    public void Reassigned_sender_cash_order_already_paid_can_be_picked_up_again_7_2()
+    {
+        var order = ArrivedCashOrder(PayerRole.Sender);
+        order.CollectCash(5, order.PickupLatitude, order.PickupLongitude, Now);
+        order.ConfirmPickup(["1.jpg", "2.jpg"], 9, Now);
+        order.ReassignDriver(newDriverProfileId: 6, dispatcherId: 77, note: null);
+        order.ConfirmArrival(10, Now);
+
+        order.ConfirmPickup(["3.jpg", "4.jpg"], 10, Now);
+
+        Assert.Equal(OrderStatus.PickedUp, order.OrderStatus);
     }
 }

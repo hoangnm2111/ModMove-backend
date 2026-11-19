@@ -79,6 +79,7 @@ public class AutoCompleteDeliveredOrdersJobTests
             order.MarkPaid(createdAt.AddMinutes(1));
         order.Accept(driverProfileId, driverUserId, createdAt.AddMinutes(5));
         order.ConfirmArrival(driverUserId, createdAt.AddMinutes(15));
+        order.CollectSenderCash(createdAt.AddMinutes(20));
         order.ConfirmPickup(["1.jpg", "2.jpg"], driverUserId, createdAt.AddMinutes(20));
         order.ApprovePickupEvidence(customerId, createdAt.AddMinutes(25));
         order.Deliver("pod.jpg", driverUserId, deliveredAt);

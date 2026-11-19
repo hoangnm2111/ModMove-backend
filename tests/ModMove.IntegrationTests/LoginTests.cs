@@ -55,6 +55,21 @@ public class LoginTests
     }
 
     [Fact]
+    public async Task Phone_number_in_login_is_the_same_401_as_unknown_email_A01()
+    {
+        var user = NewUser();
+        var (sender, uow) = Build(user);
+
+        // A-03: sign-in is by email only; the phone is used at registration, never to sign in.
+        var byPhone = await Assert.ThrowsAsync<UnauthorizedException>(() => sender.Send(new LoginCommand("0900000001", "secret")));
+        var unknown = await Assert.ThrowsAsync<UnauthorizedException>(() => sender.Send(new LoginCommand("nobody@x.vn", "secret")));
+
+        Assert.Equal(unknown.Message, byPhone.Message);
+        Assert.Equal(0, user.FailedLoginCount);
+        Assert.Equal(0, uow.Saves);
+    }
+
+    [Fact]
     public async Task Five_failures_lock_the_account_even_for_the_right_password_GB02()
     {
         var user = NewUser();

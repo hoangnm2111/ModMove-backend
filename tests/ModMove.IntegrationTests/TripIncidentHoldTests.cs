@@ -172,8 +172,6 @@ public class TripIncidentHoldTests
         s.IncidentBy(s.Driver, order);
         order.ReassignDriver(s.PreviousProfile.Id, 99, "Đổi tài xế");
         order.ConfirmArrival(s.PreviousDriver.Id, Now);
-        order.ConfirmPickup([Photo, Photo], s.PreviousDriver.Id, Now);
-        order.ApprovePickupEvidence(s.Customer.Id, Now);
 
         var error = await Assert.ThrowsAsync<DomainException>(() => s.Run(Step.CollectCash, order));
 
