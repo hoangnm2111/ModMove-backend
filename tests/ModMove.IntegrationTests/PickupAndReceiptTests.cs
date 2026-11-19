@@ -49,6 +49,7 @@ internal sealed class TripSetup
             order.MarkPaid(Now);
         order.Accept(Profile.Id, Driver.Id, Now);
         order.ConfirmArrival(Driver.Id, Now);
+        order.CollectSenderCash(Now);
         order.ConfirmPickup(["1.jpg", "2.jpg"], Driver.Id, Now);
         App.Orders.Add(order);
         return order;

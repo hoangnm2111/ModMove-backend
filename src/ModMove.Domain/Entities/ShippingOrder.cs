@@ -161,7 +161,10 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     public void ConfirmArrival(long driverUserId, DateTimeOffset now) =>
         TransitionTo(OrderStatus.Arrived, ChangedByRole.Driver, driverUserId, null, now);
 
-    /// <summary>GB-11: at least 2 photos (and at most 5, GB-06) are needed before the order is PickedUp.</summary>
+    /// <summary>
+    /// GB-11: at least 2 photos (and at most 5, GB-06) are needed before the order is PickedUp. UC-DRV-13 1b, DECISIONS 5.4: a cash
+    /// order paid by the sender is collected (CollectCash) before loading, since the sender cannot pay at the drop-off.
+    /// </summary>
     public void ConfirmPickup(IEnumerable<string> photoUrls, long driverUserId, DateTimeOffset now)
     {
         var photos = photoUrls.ToList();
@@ -184,6 +187,10 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
                 OrderStatus.PickedUp, OrderStatus.PickedUp, ChangedByRole.Driver, driverUserId, "Pickup evidence resubmitted"));
             return;
         }
+
+        if (PaymentMethod == PaymentMethod.Cash && PayerRole == Enums.PayerRole.Sender
+            && PaymentStatus != PaymentStatus.Paid && TotalFee > 0)
+            throw new DomainException("Collect the sender's cash payment before loading the cargo.", "CASH_NOT_COLLECTED");
 
         TransitionTo(OrderStatus.PickedUp, ChangedByRole.Driver, driverUserId, null, now);
         Proof ??= ProofOfDelivery.Create();

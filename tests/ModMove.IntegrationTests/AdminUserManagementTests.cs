@@ -332,6 +332,7 @@ public class AdminUserManagementTests
         var order = OrderOf(app.Customer);
         order.Accept(1, app.Driver.Id, TestApp.Start);
         order.ConfirmArrival(app.Driver.Id, TestApp.Start);
+        order.CollectSenderCash(TestApp.Start);
         order.ConfirmPickup(["1.jpg", "2.jpg"], app.Driver.Id, TestApp.Start);
         order.ApprovePickupEvidence(app.Customer.Id, TestApp.Start);
         order.Deliver("pod.jpg", app.Driver.Id, TestApp.Start); // completes on its own after 24 hours (GB-23)

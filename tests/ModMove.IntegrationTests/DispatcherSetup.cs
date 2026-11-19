@@ -95,6 +95,7 @@ internal sealed class DispatcherSetup
     public ShippingOrder PickedUp(PaymentMethod method = PaymentMethod.PayOS)
     {
         var order = Arrived(method);
+        order.CollectSenderCash(Now);
         order.ConfirmPickup(["1.jpg", "2.jpg"], Driver.Id, Now);
         return order;
     }

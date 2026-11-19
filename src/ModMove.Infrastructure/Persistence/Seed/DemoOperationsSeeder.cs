@@ -208,6 +208,10 @@ internal static class DemoOperationsSeeder
             order.Accept(people.Driver.Id, driverUserId, at);
         if (target >= OrderStatus.Arrived)
             order.ConfirmArrival(driverUserId, at);
+        // DECISIONS 5.4: the sender pays the driver at the pickup point before loading.
+        var collectsSenderCash = method == PaymentMethod.Cash && target >= OrderStatus.PickedUp;
+        if (collectsSenderCash)
+            _ = order.CollectCash(people.Driver.Id, order.PickupLatitude, order.PickupLongitude, at);
         if (target >= OrderStatus.PickedUp)
             order.ConfirmPickup([Photo, Photo], driverUserId, at);
         if (target >= OrderStatus.InTransit)
@@ -219,6 +223,14 @@ internal static class DemoOperationsSeeder
 
         db.Add(order);
         await db.SaveChangesAsync(ct);
+
+        // The cash row needs the order id, which exists only after the first save.
+        if (collectsSenderCash)
+        {
+            db.Add(PaymentTransaction.ForOrderInCash(order.Id, PayerRole.Sender, order.TotalFee, at));
+            await db.SaveChangesAsync(ct);
+        }
+
         return order;
     }
 
