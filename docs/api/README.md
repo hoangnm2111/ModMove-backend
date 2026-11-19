@@ -15,7 +15,7 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 
 | Method | Route | Ai gọi | Ghi chú |
 |---|---|---|---|
-| POST | `api/public/auth/login` | Mọi role | Trả `accessToken`, `refreshToken`, `userId`, `fullName`, `role` |
+| POST | `api/public/auth/login` | Mọi role | `{ email, password }` → `{ accessToken, refreshToken, userId, fullName, role }`. Chỉ đăng nhập bằng email, không nhận số điện thoại (A-03); sai email/mật khẩu hoặc đang khóa tạm → cùng một 401 (A-01, GB-02) |
 | POST | `api/public/auth/refresh` | Mọi role | `{ refreshToken }` → cặp token mới |
 | POST | `api/public/auth/register` | Web, app | → 200 `{ email }` (không còn `userId`): chỉ gửi OTP, tài khoản Customer được tạo khi `verify-email` thành công (A-02, D1). Email chỉ nhận ký tự ASCII in được (không dấu), sai → 400 `VALIDATION`. Gửi mail lỗi vẫn trả thành công, nên màn hình nhập OTP phải luôn có nút gửi lại (`otp/resend`). Đăng ký lại email chưa xác minh: thành công, thông tin lần mới thay thông tin cũ và có OTP mới, tính chung giới hạn GB-25 (đủ 3 lần thì vẫn thành công nhưng không gửi, không đổi gì). Email hoặc số điện thoại đã có tài khoản (mọi trạng thái) → 409 (GB-01) |
 | POST | `api/public/auth/register-driver` | Chỉ app | Như `register`, tài khoản tạo ra là Driver |
