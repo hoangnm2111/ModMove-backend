@@ -15,7 +15,7 @@ public sealed class OnboardingController : ApiControllerBase
 
     /// <summary>
     /// UC-DRV-03 / UC-DRV-05: submit a new version → 201 { id }. Pending or Approved → 422 APPLICATION_NOT_EDITABLE;
-    /// citizen ID, licence or plate used by another driver → 409.
+    /// plate used by another driver → 409.
     /// </summary>
     [HttpPost]
     public async Task<IActionResult> Submit(SubmitDriverApplicationCommand command, CancellationToken cancellationToken)

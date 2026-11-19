@@ -256,7 +256,7 @@ public class AcceptOrderTests
         var ex6 = await Assert.ThrowsAsync<DomainException>(() => busy.App.Sender.Send(new AcceptOrderCommand(secondOrder.Id)));
         Assert.Equal("DRIVER_NOT_ELIGIBLE", ex6.Code);
 
-        // 7. Cash order where commission (250k) > deposit (220k) even though deposit >= 200k MIN_COD_DEPOSIT (GB-16)
+        // 7. Cash order where commission (250k) > deposit (220k) even though deposit >= 200k REQUIRED_DEPOSIT (GB-16)
         var lowDepositForBigOrder = new Setup(depositBalance: 220_000m);
         var bigCashOrder = lowDepositForBigOrder.AddOrder(PaymentMethod.Cash, distanceFee: 2_500_000m);
         var ex7 = await Assert.ThrowsAsync<DomainException>(() => lowDepositForBigOrder.App.Sender.Send(new AcceptOrderCommand(bigCashOrder.Id)));
