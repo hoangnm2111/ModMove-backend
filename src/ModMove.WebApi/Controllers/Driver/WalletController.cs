@@ -65,7 +65,6 @@ public sealed class WalletController : ApiControllerBase
     /// (any positive whole VND amount; at least the missing amount when deposit is below REQUIRED_DEPOSIT). Calling again replaces any still-Pending session.
     /// </summary>
     [HttpPost("topup")]
-    [HttpPost("top-up")]
     public Task<TopUpDepositResponse> TopUpDeposit(
         TopUpDepositRequest request, CancellationToken cancellationToken) =>
         Sender.Send(new TopUpDepositCommand(request.Amount, request.Platform), cancellationToken);
