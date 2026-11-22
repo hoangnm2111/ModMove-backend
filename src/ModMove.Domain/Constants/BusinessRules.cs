@@ -35,5 +35,6 @@ public static class BusinessRules
     public static readonly TimeSpan GpsMaxClockSkew = TimeSpan.FromSeconds(30);      // DECISIONS B21: recordedAt at most this far ahead
     public static readonly TimeSpan GpsMaxBacklog = TimeSpan.FromMinutes(10);        // DECISIONS B21: oldest backlog point accepted
     public static readonly TimeSpan GpsLogInterval = TimeSpan.FromSeconds(60);       // DECISIONS B12: at most one logged point per order per minute
-    public const double ArrivalRadiusMeters = 500.0;                                 // Cash collection location check radius (500 m)
+    public static readonly TimeSpan DocumentViewLinkLifetime = TimeSpan.FromMinutes(10);     // NFR 2.3: driver document links expire
+    public const double ArrivalRadiusMeters = 500.0;                                 // GB-52: arrival radius the driver app checks (500 m); the server does not check it
 }

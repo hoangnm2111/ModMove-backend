@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using ModMove.Application.Features.Pricing.Commands.CreateVehicleType;
 using ModMove.Application.Features.Pricing.Commands.SetVehicleTypeStatus;
 using ModMove.Application.Features.Pricing.Commands.UpdatePlatformSettings;
 using ModMove.Application.Features.Pricing.Commands.UpdateVehicleTypeFares;
@@ -13,6 +14,14 @@ public sealed class PricingController : ApiControllerBase
     [HttpGet]
     public Task<PricingConfigurationResponse> Get(CancellationToken cancellationToken) =>
         Sender.Send(new GetPricingConfigurationsQuery(), cancellationToken);
+
+    /// <summary>UC-ADM-11/15: add a vehicle type (sizes in cm); it starts active. Name already used → 409.</summary>
+    [HttpPost("vehicletypes")]
+    public async Task<IActionResult> CreateVehicleType(CreateVehicleTypeCommand command, CancellationToken cancellationToken)
+    {
+        var id = await Sender.Send(command, cancellationToken);
+        return StatusCode(StatusCodes.Status201Created, new { id });
+    }
 
     /// <summary>UC-ADM-11: unknown id → 404.</summary>
     [HttpPut("vehicletypes/{id:long}")]

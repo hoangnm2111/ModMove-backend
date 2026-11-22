@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using ModMove.Application.Common.Models;
 using ModMove.Application.Features.MasterData.Coupons.Commands.CreateCoupon;
 using ModMove.Application.Features.MasterData.Coupons.Commands.SetCouponStatus;
+using ModMove.Application.Features.MasterData.Coupons.Commands.UpdateCoupon;
 using ModMove.Application.Features.MasterData.Coupons.Queries.GetCoupons;
 
 namespace ModMove.WebApi.Controllers.Admin;
@@ -22,6 +23,14 @@ public sealed class CouponsController : ApiControllerBase
         return CreatedAtAction(nameof(GetList), new { id }, new { id });
     }
 
+    /// <summary>UC-ADM-18: edit the terms of a coupon; the code cannot change. Usage limit below the uses so far → 422 COUPON_LIMIT_BELOW_USED.</summary>
+    [HttpPut("{id:long}")]
+    public async Task<IActionResult> Update(long id, UpdateCouponRequest body, CancellationToken cancellationToken)
+    {
+        await Sender.Send(new UpdateCouponCommand(id, body.DiscountValue, body.MinimumOrderValue, body.ValidFrom, body.ExpiresAt, body.UsageLimit), cancellationToken);
+        return NoContent();
+    }
+
     /// <summary>UC-ADM-18: enable or disable a coupon.</summary>
     [HttpPatch("{id:long}/status")]
     public async Task<IActionResult> SetStatus(long id, SetCouponStatusRequest body, CancellationToken cancellationToken)
@@ -33,6 +42,13 @@ public sealed class CouponsController : ApiControllerBase
 
 public sealed record CreateCouponRequest(
     string DiscountCode,
+    decimal DiscountValue,
+    decimal MinimumOrderValue,
+    DateTimeOffset ValidFrom,
+    DateTimeOffset ExpiresAt,
+    int? UsageLimit);
+
+public sealed record UpdateCouponRequest(
     decimal DiscountValue,
     decimal MinimumOrderValue,
     DateTimeOffset ValidFrom,

@@ -10,7 +10,8 @@ namespace ModMove.Application.Features.Drivers.Queries.GetDriverProfile;
 
 internal sealed class GetDriverProfileQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    ICurrentUserService currentUser) : IQueryHandler<GetDriverProfileQuery, DriverProfileDetailResponse>
+    ICurrentUserService currentUser,
+    IFileStorage storage) : IQueryHandler<GetDriverProfileQuery, DriverProfileDetailResponse>
 {
     private const string Sql = """
         SELECT u.id AS UserId,
@@ -104,7 +105,7 @@ internal sealed class GetDriverProfileQueryHandler(
 
         // D2: CCCD photos are the last two documents of the latest version.
         // Applications sent before D2 have five documents, so both are null.
-        var documents = SqlHelpers.ParseJsonList(row.DocumentUrlsJson);
+        var documents = SqlHelpers.ParseJsonList(row.DocumentUrlsJson).Select(storage.CreateViewUrl).ToList(); // NFR 2.3
 
         return new DriverProfileDetailResponse(
             row.UserId,

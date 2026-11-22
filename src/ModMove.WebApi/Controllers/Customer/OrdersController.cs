@@ -7,6 +7,7 @@ using ModMove.Application.Features.Orders.Commands.ReviewPickupEvidence;
 using ModMove.Application.Features.Orders.Commands.CreateOrder;
 using ModMove.Application.Features.Orders.Queries.GetMyOrderDetail;
 using ModMove.Application.Features.Orders.Queries.GetMyOrders;
+using ModMove.Application.Features.Payments.Commands.CancelOrderPayment;
 using ModMove.Application.Features.Payments.Commands.CreateOrderPayment;
 using ModMove.Application.Features.Tracking.Queries.GetOrderTracking;
 using ModMove.WebApi.Controllers.Public;
@@ -58,6 +59,17 @@ public sealed class OrdersController : ApiControllerBase
     {
         var result = await Sender.Send(new CreateOrderPaymentCommand(id, request.Platform), cancellationToken);
         return StatusCode(StatusCodes.Status201Created, result);
+    }
+
+    /// <summary>
+    /// The customer closed the PayOS page without paying (UC-CUS-27 4a): cancel every live PayOS code of the order, here and at
+    /// PayOS. The order stays Pending and Unpaid; the customer can pay again or cancel the order. Nothing pending → 204 as well.
+    /// </summary>
+    [HttpPost("{id:long}/payment/cancel")]
+    public async Task<IActionResult> CancelPayment(long id, CancellationToken cancellationToken)
+    {
+        await Sender.Send(new CancelOrderPaymentCommand(id), cancellationToken);
+        return NoContent();
     }
 
     /// <summary>Approve the driver's pickup photos (the trip starts) or reject them with a reason (UC-CUS-12, GB-26).</summary>

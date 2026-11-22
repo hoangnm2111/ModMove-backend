@@ -60,7 +60,7 @@ public sealed class TripsController : ApiControllerBase
         return NoContent();
     }
 
-    /// <summary>Confirm cash collection on a Cash order (UC-DRV-17): at pickup (Arrived/PickedUp) when Sender pays, or at drop-off (InTransit after arrive-dropoff) when Receiver pays, within 500 m.</summary>
+    /// <summary>Confirm cash collection on a Cash order (UC-DRV-17): at pickup (Arrived/PickedUp) when Sender pays, or at drop-off (InTransit after arrive-dropoff) when Receiver pays. Coordinates are optional; the server does not check the distance (GB-52).</summary>
     [HttpPost("{id:long}/collect-cash")]
     public async Task<IActionResult> CollectCash(
         long id, CollectCashRequest request, CancellationToken cancellationToken)

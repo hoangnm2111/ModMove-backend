@@ -8,7 +8,8 @@ using ModMove.Domain.Enums;
 
 namespace ModMove.Application.Features.DriverOnboarding.Queries.GetMyApplicationStatus;
 
-internal sealed class GetMyApplicationStatusQueryHandler(ISqlConnectionFactory connectionFactory, ICurrentUserService currentUser)
+internal sealed class GetMyApplicationStatusQueryHandler(
+    ISqlConnectionFactory connectionFactory, ICurrentUserService currentUser, IFileStorage storage)
     : IQueryHandler<GetMyApplicationStatusQuery, DriverOnboardingStatusResponse>
 {
     private const string AccountSql = "SELECT account_status FROM users WHERE id = @UserId";
@@ -61,7 +62,7 @@ internal sealed class GetMyApplicationStatusQueryHandler(ISqlConnectionFactory c
             VehicleTypeName: row.VehicleTypeName,
             LicensePlate: row.LicensePlate,
             MaxLoadWeightKg: row.MaxLoadWeightKg,
-            DocumentUrls: DriverOnboardingJson.ParseList(row.DocumentUrlsJson),
+            DocumentUrls: DriverOnboardingJson.ParseList(row.DocumentUrlsJson).Select(storage.CreateViewUrl).ToList(), // NFR 2.3
             RejectionReasons: rejectionReasons,
             RejectedItems: isRejected ? DriverOnboardingJson.ParseRejectedItems(row.RejectedItemsJson, rejectionReasons) : null);
     }

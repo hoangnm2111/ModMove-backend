@@ -1,11 +1,12 @@
 using Dapper;
 using ModMove.Application.Common.Exceptions;
+using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
 
 namespace ModMove.Application.Features.DriverOnboarding.Queries.GetApplicationDetails;
 
-internal sealed class GetApplicationDetailsQueryHandler(ISqlConnectionFactory connectionFactory)
+internal sealed class GetApplicationDetailsQueryHandler(ISqlConnectionFactory connectionFactory, IFileStorage storage)
     : IQueryHandler<GetApplicationDetailsQuery, DriverApplicationDetailsResponse>
 {
     private const string DetailSql = """
@@ -61,7 +62,8 @@ internal sealed class GetApplicationDetailsQueryHandler(ISqlConnectionFactory co
         var historyRows = await connection.QueryAsync<HistoryRow>(
             new CommandDefinition(HistorySql, new { row.DriverProfileId }, cancellationToken: cancellationToken));
 
-        var documentUrls = DriverOnboardingJson.ParseList(row.DocumentUrlsJson);
+        // NFR 2.3: private documents come back as links that expire after a few minutes.
+        var documentUrls = DriverOnboardingJson.ParseList(row.DocumentUrlsJson).Select(storage.CreateViewUrl).ToList();
         var rejectionReasons = DriverOnboardingJson.ParseNullableList(row.RejectionReasonsJson);
         var rejectedItems = DriverOnboardingJson.ParseRejectedItems(row.RejectedItemsJson, rejectionReasons);
 

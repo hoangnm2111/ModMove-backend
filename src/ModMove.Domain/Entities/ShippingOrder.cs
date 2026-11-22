@@ -246,12 +246,12 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     }
 
     /// <summary>
-    /// UC-DRV-17: the assigned driver confirms collecting cash for a Cash order at the pickup point (Arrived/PickedUp)
-    /// when Sender pays, or at the drop-off point (InTransit after arriving at drop-off) when Receiver pays, within 500 m.
+    /// UC-DRV-17: the assigned driver confirms collecting cash for a Cash order at the pickup step (Arrived/PickedUp)
+    /// when Sender pays, or at the drop-off step (InTransit after arriving at drop-off) when Receiver pays.
+    /// GB-52: only the driver app checks the location; the server checks the step only.
     /// Marks the order Paid and returns the cash PaymentTransaction to persist.
     /// </summary>
-    public PaymentTransaction CollectCash(
-        long driverProfileId, decimal driverLatitude, decimal driverLongitude, DateTimeOffset now)
+    public PaymentTransaction CollectCash(long driverProfileId, DateTimeOffset now)
     {
         EnsureDriver(driverProfileId);
         if (OrderStatus == OrderStatus.Cancelled)
@@ -273,17 +273,6 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
                 "CASH_COLLECTION_NOT_ALLOWED");
         }
 
-        var (targetLat, targetLon) = payer == Enums.PayerRole.Sender
-            ? (PickupLatitude, PickupLongitude)
-            : (DropoffLatitude, DropoffLongitude);
-
-        var distanceMeters = GeoDistance.HaversineKm(driverLatitude, driverLongitude, targetLat, targetLon) * 1000.0;
-        if (distanceMeters > BusinessRules.ArrivalRadiusMeters)
-        {
-            throw new DomainException(
-                $"You must be within {BusinessRules.ArrivalRadiusMeters:0} m of the {(payer == Enums.PayerRole.Sender ? "pickup" : "drop-off")} location to collect cash.",
-                "COLLECT_CASH_WRONG_LOCATION");
-        }
 
         MarkPaid(now);
         return PaymentTransaction.ForOrderInCash(Id, payer, TotalFee, now);

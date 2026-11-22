@@ -13,12 +13,15 @@ internal static class AuthRules
 {
     public const int MinPasswordLength = 8;
 
+    /// <summary>GB-53: a new password is 8–20 characters. Sign-in still accepts up to 100 so older accounts are not locked out.</summary>
+    public const int MaxPasswordLength = 20;
+
     public const string AlreadyRegistered = "This email or phone number is already registered.";
 
     public static IRuleBuilderOptions<T, string> ValidPassword<T>(this IRuleBuilder<T, string> rule) =>
         rule.NotEmpty()
             .MinimumLength(MinPasswordLength)
-            .MaximumLength(100)
+            .MaximumLength(MaxPasswordLength)
             .Matches("[A-Za-z]").WithMessage("Password must contain a letter.")
             .Matches("[0-9]").WithMessage("Password must contain a digit.");
 

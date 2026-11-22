@@ -52,6 +52,24 @@ public sealed class Coupon : BaseAuditableEntity, IAggregateRoot
     /// <summary>Discount for an order value; never more than the order itself.</summary>
     public decimal DiscountFor(decimal orderValue) => Math.Min(DiscountValue, orderValue);
 
+    /// <summary>
+    /// UC-ADM-18: the Admin edits the terms of a coupon. The code itself never changes, because orders already placed point
+    /// to it and keep the discount fixed at booking (DECISIONS 4.4). The usage limit cannot drop below the uses so far.
+    /// </summary>
+    public void UpdateTerms(
+        decimal discountValue, decimal minimumOrderValue, DateTimeOffset validFrom, DateTimeOffset expiresAt, int? usageLimit)
+    {
+        if (usageLimit is not null && usageLimit < UsedCount)
+            throw new DomainException(
+                $"The usage limit cannot be lower than the {UsedCount} uses so far.", "COUPON_LIMIT_BELOW_USED");
+
+        DiscountValue = discountValue;
+        MinimumOrderValue = minimumOrderValue;
+        ValidFrom = validFrom;
+        ExpiresAt = expiresAt;
+        UsageLimit = usageLimit;
+    }
+
     public void MarkUsed() => UsedCount++;
 
     public void SetActive(bool isActive) => IsActive = isActive;

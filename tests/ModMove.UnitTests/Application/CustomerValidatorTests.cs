@@ -137,10 +137,10 @@ public class CustomerValidatorTests
     }
 
     [Fact]
-    public void Register_password_is_at_most_100_characters_GB_53()
+    public void Register_password_is_at_most_20_characters_GB_53()
     {
-        var atLimit = Chars(96) + "1234";
-        var overLimit = Chars(97) + "1234";
+        var atLimit = Chars(16) + "1234";
+        var overLimit = Chars(17) + "1234";
 
         new RegisterCommandValidator().TestValidate(Register(password: atLimit)).ShouldNotHaveValidationErrorFor(x => x.Password);
         new RegisterCommandValidator().TestValidate(Register(password: overLimit)).ShouldHaveValidationErrorFor(x => x.Password);

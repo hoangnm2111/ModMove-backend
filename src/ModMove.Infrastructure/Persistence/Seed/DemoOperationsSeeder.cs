@@ -211,7 +211,7 @@ internal static class DemoOperationsSeeder
         // DECISIONS 5.4: the sender pays the driver at the pickup point before loading.
         var collectsSenderCash = method == PaymentMethod.Cash && target >= OrderStatus.PickedUp;
         if (collectsSenderCash)
-            _ = order.CollectCash(people.Driver.Id, order.PickupLatitude, order.PickupLongitude, at);
+            _ = order.CollectCash(people.Driver.Id, at);
         if (target >= OrderStatus.PickedUp)
             order.ConfirmPickup([Photo, Photo], driverUserId, at);
         if (target >= OrderStatus.InTransit)

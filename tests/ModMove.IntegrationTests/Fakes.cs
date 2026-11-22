@@ -636,6 +636,18 @@ internal sealed class FakeFileStorage : IFileStorage
     }
 
     public bool IsOwnedUrl(string url) => url.StartsWith($"https://res.cloudinary.com/{CloudName}/", StringComparison.Ordinal);
+
+    public List<(string FileName, string Folder)> UploadedPrivate { get; } = [];
+
+    public Task<string> UploadPrivateImageAsync(Stream content, string fileName, string folder, CancellationToken cancellationToken)
+    {
+        UploadedPrivate.Add((fileName, folder));
+        return Task.FromResult($"https://res.cloudinary.com/{CloudName}/image/authenticated/{folder}/{UploadedPrivate.Count}.jpg");
+    }
+
+    /// <summary>Marks the link so a test can see the query asked for a short-lived one.</summary>
+    public string CreateViewUrl(string storedUrl) =>
+        storedUrl.Contains("/image/authenticated/", StringComparison.Ordinal) ? storedUrl + "?signed=10min" : storedUrl;
 }
 
 internal sealed class FakeCurrentUser(long? userId) : ICurrentUserService

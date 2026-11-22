@@ -24,6 +24,16 @@ public interface IFileStorage
 
     /// <summary>True only for an https URL of the team's own Cloudinary cloud (cargo, evidence and incident photos).</summary>
     bool IsOwnedUrl(string url);
+
+    /// <summary>
+    /// NFR 2.3: a driver's documents (ID card, licence, vehicle papers) are stored as private ("authenticated") photos.
+    /// The URL returned identifies the photo but does not open it; <see cref="CreateViewUrl"/> makes a short-lived link.
+    /// </summary>
+    Task<string> UploadPrivateImageAsync(Stream content, string fileName, string folder, CancellationToken cancellationToken) =>
+        UploadImageAsync(content, fileName, folder, cancellationToken);
+
+    /// <summary>A link that opens a private photo for a few minutes (<c>DocumentViewLinkLifetime</c>); any other URL comes back unchanged.</summary>
+    string CreateViewUrl(string storedUrl) => storedUrl;
 }
 
 /// <summary>Gmail SMTP: OTP codes and notification emails.</summary>

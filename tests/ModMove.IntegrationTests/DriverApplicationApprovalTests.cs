@@ -27,6 +27,7 @@ public class DriverApplicationApprovalTests
         public User Admin { get; } = User.Create("Admin", "0900000009", "admin@x.vn", "h:x", UserRole.Administrator, emailVerified: true);
         public User DriverUser { get; } = User.Create("Nguyễn Văn Lái", "0911222333", "driver@x.vn", "h:x", UserRole.Driver, emailVerified: true);
         public FakeSql Sql { get; } = new();
+        public FakeFileStorage Files { get; } = new();
         public InMemoryUsers Users { get; }
         public InMemoryDriverProfiles DriverProfiles { get; } = new();
         public InMemoryDriverWallets DriverWallets { get; } = new();
@@ -50,6 +51,7 @@ public class DriverApplicationApprovalTests
                 .AddLogging()
                 .AddApplication()
                 .AddSingleton<ISqlConnectionFactory>(Sql)
+                .AddSingleton<IFileStorage>(Files)
                 .AddSingleton<IUserRepository>(Users)
                 .AddSingleton<IDriverProfileRepository>(DriverProfiles)
                 .AddSingleton<IDriverWalletRepository>(DriverWallets)
@@ -133,7 +135,8 @@ public class DriverApplicationApprovalTests
             "https://cdn.example.com/license-back.jpg",
             "https://cdn.example.com/reg-cert.jpg",
             "https://cdn.example.com/insp-cert.jpg",
-            "https://cdn.example.com/vehicle.jpg"
+            "https://cdn.example.com/vehicle.jpg",
+            "https://res.cloudinary.com/demo/image/authenticated/modmove/drivers/2/documents/6.jpg",
         });
 
         detailDt.Rows.Add(
@@ -167,8 +170,9 @@ public class DriverApplicationApprovalTests
         Assert.Equal(10L, response.ApplicationId);
         Assert.Equal("Nguyễn Văn Lái", response.FullName);
         Assert.Equal("51C-111.22", response.LicensePlate);
-        Assert.Equal(5, response.DocumentUrls.Count);
-        Assert.Equal("https://cdn.example.com/license-front.jpg", response.DocumentUrls[0]);
+        Assert.Equal(6, response.DocumentUrls.Count);
+        Assert.Equal("https://cdn.example.com/license-front.jpg", response.DocumentUrls[0]); // an older public photo stays as it is
+        Assert.EndsWith("?signed=10min", response.DocumentUrls[5]); // NFR 2.3: a private document comes back as a short-lived link
         Assert.Equal(2, response.History.Count);
         Assert.Equal("Rejected", response.History[1].ApplicationStatus);
         Assert.NotNull(response.History[1].RejectionReasons);

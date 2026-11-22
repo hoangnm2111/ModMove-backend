@@ -66,12 +66,12 @@ public class FePlanValidatorTests
     }
 
     [Fact]
-    public void CollectCashValidator_requires_valid_coordinates()
+    public void CollectCashValidator_takes_optional_coordinates_but_checks_their_range_GB_52()
     {
         var validator = new CollectCashCommandValidator();
 
         validator.TestValidate(new CollectCashCommand(1, 10.77m, 106.70m)).ShouldNotHaveAnyValidationErrors();
-        validator.TestValidate(new CollectCashCommand(1, null, 106.70m)).ShouldHaveValidationErrorFor(x => x.Latitude);
+        validator.TestValidate(new CollectCashCommand(1, null, null)).ShouldNotHaveAnyValidationErrors();
         validator.TestValidate(new CollectCashCommand(1, 91m, 106.70m)).ShouldHaveValidationErrorFor(x => x.Latitude);
         validator.TestValidate(new CollectCashCommand(1, 10.77m, 181m)).ShouldHaveValidationErrorFor(x => x.Longitude);
     }

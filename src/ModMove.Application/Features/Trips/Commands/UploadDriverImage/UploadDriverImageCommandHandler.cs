@@ -13,7 +13,9 @@ internal sealed class UploadDriverImageCommandHandler(
     public async Task<DriverUploadResponse> Handle(UploadDriverImageCommand request, CancellationToken cancellationToken)
     {
         var user = await currentUser.LoadUserAsync(users, cancellationToken);
-        var url = await storage.UploadImageAsync(request.Content, request.FileName, $"modmove/drivers/{user.Id}", cancellationToken);
+        var url = request.Purpose == DriverUploadPurpose.Document
+            ? await storage.UploadPrivateImageAsync(request.Content, request.FileName, $"modmove/drivers/{user.Id}/documents", cancellationToken)
+            : await storage.UploadImageAsync(request.Content, request.FileName, $"modmove/drivers/{user.Id}", cancellationToken);
         return new DriverUploadResponse(url);
     }
 }

@@ -760,22 +760,18 @@ public class ShippingOrderTests
     }
 
     [Fact]
-    public void Sender_cash_collection_is_allowed_only_at_pickup_within_500m_and_marks_order_paid_DRV17()
+    public void Sender_cash_collection_is_allowed_only_at_pickup_and_marks_order_paid_DRV17()
     {
         var order = NewOrder(PaymentMethod.Cash, PayerRole.Sender);
         order.Accept(5, 9, Now);
 
         var tooEarly = Assert.Throws<DomainException>(() =>
-            order.CollectCash(5, order.PickupLatitude, order.PickupLongitude, Now));
+            order.CollectCash(5, Now));
         Assert.Equal("CASH_COLLECTION_NOT_ALLOWED", tooEarly.Code);
 
         order.ConfirmArrival(9, Now);
 
-        var tooFar = Assert.Throws<DomainException>(() =>
-            order.CollectCash(5, order.DropoffLatitude, order.DropoffLongitude, Now.AddMinutes(1)));
-        Assert.Equal("COLLECT_CASH_WRONG_LOCATION", tooFar.Code);
-
-        var tx = order.CollectCash(5, order.PickupLatitude, order.PickupLongitude, Now.AddMinutes(3));
+        var tx = order.CollectCash(5, Now.AddMinutes(3));
 
         Assert.Equal(PaymentStatus.Paid, order.PaymentStatus);
         Assert.Equal(Now.AddMinutes(3), order.PaidAt);
@@ -783,7 +779,7 @@ public class ShippingOrderTests
             (tx.PaymentMethod, tx.PayerRole, tx.Amount, tx.TransactionStatus));
 
         var duplicate = Assert.Throws<DomainException>(() =>
-            order.CollectCash(5, order.PickupLatitude, order.PickupLongitude, Now.AddMinutes(4)));
+            order.CollectCash(5, Now.AddMinutes(4)));
         Assert.Equal("ORDER_ALREADY_PAID", duplicate.Code);
     }
 
@@ -798,12 +794,12 @@ public class ShippingOrderTests
         order.ApprovePickupEvidence(1, Now);
 
         var inTransit = Assert.Throws<DomainException>(() =>
-            order.CollectCash(5, order.PickupLatitude, order.PickupLongitude, Now.AddMinutes(5)));
+            order.CollectCash(5, Now.AddMinutes(5)));
         Assert.Equal("CASH_COLLECTION_NOT_ALLOWED", inTransit.Code);
     }
 
     [Fact]
-    public void Receiver_cash_collection_requires_arriving_at_dropoff_within_500m_DRV17()
+    public void Receiver_cash_collection_requires_arriving_at_dropoff_DRV17()
     {
         var order = NewOrder(PaymentMethod.Cash, PayerRole.Receiver);
         order.Accept(5, 9, Now);
@@ -811,22 +807,18 @@ public class ShippingOrderTests
         order.ConfirmPickup(["1.jpg", "2.jpg"], 9, Now);
 
         var atPickup = Assert.Throws<DomainException>(() =>
-            order.CollectCash(5, order.DropoffLatitude, order.DropoffLongitude, Now));
+            order.CollectCash(5, Now));
         Assert.Equal("CASH_COLLECTION_NOT_ALLOWED", atPickup.Code);
 
         order.ApprovePickupEvidence(1, Now);
 
         var beforeArriveDropoff = Assert.Throws<DomainException>(() =>
-            order.CollectCash(5, order.DropoffLatitude, order.DropoffLongitude, Now.AddMinutes(5)));
+            order.CollectCash(5, Now.AddMinutes(5)));
         Assert.Equal("CASH_COLLECTION_NOT_ALLOWED", beforeArriveDropoff.Code);
 
         order.MarkArrivedAtDropoff(5, Now.AddMinutes(9));
 
-        var tooFar = Assert.Throws<DomainException>(() =>
-            order.CollectCash(5, order.PickupLatitude, order.PickupLongitude, Now.AddMinutes(9)));
-        Assert.Equal("COLLECT_CASH_WRONG_LOCATION", tooFar.Code);
-
-        var tx = order.CollectCash(5, order.DropoffLatitude, order.DropoffLongitude, Now.AddMinutes(10));
+        var tx = order.CollectCash(5, Now.AddMinutes(10));
 
         Assert.Equal(PaymentStatus.Paid, order.PaymentStatus);
         Assert.Equal((PayerRole.Receiver, 180_000m), (tx.PayerRole, tx.Amount));
@@ -888,7 +880,7 @@ public class ShippingOrderTests
     public void Sender_cash_order_is_picked_up_after_collect_cash_DRV13()
     {
         var order = ArrivedCashOrder(PayerRole.Sender);
-        order.CollectCash(5, order.PickupLatitude, order.PickupLongitude, Now);
+        order.CollectCash(5, Now);
 
         order.ConfirmPickup(["1.jpg", "2.jpg"], 9, Now);
 
@@ -920,7 +912,7 @@ public class ShippingOrderTests
     public void Reassigned_sender_cash_order_already_paid_can_be_picked_up_again_7_2()
     {
         var order = ArrivedCashOrder(PayerRole.Sender);
-        order.CollectCash(5, order.PickupLatitude, order.PickupLongitude, Now);
+        order.CollectCash(5, Now);
         order.ConfirmPickup(["1.jpg", "2.jpg"], 9, Now);
         order.ReassignDriver(newDriverProfileId: 6, dispatcherId: 77, note: null);
         order.ConfirmArrival(10, Now);

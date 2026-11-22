@@ -12,6 +12,6 @@ internal static class TestOrders
     public static void CollectSenderCash(this ShippingOrder order, DateTimeOffset now)
     {
         if (order is { PaymentMethod: PaymentMethod.Cash, PayerRole: PayerRole.Sender, PaymentStatus: not PaymentStatus.Paid, TotalFee: > 0 })
-            order.CollectCash(order.DriverProfileId!.Value, order.PickupLatitude, order.PickupLongitude, now);
+            order.CollectCash(order.DriverProfileId!.Value, now);
     }
 }

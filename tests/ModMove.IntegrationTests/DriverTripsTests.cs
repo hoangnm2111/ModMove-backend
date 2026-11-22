@@ -95,6 +95,20 @@ public class DriverTripsTests
     }
 
     [Fact]
+    public async Task An_onboarding_document_is_stored_private_in_its_own_folder_NFR_2_3()
+    {
+        var s = new Setup();
+
+        var uploaded = await s.App.Sender.Send(new UploadDriverImageCommand(
+            new MemoryStream(JpgBytes), "cccd.jpg", "image/jpeg", JpgBytes.Length, DriverUploadPurpose.Document));
+
+        Assert.Contains("/image/authenticated/", uploaded.Url);
+        Assert.Equal($"modmove/drivers/{s.Driver.Id}/documents", s.App.Files.UploadedPrivate.Single().Folder);
+        Assert.Empty(s.App.Files.Uploaded);
+        Assert.True(s.App.Files.IsOwnedUrl(uploaded.Url)); // still accepted by submit / resubmit
+    }
+
+    [Fact]
     public async Task ConfirmArrival_transitions_to_Arrived_and_notifies_customer_and_order_group_DRV12()
     {
         var s = new Setup();
@@ -172,17 +186,12 @@ public class DriverTripsTests
         Assert.Equal("CASH_NOT_COLLECTED", missingCash.Code);
         Assert.Equal(OrderStatus.InTransit, receiverCashOrder.OrderStatus);
 
-        // Must arrive at dropoff and be within 500 m before collecting cash
+        // Must arrive at dropoff before collecting cash; the server does not check the distance (GB-52)
         await s1.App.Sender.Send(new NotifyArrivalAtDropoffCommand(receiverCashOrder.Id));
         Assert.NotNull(receiverCashOrder.ArrivedAtDropoffAt);
 
-        var wrongLocation = await Assert.ThrowsAsync<DomainException>(() =>
-            s1.App.Sender.Send(new CollectCashCommand(receiverCashOrder.Id, receiverCashOrder.PickupLatitude, receiverCashOrder.PickupLongitude)));
-        Assert.Equal("COLLECT_CASH_WRONG_LOCATION", wrongLocation.Code);
-
-        await s1.App.Sender.Send(new DeliverTripCommand(
-            receiverCashOrder.Id, PodPhoto, CashCollected: true,
-            receiverCashOrder.DropoffLatitude, receiverCashOrder.DropoffLongitude));
+        // Far from the drop-off point: still accepted, without coordinates either.
+        await s1.App.Sender.Send(new DeliverTripCommand(receiverCashOrder.Id, PodPhoto, CashCollected: true));
 
         Assert.Equal(OrderStatus.Delivered, receiverCashOrder.OrderStatus);
         Assert.Equal(PaymentStatus.Paid, receiverCashOrder.PaymentStatus);

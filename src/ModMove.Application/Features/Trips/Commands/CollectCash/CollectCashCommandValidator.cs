@@ -7,12 +7,9 @@ internal sealed class CollectCashCommandValidator : AbstractValidator<CollectCas
     public CollectCashCommandValidator()
     {
         RuleFor(x => x.OrderId).GreaterThan(0);
-        RuleFor(x => x.Latitude)
-            .NotNull().WithMessage("Current latitude is required.")
-            .InclusiveBetween(-90m, 90m);
-        RuleFor(x => x.Longitude)
-            .NotNull().WithMessage("Current longitude is required.")
-            .InclusiveBetween(-180m, 180m);
+        // GB-52: coordinates are optional and only range-checked; the server does not check the distance.
+        RuleFor(x => x.Latitude).InclusiveBetween(-90m, 90m).When(x => x.Latitude is not null);
+        RuleFor(x => x.Longitude).InclusiveBetween(-180m, 180m).When(x => x.Longitude is not null);
     }
 }
 
