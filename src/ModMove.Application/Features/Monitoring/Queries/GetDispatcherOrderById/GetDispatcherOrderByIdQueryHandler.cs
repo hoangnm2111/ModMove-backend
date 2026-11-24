@@ -24,6 +24,10 @@ internal sealed class GetDispatcherOrderByIdQueryHandler(ISqlConnectionFactory c
                o.dropoff_longitude AS DropoffLongitude,
                o.receiver_name AS ReceiverName,
                o.receiver_phone AS ReceiverPhone,
+               o.sender_name AS SenderName,
+               o.sender_phone AS SenderPhone,
+               o.pickup_note AS PickupNote,
+               o.dropoff_note AS DropoffNote,
                o.estimated_distance_km AS EstimatedDistanceKm,
                o.estimated_duration_min AS EstimatedDurationMin,
                o.has_loading_service AS HasLoadingService,
@@ -217,7 +221,10 @@ internal sealed class GetDispatcherOrderByIdQueryHandler(ISqlConnectionFactory c
                 i.ReporterName, i.HandledByName, SqlHelpers.ToUtc(i.CreatedAt), SqlHelpers.ToUtc(i.ResolvedAt))).ToList(),
             refundRows.Select(r => new DispatcherOrderRefundItem(
                 r.Id, r.IncidentId, r.SourceType, r.Reason, r.RequestedAmount, r.ProposedAmount, r.RefundStatus,
-                SqlHelpers.ToUtc(r.CreatedAt), SqlHelpers.ToUtc(r.DecidedAt), SqlHelpers.ToUtc(r.ProcessedAt))).ToList());
+                SqlHelpers.ToUtc(r.CreatedAt), SqlHelpers.ToUtc(r.DecidedAt), SqlHelpers.ToUtc(r.ProcessedAt))).ToList(),
+            row.SenderName is null ? null : new DispatcherOrderSenderDetails(row.SenderName, row.SenderPhone ?? string.Empty),
+            row.PickupNote,
+            row.DropoffNote);
     }
 
     private sealed class OrderRow
@@ -235,6 +242,10 @@ internal sealed class GetDispatcherOrderByIdQueryHandler(ISqlConnectionFactory c
         public decimal DropoffLongitude { get; init; }
         public string ReceiverName { get; init; } = "";
         public string ReceiverPhone { get; init; } = "";
+        public string? SenderName { get; init; }
+        public string? SenderPhone { get; init; }
+        public string? PickupNote { get; init; }
+        public string? DropoffNote { get; init; }
         public decimal EstimatedDistanceKm { get; init; }
         public int EstimatedDurationMin { get; init; }
         public bool HasLoadingService { get; init; }

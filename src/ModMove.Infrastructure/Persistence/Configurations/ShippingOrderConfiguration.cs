@@ -18,6 +18,10 @@ internal sealed class ShippingOrderConfiguration : IEntityTypeConfiguration<Ship
         builder.Property(o => o.DropoffLongitude).HasPrecision(9, 6);
         builder.Property(o => o.ReceiverName).HasMaxLength(100);
         builder.Property(o => o.ReceiverPhone).HasMaxLength(15);
+        builder.Property(o => o.SenderName).HasMaxLength(100);
+        builder.Property(o => o.SenderPhone).HasMaxLength(15);
+        builder.Property(o => o.PickupNote).HasMaxLength(500);
+        builder.Property(o => o.DropoffNote).HasMaxLength(500);
         builder.Property(o => o.EstimatedDistanceKm).HasPrecision(8, 2);
         builder.Property(o => o.DistanceFee).HasPrecision(15, 2);
         builder.Property(o => o.ServiceFee).HasPrecision(15, 2);

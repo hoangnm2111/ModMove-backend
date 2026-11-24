@@ -364,6 +364,13 @@ public class DriverTripsTests
             180_000m, 40_000m, 20_000m, 200_000m, DBNull.Value, DBNull.Value, "Cash", "Receiver", "Unpaid",
             TestApp.Start.UtcDateTime, TestApp.Start.UtcDateTime, DBNull.Value, DBNull.Value, DBNull.Value, DBNull.Value,
             DBNull.Value, DBNull.Value, DBNull.Value);
+        // Người gửi và ghi chú hai điểm (đơn đặt sau khi có các trường này).
+        foreach (var column in new[] { "SenderName", "SenderPhone", "PickupNote", "DropoffNote" })
+            orderTable.Columns.Add(column, typeof(string));
+        orderTable.Rows[0]["SenderName"] = "Chị Hoa";
+        orderTable.Rows[0]["SenderPhone"] = "0987654321";
+        orderTable.Rows[0]["PickupNote"] = "Cửa hầm B1";
+        orderTable.Rows[0]["DropoffNote"] = "Gọi trước 15 phút";
         s.App.Sql.Results.Enqueue(orderTable);
 
         var cargoTable = new DataTable();
@@ -425,6 +432,8 @@ public class DriverTripsTests
         Assert.NotNull(detail);
         Assert.Equal(new GeoPoint(10.8012m, 106.7415m), detail!.HandoverPoint);
         Assert.Equal(200_000m, detail.CashToCollect);
+        Assert.Equal(("Chị Hoa", "0987654321"), (detail.SenderName, detail.SenderPhone));
+        Assert.Equal(("Cửa hầm B1", "Gọi trước 15 phút"), (detail.PickupNote, detail.DropoffNote));
         Assert.Equal(5, detail.Proof!.RemainingPickupSubmissions);
         var inc = Assert.Single(detail.Incidents);
         Assert.False(inc.ReportedByYou);

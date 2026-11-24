@@ -9,13 +9,17 @@ namespace ModMove.Application.Features.Orders.Commands.CreateOrder;
 /// Photo URLs come from POST api/customer/uploads. The cargo type is a code from api/public/lookups/cargo-types.
 /// <see cref="ExpectedTotalFee"/> is the total shown by the fare estimate:
 /// if the server price differs the order is refused with FARE_CHANGED.
+/// <see cref="SenderName"/>/<see cref="SenderPhone"/>: who hands the goods over at pickup; left empty = the signed-in customer.
+/// <see cref="PickupNote"/>/<see cref="DropoffNote"/>: directions for the driver at each stop.
 /// </summary>
 public sealed record CreateOrderCommand(
     long VehicleTypeId, string PickupAddress, string DropoffAddress,
     string ReceiverName, string ReceiverPhone, CargoInput Cargo,
     bool HasLoadingService, string? CouponCode,
     PaymentMethod PaymentMethod, PayerRole? PayerRole, bool ProhibitedGoodsCommitment,
-    decimal? ExpectedTotalFee = null) : ICommand<CreateOrderResponse>;
+    decimal? ExpectedTotalFee = null,
+    string? SenderName = null, string? SenderPhone = null,
+    string? PickupNote = null, string? DropoffNote = null) : ICommand<CreateOrderResponse>;
 
 /// <summary>Size of the largest item; weight of the whole order (DECISIONS 4.2).</summary>
 public sealed record CargoInput(

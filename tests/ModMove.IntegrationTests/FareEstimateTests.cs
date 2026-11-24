@@ -30,7 +30,9 @@ public class FareEstimateTests
     {
         var result = await App().Sender.Send(Estimate());
 
-        Assert.Equal(new FareEstimateResponse(12m, 30, 170_000, 100_000, 20_000, 250_000), result);
+        Assert.Equal(new FareEstimateResponse(12m, 30, 170_000, 100_000, 20_000, 250_000), result with { Pickup = null, Dropoff = null });
+        Assert.NotNull(result.Pickup); // the matched points let the booking screen draw the trip
+        Assert.NotNull(result.Dropoff);
     }
 
     [Fact]

@@ -292,6 +292,35 @@ public class MyOrdersQueryTests
     }
 
     [Fact]
+    public async Task Detail_has_the_sender_and_the_notes_of_both_stops()
+    {
+        var db = new Db();
+        foreach (var column in new[] { "SenderName", "SenderPhone", "PickupNote", "DropoffNote" })
+            db.Orders.Columns.Add(column, typeof(string));
+        db.Orders.Rows[0]["SenderName"] = "Chị Hoa";
+        db.Orders.Rows[0]["SenderPhone"] = "0987654321";
+        db.Orders.Rows[0]["PickupNote"] = "Cửa hầm B1";
+        db.Orders.Rows[0]["DropoffNote"] = "Gọi trước 15 phút";
+
+        var order = await db.Sender().Send(new GetMyOrderDetailQuery(1));
+
+        Assert.Equal(("Chị Hoa", "0987654321"), (order.SenderName, order.SenderPhone));
+        Assert.Equal(("Cửa hầm B1", "Gọi trước 15 phút"), (order.PickupNote, order.DropoffNote));
+        var (sql, _) = db.OrdersQuery();
+        Assert.Contains("o.sender_name AS SenderName", sql);
+        Assert.Contains("o.pickup_note AS PickupNote", sql);
+    }
+
+    [Fact]
+    public async Task Detail_of_an_order_booked_before_the_sender_existed_has_no_sender_or_notes()
+    {
+        var order = await new Db().Sender().Send(new GetMyOrderDetailQuery(1));
+
+        Assert.Null(order.SenderName);
+        Assert.Null(order.PickupNote);
+    }
+
+    [Fact]
     public async Task Detail_has_no_holding_incident_by_default() =>
         Assert.Null((await new Db().Sender().Send(new GetMyOrderDetailQuery(1))).PendingDriverIncidentId);
 

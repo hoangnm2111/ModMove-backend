@@ -22,26 +22,31 @@ public sealed record FareQuote(decimal DistanceFee, decimal ServiceFee, decimal 
 /// DECISIONS B1: distance fee = max(minimum fare, base fare + price per km × km); the loading fee is added when chosen,
 /// then the coupon comes off. No rush-hour or bulky surcharge (B2). The coupon's minimum is checked against the fare
 /// before the discount (loading fee included).
+/// Every part is rounded to a whole thousand VND (fees up, the discount down) so the total shown, the total sent back as
+/// expectedTotalFee and the PayOS amount are the same round number: 91,100 becomes 92,000.
 /// </summary>
 public static class FareCalculator
 {
     /// <param name="loadingFee">LOADING_FEE when the customer wants loading, otherwise null.</param>
     public static FareQuote Calculate(VehicleType vehicleType, decimal distanceKm, decimal? loadingFee, Coupon? coupon, DateTimeOffset now)
     {
-        // Every part is whole VND, so the total is too and a client can send it back exactly (expectedTotalFee).
-        var distanceFee = ToDong(Math.Max(vehicleType.MinimumFare, vehicleType.BaseFare + vehicleType.PricePerKm * distanceKm));
-        var serviceFee = ToDong(loadingFee ?? 0);
+        var distanceFee = UpToThousand(Math.Max(vehicleType.MinimumFare, vehicleType.BaseFare + vehicleType.PricePerKm * distanceKm));
+        var serviceFee = UpToThousand(loadingFee ?? 0);
         var subtotal = distanceFee + serviceFee;
 
         var discount = 0m;
         if (coupon is not null)
         {
             coupon.EnsureApplicable(subtotal, now);
-            discount = ToDong(coupon.DiscountFor(subtotal));
+            discount = Math.Min(subtotal, DownToThousand(coupon.DiscountFor(subtotal)));
         }
 
         return new FareQuote(distanceFee, serviceFee, discount, Math.Max(0, subtotal - discount));
     }
 
-    private static decimal ToDong(decimal amount) => Math.Round(amount, 0, MidpointRounding.AwayFromZero);
+    private const decimal Thousand = 1000m;
+
+    private static decimal UpToThousand(decimal amount) => Math.Ceiling(amount / Thousand) * Thousand;
+
+    private static decimal DownToThousand(decimal amount) => Math.Floor(amount / Thousand) * Thousand;
 }

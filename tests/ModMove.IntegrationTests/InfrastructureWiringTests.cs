@@ -132,6 +132,7 @@ public class InfrastructureWiringTests
     [InlineData(typeof(ModMove.WebApi.Controllers.Customer.OrdersController), nameof(ModMove.WebApi.Controllers.Customer.OrdersController.CreatePayment))]
     [InlineData(typeof(ModMove.WebApi.Controllers.Customer.IncidentsController), nameof(ModMove.WebApi.Controllers.Customer.IncidentsController.Report))]
     [InlineData(typeof(ModMove.WebApi.Controllers.Driver.DriverController), nameof(ModMove.WebApi.Controllers.Driver.DriverController.GetRoute))] // MapVina quota
+    [InlineData(typeof(ModMove.WebApi.Controllers.Account.RouteController), nameof(ModMove.WebApi.Controllers.Account.RouteController.Get))] // MapVina quota (web)
     public void Costly_customer_endpoints_are_rate_limited_per_user(Type controller, string action) =>
         Assert.Equal(AuthRateLimit.UserPolicy, controller.GetMethod(action)!.GetCustomAttribute<EnableRateLimitingAttribute>()?.PolicyName);
 

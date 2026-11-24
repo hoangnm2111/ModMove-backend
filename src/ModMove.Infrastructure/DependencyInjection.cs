@@ -106,6 +106,10 @@ public static class DependencyInjection
             services.AddMemoryCache();
             // Every MapVina URL carries the key: the default HttpClient logs print request URIs, so they are removed.
             services.AddHttpClient(nameof(IMapService)).RemoveAllLoggers();
+            // Map files for the browser (style, tiles, sprite, glyphs) with the key added here, so the web never holds it.
+            services.AddHttpClient(nameof(IMapProxy), c => c.Timeout = TimeSpan.FromSeconds(10)).RemoveAllLoggers();
+            services.AddTransient<IMapProxy>(sp => new MapVinaProxy(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(IMapProxy)), mapVina, sp.GetRequiredService<IMemoryCache>()));
             services.AddTransient<IMapService>(sp => new CachedMapService(
                 new MapVinaMapService(sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(IMapService)), mapVina),
                 sp.GetRequiredService<IMemoryCache>()));
@@ -113,6 +117,7 @@ public static class DependencyInjection
         else
         {
             services.AddSingleton<IMapService, NotConfiguredMapService>();
+            services.AddSingleton<IMapProxy, NotConfiguredMapProxy>();
         }
 
         // Cloudinary (GB-06): image uploads and the "is this URL ours" check used by validators. Same stand-in rule.

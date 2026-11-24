@@ -200,6 +200,13 @@ public class DispatcherMonitoringTests
             3L, 30L, "Trần Tài Xế", "0907654321", "29A-88888", 21.025m, 105.825m, Now.AddMinutes(-1).UtcDateTime,
             "FURNITURE", "Đồ nội thất", 2, 120m, 150, 80, 90, "[\"https://res.cloudinary.com/demo/c1.jpg\"]", "Hàng dễ vỡ",
             "[\"https://res.cloudinary.com/demo/p1.jpg\",\"https://res.cloudinary.com/demo/p2.jpg\"]", "Verified", 1, DBNull.Value, DBNull.Value, DBNull.Value);
+        // Người gửi và ghi chú hai điểm (đơn đặt sau khi có các trường này).
+        foreach (var column in new[] { "SenderName", "SenderPhone", "PickupNote", "DropoffNote" })
+            orderTable.Columns.Add(column, typeof(string));
+        orderTable.Rows[0]["SenderName"] = "Chị Hoa";
+        orderTable.Rows[0]["SenderPhone"] = "0987654321";
+        orderTable.Rows[0]["PickupNote"] = "Cửa hầm B1";
+        orderTable.Rows[0]["DropoffNote"] = "Gọi trước 15 phút";
         sql.Results.Enqueue(orderTable);
 
         var historyTable = new DataTable();
@@ -257,6 +264,8 @@ public class DispatcherMonitoringTests
 
         Assert.Equal("MM20261020055", detail.OrderCode);
         Assert.Equal("Nguyễn Văn Khách", detail.Customer.FullName);
+        Assert.Equal(("Chị Hoa", "0987654321"), (detail.Sender!.Name, detail.Sender.PhoneNumber));
+        Assert.Equal(("Cửa hầm B1", "Gọi trước 15 phút"), (detail.PickupNote, detail.DropoffNote));
         Assert.Equal("29A-88888", detail.Driver!.LicensePlate);
         Assert.Equal("FURNITURE", detail.Cargo!.CargoType);
         Assert.Equal("Đồ nội thất", detail.Cargo.CargoTypeName);

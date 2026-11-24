@@ -14,5 +14,9 @@ internal sealed class EstimateFareCommandValidator : AbstractValidator<EstimateF
         RuleFor(x => x.WidthCm).InclusiveBetween(1, 2_000);
         RuleFor(x => x.HeightCm).InclusiveBetween(1, 2_000);
         RuleFor(x => x.CouponCode).MaximumLength(50);
+        RuleFor(x => x.DropoffAddress)
+            .Must((x, dropoff) => !string.Equals(x.PickupAddress?.Trim(), dropoff?.Trim(), StringComparison.OrdinalIgnoreCase))
+            .When(x => !string.IsNullOrWhiteSpace(x.PickupAddress) && !string.IsNullOrWhiteSpace(x.DropoffAddress))
+            .WithMessage("The drop-off address must differ from the pickup address.");
     }
 }

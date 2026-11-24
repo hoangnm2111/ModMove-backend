@@ -40,6 +40,14 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     public string ReceiverName { get; private set; } = null!;
     public string ReceiverPhone { get; private set; } = null!;
 
+    /// <summary>Who hands the goods over at pickup. Null on orders booked before the field existed.</summary>
+    public string? SenderName { get; private set; }
+    public string? SenderPhone { get; private set; }
+
+    /// <summary>Directions for the driver at each stop (gate, floor, call first…), 500 characters at most.</summary>
+    public string? PickupNote { get; private set; }
+    public string? DropoffNote { get; private set; }
+
     public decimal EstimatedDistanceKm { get; private set; }
     public int EstimatedDurationMin { get; private set; }
     public bool HasLoadingService { get; private set; }
@@ -87,7 +95,8 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
         string receiverName, string receiverPhone,
         decimal estimatedDistanceKm, int estimatedDurationMin, bool hasLoadingService,
         decimal distanceFee, decimal serviceFee, decimal discountAmount,
-        PaymentMethod paymentMethod, PayerRole? payerRole, CargoDetail cargo, DateTimeOffset warrantyAcceptedAt)
+        PaymentMethod paymentMethod, PayerRole? payerRole, CargoDetail cargo, DateTimeOffset warrantyAcceptedAt,
+        string? senderName = null, string? senderPhone = null, string? pickupNote = null, string? dropoffNote = null)
     {
         if (paymentMethod == PaymentMethod.Cash && payerRole is null)
             throw new DomainException("A cash order must say who pays: sender or receiver.");
@@ -106,6 +115,10 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
             DropoffLongitude = dropoffLongitude,
             ReceiverName = receiverName,
             ReceiverPhone = receiverPhone,
+            SenderName = string.IsNullOrWhiteSpace(senderName) ? null : senderName.Trim(),
+            SenderPhone = string.IsNullOrWhiteSpace(senderPhone) ? null : senderPhone.Trim(),
+            PickupNote = string.IsNullOrWhiteSpace(pickupNote) ? null : pickupNote.Trim(),
+            DropoffNote = string.IsNullOrWhiteSpace(dropoffNote) ? null : dropoffNote.Trim(),
             EstimatedDistanceKm = estimatedDistanceKm,
             EstimatedDurationMin = estimatedDurationMin,
             HasLoadingService = hasLoadingService,

@@ -13,6 +13,10 @@ public static class BusinessRules
 
     public const int MaxCargoPhotos = 5;                                    // GB-06
     public const int MaxPhotoSizeMb = 5;
+
+    /// <summary>Cargo notes and the pickup/drop-off notes of a booking; the web and the app check the same limit first.</summary>
+    public const int MaxOrderNoteLength = 500;
+
     public const int MinPickupPhotos = 2;                                   // GB-11
     public const int MaxPickupSubmissions = 5;                              // DECISIONS 6.3: re-sends after a rejection included
     public const int MaxRefundEvidencePhotos = 5;                           // DECISIONS 7.4

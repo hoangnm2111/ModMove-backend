@@ -49,18 +49,22 @@ public class FareCalculatorTests
             FareCalculator.Calculate(Van(), 12m, 100_000m, Welcome20k(), Now));
 
     [Fact]
-    public void Odd_km_rounds_to_the_dong() =>
-        Assert.Equal(173_457m, FareCalculator.Calculate(Van(), 12.34565m, null, null, Now).DistanceFee); // 50,000 + 123,456.5
+    public void Odd_km_rounds_up_to_the_thousand() =>
+        Assert.Equal(174_000m, FareCalculator.Calculate(Van(), 12.34565m, null, null, Now).DistanceFee); // 50,000 + 123,456.5
 
     [Fact]
-    public void Odd_loading_fee_and_coupon_round_to_the_dong()
+    public void Fare_of_91_100_becomes_92_000() =>
+        Assert.Equal(92_000m, FareCalculator.Calculate(Van(), 4.11m, null, null, Now).TotalFee); // 50,000 + 41,100
+
+    [Fact]
+    public void Odd_loading_fee_rounds_up_and_odd_coupon_rounds_down_to_the_thousand()
     {
         var coupon = Coupon.Create("ODD", 20_000.4m, 100_000, Now.AddDays(-1), Now.AddYears(1), 1_000);
 
         var fare = FareCalculator.Calculate(Van(), 12m, 100_000.5m, coupon, Now);
 
-        // 170,000 + 100,001 − 20,000: every part and the total are whole VND, so the client can send it back exactly.
-        Assert.Equal(new FareQuote(170_000, 100_001, 20_000, 250_001), fare);
+        // 170,000 + 101,000 − 20,000: every part and the total are whole thousands, the same number the client sends back.
+        Assert.Equal(new FareQuote(170_000, 101_000, 20_000, 251_000), fare);
     }
 
     [Fact]

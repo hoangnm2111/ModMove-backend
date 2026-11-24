@@ -14,6 +14,7 @@ internal sealed class EstimateFareCommandHandler(OrderPricing pricing) : IComman
         var fare = trip.Fare;
         return new FareEstimateResponse(
             trip.Route.DistanceKm, trip.Route.DurationMinutes,
-            fare.DistanceFee, fare.ServiceFee, fare.DiscountAmount, fare.TotalFee);
+            fare.DistanceFee, fare.ServiceFee, fare.DiscountAmount, fare.TotalFee,
+            trip.Pickup, trip.Dropoff, trip.Route.Polyline);
     }
 }

@@ -16,6 +16,7 @@ internal sealed class GetMyOrderDetailQueryHandler(
         SELECT o.id AS Id, o.order_code AS OrderCode, o.order_status AS OrderStatus,
                o.pickup_address AS PickupAddress, o.dropoff_address AS DropoffAddress, vt.name AS VehicleTypeName,
                o.receiver_name AS ReceiverName, o.receiver_phone AS ReceiverPhone,
+               o.sender_name AS SenderName, o.sender_phone AS SenderPhone, o.pickup_note AS PickupNote, o.dropoff_note AS DropoffNote,
                o.estimated_distance_km AS EstimatedDistanceKm, o.estimated_duration_min AS EstimatedDurationMin,
                o.has_loading_service AS HasLoadingService, o.distance_fee AS DistanceFee, o.service_fee AS ServiceFee,
                o.discount_amount AS DiscountAmount, o.total_fee AS TotalFee, o.payment_method AS PaymentMethod,
@@ -100,7 +101,8 @@ internal sealed class GetMyOrderDetailQueryHandler(
                 p.DeliveryCompletionTime is { } delivered ? CustomerAccess.Utc(delivered) : null),
             history.Select(h => new StatusHistoryResponse(h.FromStatus, h.ToStatus, h.ChangedByRole, h.Note, CustomerAccess.Utc(h.ChangedAt))).ToList(),
             // A cancelled order cannot be paid any more, even while its last link is still alive.
-            o.CouponCode, pay is null || o.OrderStatus == "Cancelled" ? null : ToPayment(pay), o.PendingDriverIncidentId);
+            o.CouponCode, pay is null || o.OrderStatus == "Cancelled" ? null : ToPayment(pay), o.PendingDriverIncidentId,
+            o.SenderName, o.SenderPhone, o.PickupNote, o.DropoffNote);
     }
 
     private PaymentResponse ToPayment(PaymentRow row)
@@ -122,6 +124,10 @@ internal sealed class GetMyOrderDetailQueryHandler(
         public string VehicleTypeName { get; init; } = "";
         public string ReceiverName { get; init; } = "";
         public string ReceiverPhone { get; init; } = "";
+        public string? SenderName { get; init; }
+        public string? SenderPhone { get; init; }
+        public string? PickupNote { get; init; }
+        public string? DropoffNote { get; init; }
         public decimal EstimatedDistanceKm { get; init; }
         public int EstimatedDurationMin { get; init; }
         public bool HasLoadingService { get; init; }

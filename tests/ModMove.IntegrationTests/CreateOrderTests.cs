@@ -49,6 +49,63 @@ public class CreateOrderTests
     }
 
     [Fact]
+    public async Task Sender_and_stop_notes_are_saved_as_booked()
+    {
+        var app = App();
+
+        await app.Sender.Send(Order() with
+        {
+            SenderName = " Chị Hoa ",
+            SenderPhone = "0987654321",
+            PickupNote = " Cửa hầm B1 ",
+            DropoffNote = "Gọi trước 15 phút",
+        });
+
+        var order = app.Orders.Items.Single();
+        Assert.Equal(("Chị Hoa", "0987654321"), (order.SenderName, order.SenderPhone));
+        Assert.Equal(("Cửa hầm B1", "Gọi trước 15 phút"), (order.PickupNote, order.DropoffNote));
+    }
+
+    [Fact]
+    public async Task Sender_left_empty_is_the_signed_in_customer()
+    {
+        var app = App();
+
+        await app.Sender.Send(Order());
+
+        var order = app.Orders.Items.Single();
+        Assert.Equal(("An", "0900000001"), (order.SenderName, order.SenderPhone));
+        Assert.Null(order.PickupNote);
+    }
+
+    [Theory]
+    [InlineData("pickup")]
+    [InlineData("dropoff")]
+    [InlineData("cargo")]
+    public async Task Note_over_500_characters_is_rejected(string which)
+    {
+        var tooLong = new string('a', 501);
+        var order = Order();
+        order = which switch
+        {
+            "pickup" => order with { PickupNote = tooLong },
+            "dropoff" => order with { DropoffNote = tooLong },
+            _ => order with { Cargo = order.Cargo with { SpecialNotes = tooLong } },
+        };
+
+        await Assert.ThrowsAsync<ValidationException>(() => App().Sender.Send(order));
+    }
+
+    [Fact]
+    public async Task Invalid_sender_phone_is_rejected() =>
+        await Assert.ThrowsAsync<ValidationException>(() => App().Sender.Send(Order() with { SenderPhone = "12345" }));
+
+    [Fact]
+    public async Task Same_pickup_and_dropoff_address_is_rejected() =>
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            App().Sender.Send(Order() with { DropoffAddress = " hoàn kiếm, hà nội " }));
+
+    [Fact]
     public async Task Coupon_use_is_counted_on_create_B11()
     {
         var app = App();

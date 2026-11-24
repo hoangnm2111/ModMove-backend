@@ -11,7 +11,7 @@
 
 | # | Quyết định |
 |---|---|
-| B1 | **Giá đơn** = `max(minimum_fare, base_fare + price_per_km × km)` + phí bốc xếp (`LOADING_FEE`, nếu chọn) − coupon = `total_fee`. Giá nằm ở `vehicle_types` và `platform_settings`, không có entity `FareRule` |
+| B1 | **Giá đơn** = `max(minimum_fare, base_fare + price_per_km × km)` + phí bốc xếp (`LOADING_FEE`, nếu chọn) − coupon = `total_fee`. Giá nằm ở `vehicle_types` và `platform_settings`, không có entity `FareRule`. Mỗi khoản làm tròn theo nghìn đồng: phí vận chuyển và phí bốc xếp làm tròn lên, giảm giá làm tròn xuống (91.100 ₫ → 92.000 ₫), nên số khách thấy, `expectedTotalFee` và số PayOS thu là một (2026-11-24) |
 | B2 | Không có giờ cao điểm, không có phụ phí cồng kềnh |
 | 4.4 | Giá chốt lúc đặt đơn theo khoảng cách MapVina, không tính lại theo quãng đường thực tế. Tạo đơn gửi kèm `expectedTotalFee`; giá server khác số này thì trả 422 `FARE_CHANGED`, không tạo đơn và không tính lượt coupon (2026-11-02) |
 | 4.6 | Không giới hạn phạm vi phục vụ hay số km |

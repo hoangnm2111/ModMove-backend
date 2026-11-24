@@ -1221,6 +1221,11 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnType("decimal(9,6)")
                         .HasColumnName("dropoff_longitude");
 
+                    b.Property<string>("DropoffNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("dropoff_note");
+
                     b.Property<decimal>("EstimatedDistanceKm")
                         .HasPrecision(8, 2)
                         .HasColumnType("decimal(8,2)")
@@ -1283,6 +1288,11 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .HasColumnType("decimal(9,6)")
                         .HasColumnName("pickup_longitude");
 
+                    b.Property<string>("PickupNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("varchar(500)")
+                        .HasColumnName("pickup_note");
+
                     b.Property<string>("ReceiverName")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -1299,6 +1309,16 @@ namespace ModMove.Infrastructure.Persistence.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("int")
                         .HasColumnName("row_version");
+
+                    b.Property<string>("SenderName")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("sender_name");
+
+                    b.Property<string>("SenderPhone")
+                        .HasMaxLength(15)
+                        .HasColumnType("varchar(15)")
+                        .HasColumnName("sender_phone");
 
                     b.Property<decimal>("ServiceFee")
                         .HasPrecision(15, 2)

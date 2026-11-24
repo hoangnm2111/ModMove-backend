@@ -46,7 +46,15 @@ public sealed record DispatcherOrderDetailResponse(
     IReadOnlyList<DispatcherOrderStatusHistoryItem> StatusHistories,
     IReadOnlyList<DispatcherOrderPaymentItem> Payments,
     IReadOnlyList<DispatcherOrderIncidentItem> Incidents,
-    IReadOnlyList<DispatcherOrderRefundItem> Refunds);
+    IReadOnlyList<DispatcherOrderRefundItem> Refunds,
+    DispatcherOrderSenderDetails? Sender = null,
+    string? PickupNote = null,
+    string? DropoffNote = null);
+
+/// <summary>Who hands the goods over at pickup; null on orders booked before the sender was asked for.</summary>
+public sealed record DispatcherOrderSenderDetails(
+    string Name,
+    string PhoneNumber);
 
 public sealed record DispatcherOrderCustomerDetails(
     long Id,

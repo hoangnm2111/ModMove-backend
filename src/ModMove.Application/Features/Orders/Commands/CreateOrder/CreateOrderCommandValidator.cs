@@ -16,6 +16,14 @@ internal sealed class CreateOrderCommandValidator : AbstractValidator<CreateOrde
         RuleFor(x => x.DropoffAddress).NotEmpty().MaximumLength(255);
         RuleFor(x => x.ReceiverName).NotEmpty().MaximumLength(100);
         RuleFor(x => x.ReceiverPhone).ValidPhone();
+        RuleFor(x => x.SenderName).MaximumLength(100);
+        RuleFor(x => x.SenderPhone!).ValidPhone().When(x => !string.IsNullOrWhiteSpace(x.SenderPhone));
+        RuleFor(x => x.PickupNote).MaximumLength(BusinessRules.MaxOrderNoteLength);
+        RuleFor(x => x.DropoffNote).MaximumLength(BusinessRules.MaxOrderNoteLength);
+        RuleFor(x => x.DropoffAddress)
+            .Must((x, dropoff) => !string.Equals(x.PickupAddress?.Trim(), dropoff?.Trim(), StringComparison.OrdinalIgnoreCase))
+            .When(x => !string.IsNullOrWhiteSpace(x.PickupAddress) && !string.IsNullOrWhiteSpace(x.DropoffAddress))
+            .WithMessage("The drop-off address must differ from the pickup address.");
         RuleFor(x => x.CouponCode).MaximumLength(50);
         RuleFor(x => x.ProhibitedGoodsCommitment).Equal(true).WithMessage("Confirm that the cargo has no prohibited goods.");
         RuleFor(x => x.PaymentMethod).IsInEnum();
@@ -35,7 +43,7 @@ internal sealed class CreateOrderCommandValidator : AbstractValidator<CreateOrde
             RuleFor(x => x.Cargo.LengthCm).InclusiveBetween(1, 2_000);
             RuleFor(x => x.Cargo.WidthCm).InclusiveBetween(1, 2_000);
             RuleFor(x => x.Cargo.HeightCm).InclusiveBetween(1, 2_000);
-            RuleFor(x => x.Cargo.SpecialNotes).MaximumLength(500);
+            RuleFor(x => x.Cargo.SpecialNotes).MaximumLength(BusinessRules.MaxOrderNoteLength);
             RuleFor(x => x.Cargo.PhotoUrls)
                 .NotNull()
                 .Must(p => p.Count is >= 1 and <= BusinessRules.MaxCargoPhotos)

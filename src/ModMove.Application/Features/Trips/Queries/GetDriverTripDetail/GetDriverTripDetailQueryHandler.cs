@@ -85,6 +85,10 @@ internal static class DriverTripDetailReader
                cu.phone_number AS CustomerPhone,
                o.receiver_name AS ReceiverName,
                o.receiver_phone AS ReceiverPhone,
+               o.sender_name AS SenderName,
+               o.sender_phone AS SenderPhone,
+               o.pickup_note AS PickupNote,
+               o.dropoff_note AS DropoffNote,
                o.distance_fee AS DistanceFee,
                o.service_fee AS ServiceFee,
                o.discount_amount AS DiscountAmount,
@@ -286,7 +290,11 @@ internal static class DriverTripDetailReader
                 SqlHelpers.ToUtc(i.ResolvedAt))).ToList(),
             o.RatingStars is { } stars && o.RatedAt is { } ratedAt
                 ? new DriverTripRatingResponse(stars, o.ReviewComment, SqlHelpers.ToUtc(ratedAt))
-                : null);
+                : null,
+            o.SenderName,
+            o.SenderPhone,
+            o.PickupNote,
+            o.DropoffNote);
     }
 
     private sealed class OrderRow
@@ -308,6 +316,10 @@ internal static class DriverTripDetailReader
         public string CustomerPhone { get; init; } = "";
         public string ReceiverName { get; init; } = "";
         public string ReceiverPhone { get; init; } = "";
+        public string? SenderName { get; init; }
+        public string? SenderPhone { get; init; }
+        public string? PickupNote { get; init; }
+        public string? DropoffNote { get; init; }
         public decimal DistanceFee { get; init; }
         public decimal ServiceFee { get; init; }
         public decimal DiscountAmount { get; init; }

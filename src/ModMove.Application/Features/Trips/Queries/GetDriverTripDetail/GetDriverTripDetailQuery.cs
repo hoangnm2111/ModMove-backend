@@ -49,7 +49,11 @@ public sealed record DriverTripDetailResponse(
     DriverTripProofResponse? Proof,
     IReadOnlyList<DriverTripHistoryResponse> StatusHistories,
     IReadOnlyList<DriverTripIncidentResponse> Incidents,
-    DriverTripRatingResponse? Rating);
+    DriverTripRatingResponse? Rating,
+    string? SenderName = null,
+    string? SenderPhone = null,
+    string? PickupNote = null,
+    string? DropoffNote = null);
 
 public sealed record DriverTripCargoResponse(
     string CargoType,

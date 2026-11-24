@@ -52,7 +52,11 @@ internal sealed class CreateOrderCommandHandler(
             CargoDetail.Create(
                 cargoType.Code, cargo.Quantity, cargo.WeightKg, cargo.LengthCm, cargo.WidthCm, cargo.HeightCm,
                 cargo.PhotoUrls, cargo.SpecialNotes?.Trim()),
-            warrantyAcceptedAt: now);
+            warrantyAcceptedAt: now,
+            senderName: string.IsNullOrWhiteSpace(request.SenderName) ? customer.FullName : request.SenderName,
+            senderPhone: string.IsNullOrWhiteSpace(request.SenderPhone) ? customer.PhoneNumber : request.SenderPhone,
+            pickupNote: request.PickupNote,
+            dropoffNote: request.DropoffNote);
 
         trip.Coupon?.MarkUsed(); // B11: counted with the order, in the same save
         orders.Add(order);

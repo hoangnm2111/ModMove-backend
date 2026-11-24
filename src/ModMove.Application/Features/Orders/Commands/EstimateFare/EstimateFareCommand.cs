@@ -1,3 +1,4 @@
+using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Messaging;
 
 namespace ModMove.Application.Features.Orders.Commands.EstimateFare;
@@ -12,6 +13,11 @@ public sealed record EstimateFareCommand(
     decimal WeightKg, int LengthCm, int WidthCm, int HeightCm,
     bool HasLoadingService, string? CouponCode) : ICommand<FareEstimateResponse>;
 
+/// <summary>
+/// The pickup and drop-off points the addresses were matched to and the encoded route (<c>polyline</c>, 5 decimals, null
+/// when MapVina gives no shape) let the booking screen draw the trip on the map without another MapVina call.
+/// </summary>
 public sealed record FareEstimateResponse(
     decimal DistanceKm, int DurationMinutes,
-    decimal DistanceFee, decimal ServiceFee, decimal DiscountAmount, decimal TotalFee);
+    decimal DistanceFee, decimal ServiceFee, decimal DiscountAmount, decimal TotalFee,
+    GeoPoint? Pickup = null, GeoPoint? Dropoff = null, string? Polyline = null);

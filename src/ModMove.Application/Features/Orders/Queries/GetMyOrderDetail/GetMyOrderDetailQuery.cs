@@ -15,7 +15,8 @@ public sealed record OrderDetailResponse(
     decimal DistanceFee, decimal ServiceFee, decimal DiscountAmount, decimal TotalFee,
     string PaymentMethod, string? PayerRole, string PaymentStatus, DateTimeOffset CreatedAt,
     CargoResponse Cargo, DriverResponse? Driver, ProofResponse? Proof, IReadOnlyList<StatusHistoryResponse> History,
-    string? CouponCode, PaymentResponse? Payment, long? PendingDriverIncidentId = null);
+    string? CouponCode, PaymentResponse? Payment, long? PendingDriverIncidentId = null,
+    string? SenderName = null, string? SenderPhone = null, string? PickupNote = null, string? DropoffNote = null);
 
 public sealed record CargoResponse(
     string CargoType, int Quantity, decimal WeightKg, int LengthCm, int WidthCm, int HeightCm,

@@ -85,6 +85,25 @@ public interface IMapService
     Task<RouteInfo> GetRouteAsync(GeoPoint from, GeoPoint to, CancellationToken cancellationToken);
 }
 
+/// <summary>A MapVina map file (style, TileJSON, sprite, glyphs or a vector tile) already stripped of the API key.</summary>
+public sealed record MapProxyResponse(byte[] Content, string ContentType, TimeSpan MaxAge);
+
+/// <summary>
+/// Lets the web draw MapVina maps without ever seeing the MapVina key: the browser asks this server for the style and every
+/// file it points to, and the key is added here (DECISIONS 3.4: the key stays on the server). Only MapVina map files are served.
+/// </summary>
+public interface IMapProxy
+{
+    /// <summary>False when <c>MapVina:ApiKey</c> is not set: the endpoints answer 503 instead of failing at random.</summary>
+    bool IsConfigured { get; }
+
+    /// <summary>The MapVina street style with every URL rewritten to <paramref name="proxyBaseUrl"/> (e.g. https://host/api/public/Map).</summary>
+    Task<MapProxyResponse> GetStyleAsync(string proxyBaseUrl, CancellationToken cancellationToken);
+
+    /// <summary><paramref name="host"/> is "maps" or "tiles". Null when the path is not a MapVina map file (404).</summary>
+    Task<MapProxyResponse?> GetResourceAsync(string host, string path, string query, string proxyBaseUrl, CancellationToken cancellationToken);
+}
+
 /// <summary>Event names the hub /hubs/tracking sends to clients (DECISIONS B12, B17).</summary>
 public static class RealtimeEvents
 {
