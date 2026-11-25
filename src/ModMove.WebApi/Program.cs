@@ -121,8 +121,16 @@ builder.Services.AddCors(options => options.AddPolicy(ClientCorsPolicy, policy =
     .WithExposedHeaders("Content-Disposition")
     .AllowCredentials()));
 
+// Behind a proxy or tunnel (nginx, Cloudflare...) the app sees http from localhost: trust the proxy's X-Forwarded-* so the scheme, host and
+// client IP are the real ones (map URLs given to the apps, the per-IP rate limit). Only loopback proxies are trusted unless KnownProxies is set.
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(o =>
+    o.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
+        | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+        | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedHost);
+
 var app = builder.Build();
 
+app.UseForwardedHeaders();
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 if (app.Environment.IsDevelopment())
