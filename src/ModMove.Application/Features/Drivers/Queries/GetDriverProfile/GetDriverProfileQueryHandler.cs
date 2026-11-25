@@ -93,9 +93,9 @@ internal sealed class GetDriverProfileQueryHandler(
                 row.CargoBedWidthCm ?? 0,
                 row.CargoBedHeightCm ?? 0,
                 row.CargoBedDimensions ?? "",
-                row.RegistrationCertUrl ?? "",
-                row.InspectionCertUrl ?? "",
-                row.VehiclePhotoUrl ?? "",
+                storage.CreateViewUrl(row.RegistrationCertUrl ?? ""),   // NFR 2.3: private documents need a signed link
+                storage.CreateViewUrl(row.InspectionCertUrl ?? ""),
+                storage.CreateViewUrl(row.VehiclePhotoUrl ?? ""),
                 row.VehicleStatus ?? "");
         }
 
@@ -118,8 +118,8 @@ internal sealed class GetDriverProfileQueryHandler(
             row.DriverProfileId,
             row.ApprovalStatus,
             row.OnlineStatus,
-            row.LicenseFrontUrl,
-            row.LicenseBackUrl,
+            row.LicenseFrontUrl is null ? null : storage.CreateViewUrl(row.LicenseFrontUrl),
+            row.LicenseBackUrl is null ? null : storage.CreateViewUrl(row.LicenseBackUrl),
             documents.ElementAtOrDefault(5),
             documents.ElementAtOrDefault(6),
             bankAccount,

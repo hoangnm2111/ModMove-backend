@@ -75,6 +75,70 @@ public class DriverProfileMatchingAndRatingsTests
         Assert.Equal(("https://cdn/cccd-f.jpg", "https://cdn/cccd-b.jpg"), (profile.CitizenIdFrontUrl, profile.CitizenIdBackUrl)); // D2
     }
 
+    private static DataTable ProfileTable(User driver, string licenseFront, string licenseBack, string registration, string inspection, string vehiclePhoto, string documentsJson)
+    {
+        var dt = new DataTable();
+        foreach (var (name, type) in new (string, Type)[]
+        {
+            ("UserId", typeof(long)), ("FullName", typeof(string)), ("PhoneNumber", typeof(string)), ("Email", typeof(string)), ("EmailVerified", typeof(bool)),
+            ("AccountStatus", typeof(string)), ("CreatedAt", typeof(DateTime)), ("DriverProfileId", typeof(long)), ("ApprovalStatus", typeof(string)),
+            ("OnlineStatus", typeof(string)), ("LicenseFrontUrl", typeof(string)), ("LicenseBackUrl", typeof(string)), ("BankName", typeof(string)),
+            ("BankAccountNumber", typeof(string)), ("BankAccountHolder", typeof(string)), ("VehicleId", typeof(long)), ("VehicleTypeId", typeof(long)),
+            ("VehicleTypeName", typeof(string)), ("LicensePlate", typeof(string)), ("MaxLoadWeightKg", typeof(decimal)), ("CargoBedLengthCm", typeof(int)),
+            ("CargoBedWidthCm", typeof(int)), ("CargoBedHeightCm", typeof(int)), ("CargoBedDimensions", typeof(string)), ("RegistrationCertUrl", typeof(string)),
+            ("InspectionCertUrl", typeof(string)), ("VehiclePhotoUrl", typeof(string)), ("VehicleStatus", typeof(string)), ("TotalRatings", typeof(int)),
+            ("AverageStars", typeof(decimal)), ("CompletedTrips", typeof(int)), ("DocumentUrlsJson", typeof(string)),
+        })
+            dt.Columns.Add(name, type);
+        dt.Rows.Add(
+            driver.Id, "Nguyễn Văn Tài", "0912000001", "driver@x.vn", true, "Active", TestApp.Start.UtcDateTime,
+            10L, "Approved", "Online", licenseFront, licenseBack,
+            "Vietcombank", "0071001234567", "NGUYEN VAN TAI",
+            20L, 1L, "Xe tải 1 tấn", "51C-123.45", 1000m, 300, 160, 170, "300x160x170",
+            registration, inspection, vehiclePhoto, "Active",
+            12, 4.8333m, 45, documentsJson);
+        return dt;
+    }
+
+    private const string Authenticated = "https://res.cloudinary.com/demo/image/authenticated/v1/modmove/drivers/1/documents/";
+
+    [Fact]
+    public async Task GetDriverProfile_gives_a_signed_link_for_every_private_document_NFR_2_3()
+    {
+        var driver = User.Create("Nguyễn Văn Tài", "0912000001", "driver@x.vn", "h:x", UserRole.Driver, emailVerified: true);
+        var app = TestApp.SignedInAs(driver);
+        string Doc(string name) => Authenticated + name + ".jpg";
+        app.Sql.Results.Enqueue(ProfileTable(driver, Doc("lf"), Doc("lb"), Doc("reg"), Doc("ins"), Doc("veh"),
+            $$"""["{{Doc("lf")}}","{{Doc("lb")}}","{{Doc("reg")}}","{{Doc("ins")}}","{{Doc("veh")}}","{{Doc("cf")}}","{{Doc("cb")}}"]"""));
+
+        var profile = await app.Sender.Send(new GetDriverProfileQuery());
+
+        // All seven photos, not only the two citizen-ID ones: the stored URLs have no signature and would answer 401.
+        string[] links =
+        [
+            profile.LicenseFrontUrl!, profile.LicenseBackUrl!, profile.Vehicle!.RegistrationCertUrl, profile.Vehicle.InspectionCertUrl,
+            profile.Vehicle.VehiclePhotoUrl, profile.CitizenIdFrontUrl!, profile.CitizenIdBackUrl!,
+        ];
+        Assert.All(links, link => Assert.EndsWith("?signed=10min", link));
+    }
+
+    [Fact]
+    public async Task GetDriverProfile_leaves_public_links_of_older_uploads_untouched_and_keeps_missing_license_photos_null()
+    {
+        var driver = User.Create("Nguyễn Văn Tài", "0912000001", "driver@x.vn", "h:x", UserRole.Driver, emailVerified: true);
+        var app = TestApp.SignedInAs(driver);
+        var dt = ProfileTable(driver, "https://cdn/f.jpg", "https://cdn/b.jpg", "https://cdn/reg.jpg", "https://cdn/ins.jpg", "https://cdn/veh.jpg", "[]");
+        dt.Rows[0]["LicenseBackUrl"] = DBNull.Value;
+        app.Sql.Results.Enqueue(dt);
+
+        var profile = await app.Sender.Send(new GetDriverProfileQuery());
+
+        Assert.Equal("https://cdn/f.jpg", profile.LicenseFrontUrl); // uploaded before A-05: public, returned as it is
+        Assert.Null(profile.LicenseBackUrl);
+        Assert.Equal(("https://cdn/reg.jpg", "https://cdn/ins.jpg", "https://cdn/veh.jpg"), (profile.Vehicle!.RegistrationCertUrl, profile.Vehicle.InspectionCertUrl, profile.Vehicle.VehiclePhotoUrl));
+        Assert.Null(profile.CitizenIdFrontUrl);
+    }
+
     [Fact]
     public async Task GetNearbyOrderDetail_evaluates_eligibility_and_rejects_taken_cancelled_or_expired_orders_DRV09()
     {
