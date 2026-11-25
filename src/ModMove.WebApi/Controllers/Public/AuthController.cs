@@ -7,6 +7,7 @@ using ModMove.Application.Features.Auth.Commands.Register;
 using ModMove.Application.Features.Auth.Commands.ResendOtp;
 using ModMove.Application.Features.Auth.Commands.ResetPassword;
 using ModMove.Application.Features.Auth.Commands.VerifyEmail;
+using ModMove.Application.Features.Auth.Queries.CheckEmailAvailable;
 using ModMove.Domain.Enums;
 
 namespace ModMove.WebApi.Controllers.Public;
@@ -34,6 +35,11 @@ public sealed class AuthController : ApiControllerBase
     [HttpPost("register-driver")]
     public Task<RegisterResponse> RegisterDriver(RegisterRequest request, CancellationToken cancellationToken) =>
         Sender.Send(RegisterCommand.From(request, UserRole.Driver), cancellationToken);
+
+    /// <summary>Sign-up form: is this email still free? Same IP rate limit as the other auth endpoints.</summary>
+    [HttpGet("email-available")]
+    public Task<CheckEmailAvailableResponse> EmailAvailable([FromQuery] string email, CancellationToken cancellationToken) =>
+        Sender.Send(new CheckEmailAvailableQuery(email), cancellationToken);
 
     [HttpPost("verify-email")]
     public async Task<IActionResult> VerifyEmail(VerifyEmailCommand command, CancellationToken cancellationToken)
