@@ -37,8 +37,8 @@ services:
       AllowedHosts: ${DOMAIN:?set DOMAIN in .env}
       Database__MigrateOnStartup: "true"
       ConnectionStrings__DefaultConnection: "Server=mysql;Port=3306;Database=modmove;User=modmove;Password=${MYSQL_PASSWORD}"
-      PayOS__ReturnUrls__Web: https://${DOMAIN}/orders
-      PayOS__CancelUrls__Web: https://${DOMAIN}/orders
+      PayOS__ReturnUrls__Web: https://${DOMAIN}/orders/success
+      PayOS__CancelUrls__Web: https://${DOMAIN}/orders/cancel
       # Same origin as the web app, so no other origin needs CORS.
       Cors__AllowedOrigins__0: https://${DOMAIN}
 
