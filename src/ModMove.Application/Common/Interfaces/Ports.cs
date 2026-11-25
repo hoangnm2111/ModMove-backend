@@ -10,6 +10,9 @@ public sealed record RouteInfo(decimal DistanceKm, int DurationMinutes, string? 
 
 public sealed record PaymentLink(string CheckoutUrl, string? QrCode);
 
+/// <summary>What PayOS says about one payment code (GET /v2/payment-requests/{code}). <see cref="IsPaid"/> only when PayOS reports status PAID.</summary>
+public sealed record PayOsPaymentInfo(bool IsPaid, decimal AmountPaid, string? PayerBankBin, string? PayerAccountNumber, string? PayerAccountName);
+
 /// <summary>Where the customer pays from: decides which return URL PayOS sends them back to (DECISIONS 3.1).</summary>
 public enum PaymentPlatform
 {
@@ -67,6 +70,12 @@ public interface IPaymentGateway
     /// because a transfer that still arrives on the old code is reconciled by the webhook.
     /// </summary>
     Task CancelPaymentLinkAsync(long payosOrderCode, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Asks PayOS directly whether a code has been paid, for when the webhook did not arrive (tunnel down, URL not registered).
+    /// Null when PayOS does not know the code or cannot be reached: the caller then just waits for the webhook.
+    /// </summary>
+    Task<PayOsPaymentInfo?> GetPaymentInfoAsync(long payosOrderCode, CancellationToken cancellationToken);
 
     /// <summary>
     /// Registers the public HTTPS webhook URL with PayOS (<c>POST /confirm-webhook</c>). PayOS immediately sends a

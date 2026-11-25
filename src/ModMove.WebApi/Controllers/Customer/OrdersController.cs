@@ -9,6 +9,7 @@ using ModMove.Application.Features.Orders.Queries.GetMyOrderDetail;
 using ModMove.Application.Features.Orders.Queries.GetMyOrders;
 using ModMove.Application.Features.Payments.Commands.CancelOrderPayment;
 using ModMove.Application.Features.Payments.Commands.CreateOrderPayment;
+using ModMove.Application.Features.Payments.Commands.SyncOrderPayment;
 using ModMove.Application.Features.Tracking.Queries.GetOrderTracking;
 using ModMove.WebApi.Controllers.Public;
 
@@ -69,6 +70,17 @@ public sealed class OrdersController : ApiControllerBase
     public async Task<IActionResult> CancelPayment(long id, CancellationToken cancellationToken)
     {
         await Sender.Send(new CancelOrderPaymentCommand(id), cancellationToken);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// "I paid" / back from the PayOS page (UC-CUS-27): ask PayOS directly whether one of the order's codes is paid and settle it
+    /// like the webhook would, so a missing webhook does not leave the order Unpaid. Nothing paid → 204 as well; reload the order.
+    /// </summary>
+    [HttpPost("{id:long}/payment/sync")]
+    public async Task<IActionResult> SyncPayment(long id, CancellationToken cancellationToken)
+    {
+        await Sender.Send(new SyncOrderPaymentCommand(id), cancellationToken);
         return NoContent();
     }
 

@@ -9,6 +9,9 @@ public interface IPaymentTransactionRepository : IRepository<PaymentTransaction>
     Task<IReadOnlyList<PaymentTransaction>> GetPendingPayOsForOrderAsync(long orderId, CancellationToken cancellationToken = default);
 
     /// <summary>The driver wallet's PayOS deposit sessions still Pending. A new top-up code replaces them (DECISIONS 5.2).</summary>
+    /// <summary>The order's PayOS sessions that are not Paid yet (Pending, Cancelled, Expired, Failed), newest first: a transfer may still land on any of them.</summary>
+    Task<IReadOnlyList<PaymentTransaction>> GetUnpaidPayOsForOrderAsync(long orderId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<PaymentTransaction>> GetPendingPayOsForWalletAsync(long walletId, CancellationToken cancellationToken = default);
 
     /// <summary>All PayOS sessions (order payment or wallet deposit) still in <see cref="Domain.Enums.PaymentTransactionStatus.Pending"/>, for JOB-PAY-01 (GB-13).</summary>

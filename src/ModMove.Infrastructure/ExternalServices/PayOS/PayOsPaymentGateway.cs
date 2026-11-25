@@ -102,6 +102,50 @@ public sealed class PayOsPaymentGateway(HttpClient http, PayOsOptions options, I
         }
     }
 
+    public async Task<PayOsPaymentInfo?> GetPaymentInfoAsync(long payosOrderCode, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{options.Endpoint}/v2/payment-requests/{payosOrderCode}");
+            AddCredentials(request);
+
+            using var response = await http.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                logger.LogWarning("PayOS could not give the status of code {OrderCode}: HTTP {Status}", payosOrderCode, (int)response.StatusCode);
+                return null;
+            }
+
+            using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+            var root = json.RootElement;
+            if (!root.TryGetProperty("code", out var c) || c.GetString() != SuccessCode
+                || !root.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Object)
+                return null;
+
+            var status = data.TryGetProperty("status", out var st) && st.ValueKind == JsonValueKind.String ? st.GetString() : null;
+            var paid = data.TryGetProperty("amountPaid", out var ap) && ap.TryGetDecimal(out var amountPaid) ? amountPaid : 0m;
+
+            string? bin = null, account = null, name = null;
+            if (data.TryGetProperty("transactions", out var txs) && txs.ValueKind == JsonValueKind.Array && txs.GetArrayLength() > 0)
+            {
+                var first = txs[0];
+                bin = Text(first, "counterAccountBankId");
+                account = Text(first, "counterAccountNumber");
+                name = Text(first, "counterAccountName");
+            }
+
+            return new PayOsPaymentInfo(string.Equals(status, "PAID", StringComparison.OrdinalIgnoreCase), paid, bin, account, name);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JsonException || (ex is OperationCanceledException && !cancellationToken.IsCancellationRequested))
+        {
+            logger.LogWarning(ex, "PayOS could not be reached for the status of code {OrderCode}", payosOrderCode);
+            return null;
+        }
+
+        static string? Text(JsonElement e, string name) =>
+            e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() : null;
+    }
+
     public async Task ConfirmWebhookAsync(string webhookUrl, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(webhookUrl))

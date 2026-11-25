@@ -567,6 +567,14 @@ internal sealed class FakePaymentGateway : IPaymentGateway
         return Task.CompletedTask;
     }
 
+    /// <summary>Codes PayOS reports as paid, with the amount; tests add to it to act like "PayOS knows the customer paid".</summary>
+    public Dictionary<long, decimal> PaidCodes { get; } = [];
+
+    public Task<PayOsPaymentInfo?> GetPaymentInfoAsync(long payosOrderCode, CancellationToken cancellationToken) =>
+        Task.FromResult<PayOsPaymentInfo?>(PaidCodes.TryGetValue(payosOrderCode, out var amount)
+            ? new PayOsPaymentInfo(true, amount, "970436", "0123456789", "NGUYEN VAN A")
+            : new PayOsPaymentInfo(false, 0, null, null, null));
+
     public Task ConfirmWebhookAsync(string webhookUrl, CancellationToken cancellationToken = default)
     {
         if (Fail)
@@ -586,6 +594,12 @@ internal sealed class InMemoryPaymentTransactions : IPaymentTransactionRepositor
     public Task<IReadOnlyList<PaymentTransaction>> GetPendingPayOsForOrderAsync(long orderId, CancellationToken cancellationToken = default) =>
         Task.FromResult<IReadOnlyList<PaymentTransaction>>(Items
             .Where(p => p.OrderId == orderId && p.PaymentMethod == PaymentMethod.PayOS && p.TransactionStatus == PaymentTransactionStatus.Pending)
+            .ToList());
+
+    public Task<IReadOnlyList<PaymentTransaction>> GetUnpaidPayOsForOrderAsync(long orderId, CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<PaymentTransaction>>(Items
+            .Where(p => p.OrderId == orderId && p.PaymentMethod == PaymentMethod.PayOS && p.TransactionStatus != PaymentTransactionStatus.Paid)
+            .OrderByDescending(p => p.Id)
             .ToList());
 
     public Task<IReadOnlyList<PaymentTransaction>> GetPendingPayOsForWalletAsync(long walletId, CancellationToken cancellationToken = default) =>
