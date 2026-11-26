@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using FluentValidation;
 using Microsoft.Extensions.Logging;
+using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Domain.Entities;
@@ -16,7 +17,11 @@ internal static class AuthRules
     /// <summary>GB-53: a new password is 8–20 characters. Sign-in still accepts up to 100 so older accounts are not locked out.</summary>
     public const int MaxPasswordLength = 20;
 
-    public const string AlreadyRegistered = "This email or phone number is already registered.";
+    /// <summary>GB-01 (MSG18 on the field): the email is reported when both are taken.</summary>
+    public static async Task<ConflictException> AlreadyRegisteredAsync(IUserRepository users, string email, CancellationToken cancellationToken) =>
+        await users.GetByEmailAsync(email, cancellationToken) is not null
+            ? new ConflictException("This email is already registered.", "EMAIL_TAKEN")
+            : new ConflictException("This phone number is already registered.", "PHONE_TAKEN");
 
     public static IRuleBuilderOptions<T, string> ValidPassword<T>(this IRuleBuilder<T, string> rule) =>
         rule.NotEmpty()

@@ -18,9 +18,9 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 |---|---|---|---|
 | POST | `api/public/auth/login` | Mọi role | `{ email, password }` → `{ accessToken, refreshToken, userId, fullName, role }`. Chỉ đăng nhập bằng email, không nhận số điện thoại (A-03); sai email/mật khẩu hoặc đang khóa tạm → cùng một 401 (A-01, GB-02) |
 | POST | `api/public/auth/refresh` | Mọi role | `{ refreshToken }` → cặp token mới |
-| POST | `api/public/auth/register` | Web, app | → 200 `{ email }` (không còn `userId`): chỉ gửi OTP, tài khoản Customer được tạo khi `verify-email` thành công (A-02, D1). Email chỉ nhận ký tự ASCII in được (không dấu), sai → 400 `VALIDATION`. Gửi mail lỗi vẫn trả thành công, nên màn hình nhập OTP phải luôn có nút gửi lại (`otp/resend`). Đăng ký lại email chưa xác minh: thành công, thông tin lần mới thay thông tin cũ và có OTP mới, tính chung giới hạn GB-25 (đủ 3 lần thì vẫn thành công nhưng không gửi, không đổi gì). Email hoặc số điện thoại đã có tài khoản (mọi trạng thái) → 409 (GB-01) |
+| POST | `api/public/auth/register` | Web, app | → 200 `{ email }` (không còn `userId`): chỉ gửi OTP, tài khoản Customer được tạo khi `verify-email` thành công (A-02, D1). Email chỉ nhận ký tự ASCII in được (không dấu), sai → 400 `VALIDATION`. Gửi mail lỗi vẫn trả thành công, nên màn hình nhập OTP phải luôn có nút gửi lại (`otp/resend`). Đăng ký lại email chưa xác minh: thành công, thông tin lần mới thay thông tin cũ và có OTP mới, tính chung giới hạn GB-25 (đủ 3 lần thì vẫn thành công nhưng không gửi, không đổi gì). Email hoặc số điện thoại đã có tài khoản (mọi trạng thái) → 409 `EMAIL_TAKEN` hoặc `PHONE_TAKEN` (GB-01, MSG18 dưới đúng ô; trùng cả hai thì báo email) |
 | POST | `api/public/auth/register-driver` | Chỉ app | Như `register`, tài khoản tạo ra là Driver |
-| POST | `api/public/auth/verify-email` | Web, app | `{ email, code, password }` → 204, lúc này tài khoản mới được tạo và đăng nhập được. `password` là mật khẩu đã đăng ký; chỉ kiểm tra sau khi mã đúng, sai → 422 `VERIFY_PASSWORD_MISMATCH`, mã vẫn dùng được; hướng người dùng đăng ký lại (đủ 3 lần gửi thì chờ 15 phút). Số điện thoại vừa bị tài khoản khác xác minh trước → 409. Trùng thao tác khác → 409: mã có thể đã bị thay, nếu thử lại nhận `OTP_INVALID` thì xin mã mới (A-02) |
+| POST | `api/public/auth/verify-email` | Web, app | `{ email, code, password }` → 204, lúc này tài khoản mới được tạo và đăng nhập được. `password` là mật khẩu đã đăng ký; chỉ kiểm tra sau khi mã đúng, sai → 422 `VERIFY_PASSWORD_MISMATCH`, mã vẫn dùng được; hướng người dùng đăng ký lại (đủ 3 lần gửi thì chờ 15 phút). Số điện thoại vừa bị tài khoản khác xác minh trước → 409 `PHONE_TAKEN`. Trùng thao tác khác → 409: mã có thể đã bị thay, nếu thử lại nhận `OTP_INVALID` thì xin mã mới (A-02) |
 | POST | `api/public/auth/otp/resend` | Web, app | `{ email, purpose: Register \| ResetPassword }` → luôn 204 |
 | POST | `api/public/auth/forgot-password` | Web, app | `{ email }` → luôn 204 |
 | POST | `api/public/auth/reset-password` | Web, app | `{ email, code, newPassword }` → 204. Trùng lúc có người xin mã mới → 409: mật khẩu chưa đổi nhưng các phiên có thể đã bị đăng xuất, xin mã mới rồi làm lại |
@@ -33,7 +33,7 @@ Danh sách endpoint đã có và bảng mã lỗi, cho nhóm web/mobile và cho 
 | GET | `api/public/map/style`, `api/public/map/maps/{**path}`, `api/public/map/tiles/{**path}` | Ai cũng được | Bản đồ MapVina cho web và app mà không đưa key MapVina xuống client (3.4): trỏ MapLibre / MapVina SDK vào `GET api/public/map/style`, mọi URL trong style (TileJSON, sprite, font, tile) đều quay về BE và BE thêm key. Chỉ phục vụ file bản đồ của MapVina; đường dẫn khác → 404. Chưa cấu hình `MapVina:ApiKey` → 503 |
 | GET | `api/account/route` | Đã đăng nhập (mọi vai trò) | `?fromLatitude=&fromLongitude=&toLatitude=&toLongitude=` → `{ distanceKm, durationMinutes, polyline }`, giống `api/driver/route`, cho bản đồ của khách và Điều phối viên. Tối đa 10 request/phút/tài khoản → 429 `TOO_MANY_REQUESTS` |
 | GET | `api/account/profile` | Đã đăng nhập | Hồ sơ của chính mình |
-| PUT | `api/account/profile` | Đã đăng nhập | `{ fullName, phoneNumber }` → 204 |
+| PUT | `api/account/profile` | Đã đăng nhập | `{ fullName, phoneNumber }` → 204. Số điện thoại của tài khoản khác → 409 `PHONE_TAKEN` (GB-01, MSG18) |
 | PUT | `api/account/fcmtoken` | Chỉ app (web không dùng FCM, 9.2) | `{ token }` → 204; mỗi tài khoản giữ một token, máy đăng ký sau cùng thắng |
 | POST | `api/account/password` | Đã đăng nhập | `{ currentPassword, newPassword }` → 204; thu hồi mọi refresh token, mọi máy (cả máy đang dùng) phải đăng nhập lại |
 | POST | `api/account/logout` | Đã đăng nhập | App: `{ fcmToken }`; web: không body → 204. Thu hồi mọi refresh token (9.1); chỉ xóa FCM token khi `fcmToken` gửi lên đúng là token đang lưu, máy đăng ký sau vẫn nhận thông báo (9.2) |
@@ -170,7 +170,9 @@ Kết nối với JWT trên query string: `/hubs/tracking?access_token=<accessTo
 | `EMAIL_NOT_VERIFIED` | 403 | Chỉ còn cho tài khoản cũ chưa xác minh email. Tài khoản mới chỉ được tạo sau khi xác minh, nên đăng nhập trước đó trả 401 `UNAUTHORIZED` như email không tồn tại (D1) |
 | `ACCOUNT_INACTIVE` | 403 | Tài khoản đã xóa hoặc bị khóa. Mọi endpoint, kể cả `api/dispatcher/*` và `api/admin/*`, kiểm tra trên từng request, không chờ token hết hạn (B8) |
 | `NOT_FOUND` | 404 | Không tìm thấy |
-| `CONFLICT` | 409 | Trùng email/số điện thoại, hoặc dữ liệu vừa bị người khác đổi: tải lại rồi thử lại |
+| `CONFLICT` | 409 | Dữ liệu vừa bị người khác đổi: tải lại rồi thử lại |
+| `EMAIL_TAKEN` | 409 | Email đã có tài khoản (GB-01): MSG18 dưới ô Email |
+| `PHONE_TAKEN` | 409 | Số điện thoại đã có tài khoản (GB-01): MSG18 dưới ô Số điện thoại |
 | `TOO_MANY_REQUESTS` | 429 | Vượt giới hạn tần suất |
 | `BUSINESS_RULE` | 422 | Vi phạm luật nghiệp vụ không có mã riêng |
 | `OTP_INVALID` | 422 | Mã OTP sai, hết hạn, đã dùng, hoặc đã nhập sai quá 5 lần |

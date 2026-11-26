@@ -25,7 +25,7 @@ internal sealed class RegisterCommandHandler(
 
         // GB-01: accounts are saved only once verified (A-02), so any account with this email or phone is taken.
         if (await users.IsEmailOrPhoneTakenAsync(email, phone, cancellationToken))
-            throw new ConflictException(AuthRules.AlreadyRegistered);
+            throw await AuthRules.AlreadyRegisteredAsync(users, email, cancellationToken);
 
         // GB-25 limit reached: send nothing and change nothing, answer like a normal registration.
         var otp = await AuthRules.TryIssueOtpAsync(otps, email, OtpPurpose.Register, passwordHasher.Hash(code), clock.GetUtcNow(), cancellationToken);

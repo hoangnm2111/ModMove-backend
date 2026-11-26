@@ -44,7 +44,7 @@ public sealed class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Ex
         UnauthorizedException e => Problem(StatusCodes.Status401Unauthorized, "Unauthorized", e.Message, "UNAUTHORIZED"),
         NotFoundException e => Problem(StatusCodes.Status404NotFound, "Not found", e.Message, "NOT_FOUND"),
         ForbiddenAccessException e => Problem(StatusCodes.Status403Forbidden, "Forbidden", e.Message, e.Code ?? "FORBIDDEN"),
-        ConflictException e => Problem(StatusCodes.Status409Conflict, "Conflict", e.Message, "CONFLICT"),
+        ConflictException e => Problem(StatusCodes.Status409Conflict, "Conflict", e.Message, e.Code ?? "CONFLICT"),
         WrongBankAccountException e => Problem(
             StatusCodes.Status422UnprocessableEntity, "Wrong bank account", e.Message, WrongBankAccountException.ErrorCode),
         DomainException e => Problem(StatusCodes.Status422UnprocessableEntity, "Business rule violated", e.Message, e.Code ?? "BUSINESS_RULE"),

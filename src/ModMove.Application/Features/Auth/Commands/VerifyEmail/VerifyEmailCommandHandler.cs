@@ -30,7 +30,7 @@ internal sealed class VerifyEmailCommandHandler(
 
         // GB-01: another registration with this phone may have been verified first. The unique indexes catch a race (→ 409).
         if (await users.IsEmailOrPhoneTakenAsync(email, otp.PhoneNumber, cancellationToken))
-            throw new ConflictException(AuthRules.AlreadyRegistered);
+            throw await AuthRules.AlreadyRegisteredAsync(users, email, cancellationToken);
 
         users.Add(otp.CompleteRegistration(now));
         await unitOfWork.SaveChangesAsync(cancellationToken);
