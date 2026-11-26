@@ -40,6 +40,6 @@ public static class DatabaseInitializer
         }
 
         await DemoDataSeeder.SeedAsync(db, hasher, now, ct);
-        logger.LogInformation("Demo accounts ready (password {Password}).", DemoDataSeeder.DefaultPassword);
+        logger.LogInformation("Demo accounts ready (password: docs/TEAM-PLAN.md section 3)."); // never log a password, even a demo one
     }
 }
