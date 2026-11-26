@@ -7,7 +7,7 @@ namespace ModMove.Domain.Services;
 public sealed record FareQuote(decimal DistanceFee, decimal ServiceFee, decimal DiscountAmount, decimal TotalFee)
 {
     /// <summary>
-    /// UC-GST-17 6a: the total the customer saw on the estimate. If prices, the coupon or the route changed since then,
+    /// UC-GST-06 6a: the total the customer saw on the estimate. If prices, the coupon or the route changed since then,
     /// the order is refused so the client shows the new total and asks again. Null = the client did not send one.
     /// </summary>
     public void EnsureMatches(decimal? expectedTotalFee)

@@ -9,7 +9,7 @@ using ModMove.Application.Features.Orders.Queries.GetAvailableCoupons;
 
 namespace ModMove.IntegrationTests;
 
-/// <summary>GET api/customer/coupons (UC-GST-14, GB-21); rows served by FakeSql.</summary>
+/// <summary>GET api/customer/coupons (UC-GST-05, GB-21); rows served by FakeSql.</summary>
 public class AvailableCouponsTests
 {
     private const long CustomerId = 7;

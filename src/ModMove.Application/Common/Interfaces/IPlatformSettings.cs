@@ -13,7 +13,7 @@ public interface IPlatformSettings
 public static class SettingKeys
 {
     public const string CommissionRate = "COMMISSION_RATE";     // GB-14, e.g. 0.10
-    public const string LoadingFee = "LOADING_FEE";             // VND, UC-GST-12
+    public const string LoadingFee = "LOADING_FEE";             // VND, UC-GST-05
     public const string RequiredDeposit = "REQUIRED_DEPOSIT";  // VND, GB-16, GB-32
     public const string MatchingRadiusKm = "MATCHING_RADIUS_KM"; // DECISIONS B5
 }

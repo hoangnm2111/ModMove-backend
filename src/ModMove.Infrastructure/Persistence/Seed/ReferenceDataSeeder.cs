@@ -43,7 +43,7 @@ internal static class ReferenceDataSeeder
         (string Key, string Value)[] rows =
         [
             (SettingKeys.CommissionRate, "0.10"),   // GB-14
-            (SettingKeys.LoadingFee, "100000"),    // UC-GST-12
+            (SettingKeys.LoadingFee, "100000"),    // UC-GST-05
             (SettingKeys.RequiredDeposit, "200000"), // GB-16, GB-32
             (SettingKeys.MatchingRadiusKm, "5"),   // DECISIONS B5
         ];
