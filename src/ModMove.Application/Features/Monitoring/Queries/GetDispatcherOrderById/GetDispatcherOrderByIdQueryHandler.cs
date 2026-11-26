@@ -1,13 +1,14 @@
 using Dapper;
 using ModMove.Application.Common;
 using ModMove.Application.Common.Exceptions;
+using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
 using ModMove.Domain.Entities;
 
 namespace ModMove.Application.Features.Monitoring.Queries.GetDispatcherOrderById;
 
-internal sealed class GetDispatcherOrderByIdQueryHandler(ISqlConnectionFactory connectionFactory)
+internal sealed class GetDispatcherOrderByIdQueryHandler(ISqlConnectionFactory connectionFactory, IFileStorage storage)
     : IQueryHandler<GetDispatcherOrderByIdQuery, DispatcherOrderDetailResponse>
 {
     private const string OrderSql = """
@@ -185,17 +186,17 @@ internal sealed class GetDispatcherOrderByIdQueryHandler(ISqlConnectionFactory c
             ? new DispatcherOrderCargoDetails(
                 row.CargoType, row.CargoQuantity ?? 0, row.CargoWeightKg ?? 0m,
                 row.CargoLengthCm ?? 0, row.CargoWidthCm ?? 0, row.CargoHeightCm ?? 0,
-                SqlHelpers.ParseJsonList(row.CargoPhotoUrlsJson), row.CargoSpecialNotes,
+                SqlHelpers.ParseJsonList(row.CargoPhotoUrlsJson).Select(storage.CreateViewUrl).ToList(), row.CargoSpecialNotes,
                 row.CargoTypeName)
             : null;
 
         var proof = row.ProofStatus is not null
             ? new DispatcherOrderProofDetails(
-                SqlHelpers.ParseJsonList(row.PickupPhotoUrlsJson),
+                SqlHelpers.ParseJsonList(row.PickupPhotoUrlsJson).Select(storage.CreateViewUrl).ToList(),
                 row.ProofStatus,
                 row.PickupSubmissionCount ?? 0,
                 row.RejectionReason,
-                row.DeliveryPhotoUrl,
+                row.DeliveryPhotoUrl is null ? null : storage.CreateViewUrl(row.DeliveryPhotoUrl),
                 SqlHelpers.ToUtc(row.DeliveryCompletionTime))
             : null;
 

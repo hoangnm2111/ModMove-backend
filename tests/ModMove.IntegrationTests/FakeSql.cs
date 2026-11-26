@@ -24,6 +24,16 @@ internal sealed class FakeSql : ISqlConnectionFactory
 
     public IDbConnection CreateConnection() => new Connection(this);
 
+    /// <summary>A one-row result with only the columns a test cares about; Dapper leaves the other properties at their default.</summary>
+    public static DataTable Row(params (string Name, object Value)[] columns)
+    {
+        var table = new DataTable();
+        foreach (var (name, value) in columns)
+            table.Columns.Add(name, value.GetType());
+        table.Rows.Add(columns.Select(c => c.Value).ToArray());
+        return table;
+    }
+
     private sealed class Connection(FakeSql sql) : DbConnection
     {
         [AllowNull] public override string ConnectionString { get; set; } = "";

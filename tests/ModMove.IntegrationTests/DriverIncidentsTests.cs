@@ -78,6 +78,17 @@ public class DriverIncidentsTests
     }
 
     [Fact]
+    public async Task ReportIncidentByDriver_stores_the_unsigned_url_of_a_signed_photo_DEF011()
+    {
+        var s = Build(OrderStatus.Accepted);
+
+        await s.App.Sender.Send(new ReportIncidentByDriverCommand(
+            s.Order.Id, IncidentType.VehicleBreakdown, "Xe hỏng", [FakeFileStorage.SignedPhoto]));
+
+        Assert.Equal([FakeFileStorage.PrivatePhoto], Assert.Single(s.App.Incidents.Items).PhotoUrls!);
+    }
+
+    [Fact]
     public async Task Driver_cannot_report_incident_once_order_is_delivered()
     {
         var s = Build(OrderStatus.Delivered);
@@ -87,6 +98,22 @@ public class DriverIncidentsTests
 
         Assert.Equal("INCIDENT_NOT_ALLOWED", error.Code);
         Assert.Empty(s.App.Incidents.Items);
+    }
+
+    [Fact]
+    public async Task GetDriverIncidents_signs_private_photos_DEF011()
+    {
+        var s = Build();
+        s.App.Sql.ScalarResult = 1;
+        s.App.Sql.CustomQuery = (sql, _) => sql.Contains("FROM users")
+            ? FakeSql.Row(("AccountStatus", "Active"), ("DriverProfileId", s.Profile.Id), ("ApprovalStatus", "Approved"))
+            : FakeSql.Row(("Id", 11L), ("ReportedBy", s.Driver.Id), ("PhotoUrls", FakeFileStorage.MixedPhotosJson));
+
+        var page = await s.App.Sender.Send(new GetDriverIncidentsQuery());
+        var detail = await s.App.Sender.Send(new GetDriverIncidentDetailQuery(11));
+
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, Assert.Single(page.Items).PhotoUrls);
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, detail.PhotoUrls);
     }
 
     [Fact]

@@ -37,6 +37,14 @@ public sealed class CloudinaryFileStorage(
         return _cloudinary.DownloadPrivate(publicId, attachment: false, format: format, type: CloudinaryUrls.AuthenticatedType, expiresAt: expiresAt);
     }
 
+    public string ToStoredUrl(string url)
+    {
+        if (CloudinaryUrls.TryParseDownload(url, options.CloudName, out var publicId, out var format))
+            return CloudinaryUrls.StoredUrl(options.CloudName, publicId, format);
+
+        return CloudinaryUrls.TryParseAuthenticated(url, options.CloudName, out _, out _) ? CloudinaryUrls.WithoutSignature(url) : url;
+    }
+
     private async Task<string> UploadAsync(Stream content, string fileName, string folder, bool isPrivate, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(options.CloudName)
@@ -93,10 +101,11 @@ public sealed class CloudinaryFileStorage(
     }
 
     public bool IsOwnedUrl(string url) =>
-        Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
-        uri.Scheme == Uri.UriSchemeHttps &&
-        string.Equals(uri.Host, "res.cloudinary.com", StringComparison.OrdinalIgnoreCase) &&
-        uri.AbsolutePath.StartsWith($"/{options.CloudName}/", StringComparison.Ordinal);
+        CloudinaryUrls.TryParseDownload(url, options.CloudName, out _, out _) ||
+        (Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+         uri.Scheme == Uri.UriSchemeHttps &&
+         string.Equals(uri.Host, "res.cloudinary.com", StringComparison.OrdinalIgnoreCase) &&
+         uri.AbsolutePath.StartsWith($"/{options.CloudName}/", StringComparison.Ordinal));
 
     private Task<ImageUploadResult> UploadOnceAsync(
         Stream content, string fileName, string folder, string? uploadPreset, bool isPrivate, CancellationToken cancellationToken) =>

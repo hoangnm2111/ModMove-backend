@@ -16,7 +16,8 @@ internal sealed class GetNearbyOrderDetailQueryHandler(
     ISqlConnectionFactory connectionFactory,
     ICurrentUserService currentUser,
     IPlatformSettings settings,
-    TimeProvider clock) : IQueryHandler<GetNearbyOrderDetailQuery, NearbyOrderDetailResponse>
+    TimeProvider clock,
+    IFileStorage storage) : IQueryHandler<GetNearbyOrderDetailQuery, NearbyOrderDetailResponse>
 {
     private const string DriverContextSql = """
         SELECT u.account_status AS AccountStatus,
@@ -185,7 +186,7 @@ internal sealed class GetNearbyOrderDetailQueryHandler(
             order.CargoLengthCm,
             order.CargoWidthCm,
             order.CargoHeightCm,
-            SqlHelpers.ParseJsonList(order.CargoPhotoUrlsJson),
+            SqlHelpers.ParseJsonList(order.CargoPhotoUrlsJson).Select(storage.CreateViewUrl).ToList(),
             order.SpecialNotes,
             createdAt,
             matchingExpiresAt,

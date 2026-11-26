@@ -41,6 +41,18 @@ public class ReportIncidentByCustomerTests
     }
 
     [Fact]
+    public async Task ReportIncidentByCustomer_stores_the_unsigned_url_of_a_signed_photo_DEF011()
+    {
+        var s = new TripSetup();
+        var order = s.PickedUp();
+
+        await s.App.Sender.Send(new ReportIncidentByCustomerCommand(
+            order.Id, IncidentType.Other, "x", [FakeFileStorage.SignedPhoto], null, null));
+
+        Assert.Equal([FakeFileStorage.PrivatePhoto], Assert.Single(s.App.Incidents.Items).PhotoUrls!);
+    }
+
+    [Fact]
     public async Task The_driver_is_not_shown_what_the_customer_wrote()
     {
         var s = new TripSetup();
@@ -176,6 +188,7 @@ public class MyIncidentsQueryTests
             .AddApplication()
             .AddSingleton<ISqlConnectionFactory>(Sql)
             .AddSingleton<ICurrentUserService>(new FakeCurrentUser(CustomerId))
+            .AddSingleton<IFileStorage>(new FakeFileStorage())
             .BuildServiceProvider()
             .GetRequiredService<ISender>();
     }
@@ -205,6 +218,16 @@ public class MyIncidentsQueryTests
         Assert.False(item.ReportedByYou); // the driver reported it
         Assert.Empty(item.PhotoUrls);
         Assert.Equal(new DateTimeOffset(2026, 10, 20, 10, 0, 0, TimeSpan.Zero), item.ResolvedAt);
+    }
+
+    [Fact]
+    public async Task GetMyIncidents_signs_private_photos_DEF011()
+    {
+        var db = new Db { PhotoUrls = FakeFileStorage.MixedPhotosJson };
+
+        var item = (await db.Sender().Send(new GetMyIncidentsQuery())).Items.Single();
+
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, item.PhotoUrls);
     }
 
     [Fact]

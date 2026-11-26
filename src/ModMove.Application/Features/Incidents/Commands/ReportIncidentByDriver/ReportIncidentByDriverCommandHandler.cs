@@ -16,6 +16,7 @@ internal sealed class ReportIncidentByDriverCommandHandler(
     IShippingOrderRepository orders,
     IRepository<InTransitIncident> incidents,
     INotificationService notifications,
+    IFileStorage storage,
     IUnitOfWork unitOfWork) : ICommandHandler<ReportIncidentByDriverCommand, IncidentCreatedResponse>
 {
     public async Task<IncidentCreatedResponse> Handle(
@@ -39,7 +40,7 @@ internal sealed class ReportIncidentByDriverCommandHandler(
             driver.Id,
             request.IncidentType,
             request.Description.Trim(),
-            request.PhotoUrls,
+            request.PhotoUrls?.Select(storage.ToStoredUrl).ToList(),
             latitude,
             longitude);
 

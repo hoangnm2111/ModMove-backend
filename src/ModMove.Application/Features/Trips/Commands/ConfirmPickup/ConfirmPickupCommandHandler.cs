@@ -16,6 +16,7 @@ internal sealed class ConfirmPickupCommandHandler(
     IShippingOrderRepository orders,
     IIncidentRepository incidents,
     INotificationService notifications,
+    IFileStorage storage,
     IUnitOfWork unitOfWork,
     TimeProvider clock) : ICommandHandler<ConfirmPickupCommand>
 {
@@ -29,7 +30,7 @@ internal sealed class ConfirmPickupCommandHandler(
 
         order.EnsureDriver(profile.Id);
         await IncidentGuard.EnsureDriverHasNoOpenIncidentAsync(incidents, order.Id, driver.Id, cancellationToken); // 7.6
-        order.ConfirmPickup(request.PhotoUrls, driver.Id, clock.GetUtcNow());
+        order.ConfirmPickup(request.PhotoUrls.Select(storage.ToStoredUrl).ToList(), driver.Id, clock.GetUtcNow());
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         await notifications.PublishOrderStatusAsync(order, driver.Id, cancellationToken);

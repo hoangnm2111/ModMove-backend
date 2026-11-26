@@ -10,7 +10,8 @@ namespace ModMove.Application.Features.Incidents.Queries.GetDriverIncidents;
 
 internal sealed class GetDriverIncidentsQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    ICurrentUserService currentUser) : IQueryHandler<GetDriverIncidentsQuery, PagedResult<DriverIncidentResponse>>
+    ICurrentUserService currentUser,
+    IFileStorage storage) : IQueryHandler<GetDriverIncidentsQuery, PagedResult<DriverIncidentResponse>>
 {
     // Includes both incidents reported by this driver (even after ReassignDriver moved the order to another driver)
     // and incidents on orders currently assigned to this driver (IDOR-safe, C10).
@@ -70,14 +71,15 @@ internal sealed class GetDriverIncidentsQueryHandler(
         var rows = await connection.QueryAsync<DriverIncidentRow>(
             new CommandDefinition(ItemsSql, parameters, cancellationToken: cancellationToken));
 
-        var items = rows.Select(r => r.ToResponse(userId)).ToList();
+        var items = rows.Select(r => r.ToResponse(userId, storage)).ToList();
         return new PagedResult<DriverIncidentResponse>(items, request.Page, request.PageSize, total);
     }
 }
 
 internal sealed class GetDriverIncidentDetailQueryHandler(
     ISqlConnectionFactory connectionFactory,
-    ICurrentUserService currentUser) : IQueryHandler<GetDriverIncidentDetailQuery, DriverIncidentResponse>
+    ICurrentUserService currentUser,
+    IFileStorage storage) : IQueryHandler<GetDriverIncidentDetailQuery, DriverIncidentResponse>
 {
     private const string Sql = """
         SELECT i.id AS Id,
@@ -115,7 +117,7 @@ internal sealed class GetDriverIncidentDetailQueryHandler(
                 cancellationToken: cancellationToken))
             ?? throw new NotFoundException("Incident", request.IncidentId);
 
-        return row.ToResponse(userId);
+        return row.ToResponse(userId, storage);
     }
 }
 
@@ -137,7 +139,7 @@ internal sealed class DriverIncidentRow
     public DateTime CreatedAt { get; init; }
     public DateTime? ResolvedAt { get; init; }
 
-    public DriverIncidentResponse ToResponse(long driverUserId)
+    public DriverIncidentResponse ToResponse(long driverUserId, IFileStorage storage)
     {
         var reportedByYou = ReportedBy == driverUserId;
         return new DriverIncidentResponse(
@@ -148,7 +150,7 @@ internal sealed class DriverIncidentRow
             IncidentType,
             // DECISIONS 8.3: someone else's report (the customer's, a Dispatcher's note, a previous driver's) goes to Dispatchers only.
             reportedByYou ? Description : "Có sự cố trên đơn này, Điều phối viên đang xử lý.",
-            reportedByYou ? SqlHelpers.ParseJsonList(PhotoUrls) : [],
+            reportedByYou ? SqlHelpers.ParseJsonList(PhotoUrls).Select(storage.CreateViewUrl).ToList() : [],
             reportedByYou ? Latitude : null,
             reportedByYou ? Longitude : null,
             reportedByYou,

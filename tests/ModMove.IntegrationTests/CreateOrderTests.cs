@@ -1,6 +1,7 @@
 using ModMove.Application.Common.Exceptions;
 using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Features.Orders.Commands.CreateOrder;
+using ModMove.Application.Features.Orders.Commands.UploadImage;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 using ModMove.Domain.Exceptions;
@@ -199,6 +200,27 @@ public class CreateOrderTests
     [Fact]
     public async Task Cash_without_payer_is_rejected() =>
         await Assert.ThrowsAsync<ValidationException>(() => App().Sender.Send(Order(payer: null)));
+
+    [Fact]
+    public async Task CreateOrder_stores_the_unsigned_url_of_a_signed_photo_DEF011()
+    {
+        var app = App();
+
+        await app.Sender.Send(Order(photos: [FakeFileStorage.SignedPhoto, FakeFileStorage.PublicPhoto]));
+
+        Assert.Equal([FakeFileStorage.PrivatePhoto, FakeFileStorage.PublicPhoto], app.Orders.Items.Single().Cargo!.PhotoUrls);
+    }
+
+    [Fact]
+    public async Task Upload_link_is_accepted_by_create_order_DEF011()
+    {
+        var app = App();
+        var uploaded = await app.Sender.Send(new UploadImageCommand(new MemoryStream([0xFF, 0xD8, 0xFF, 0xE0]), "a.jpg", "image/jpeg", 4));
+
+        await app.Sender.Send(Order(photos: [uploaded.Url]));
+
+        Assert.Equal([uploaded.Url.Replace("?signed=10min", "")], app.Orders.Items.Single().Cargo!.PhotoUrls);
+    }
 
     [Fact]
     public async Task Photo_outside_our_cloudinary_is_rejected() =>

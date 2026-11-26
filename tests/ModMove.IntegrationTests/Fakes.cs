@@ -641,6 +641,17 @@ internal sealed class FakeFileStorage : IFileStorage
 {
     public const string CloudName = "demo";
 
+    /// <summary>A private photo as saved, and the same photo as a client sends it back (the link <see cref="CreateViewUrl"/> made).</summary>
+    public const string PrivatePhoto = "https://res.cloudinary.com/demo/image/authenticated/modmove/customers/1/1.jpg";
+    public const string SignedPhoto = PrivatePhoto + "?signed=10min";
+
+    /// <summary>A photo saved before DEF-011: public, returned unchanged.</summary>
+    public const string PublicPhoto = "https://res.cloudinary.com/demo/image/upload/modmove/customers/1/old.jpg";
+
+    /// <summary>A JSON photo column holding one photo of each kind, and what a read must return for it.</summary>
+    public const string MixedPhotosJson = $"""["{PrivatePhoto}","{PublicPhoto}"]""";
+    public static readonly string[] MixedPhotosViewed = [SignedPhoto, PublicPhoto];
+
     public List<(string FileName, string Folder)> Uploaded { get; } = [];
 
     public Task<string> UploadImageAsync(Stream content, string fileName, string folder, CancellationToken cancellationToken)
@@ -662,6 +673,8 @@ internal sealed class FakeFileStorage : IFileStorage
     /// <summary>Marks the link so a test can see the query asked for a short-lived one.</summary>
     public string CreateViewUrl(string storedUrl) =>
         storedUrl.Contains("/image/authenticated/", StringComparison.Ordinal) ? storedUrl + "?signed=10min" : storedUrl;
+
+    public string ToStoredUrl(string url) => url.Replace("?signed=10min", "", StringComparison.Ordinal);
 }
 
 internal sealed class FakeCurrentUser(long? userId) : ICurrentUserService

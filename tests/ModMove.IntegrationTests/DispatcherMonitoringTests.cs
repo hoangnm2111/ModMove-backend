@@ -27,6 +27,7 @@ public class DispatcherMonitoringTests
             .AddLogging()
             .AddApplication()
             .AddSingleton<ISqlConnectionFactory>(sql)
+            .AddSingleton<IFileStorage>(new FakeFileStorage())
             .AddSingleton<ICurrentUserService>(new FakeCurrentUser(userId))
             .AddSingleton<TimeProvider>(new MutableTime(Now))
             .BuildServiceProvider()
@@ -97,6 +98,25 @@ public class DispatcherMonitoringTests
         Assert.False(res.Items[2].MatchingTimeoutSoon);
         Assert.True(res.Items[2].AwaitingPickupApproval);
         Assert.Equal(42L, res.Items[2].OpenIncidentId);
+    }
+
+    [Fact]
+    public async Task GetDispatcherOrderById_signs_private_photos_DEF011()
+    {
+        const string json = FakeFileStorage.MixedPhotosJson;
+        var sql = new FakeSql
+        {
+            CustomQuery = (text, _) => text.Contains("FROM shipping_orders")
+                ? FakeSql.Row(("Id", 55L), ("CargoType", "FURNITURE"), ("CargoPhotoUrlsJson", json), ("ProofStatus", "Verified"),
+                    ("PickupPhotoUrlsJson", json), ("DeliveryPhotoUrl", FakeFileStorage.PrivatePhoto))
+                : new DataTable(),
+        };
+
+        var detail = await SenderWith(sql).Send(new GetDispatcherOrderByIdQuery(55));
+
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, detail.Cargo!.PhotoUrls);
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, detail.Proof!.PickupPhotoUrls);
+        Assert.Equal(FakeFileStorage.SignedPhoto, detail.Proof.DeliveryPhotoUrl);
     }
 
     [Fact]

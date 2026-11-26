@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Web;
 
 namespace ModMove.Infrastructure.ExternalServices.Cloudinary;
 
@@ -30,6 +31,37 @@ internal static partial class CloudinaryUrls
         format = match.Groups["format"].Value;
         return true;
     }
+
+    /// <summary>
+    /// A signed download link of our cloud, as <c>CreateViewUrl</c> makes it
+    /// (<c>https://api.cloudinary.com/v1_1/{cloud}/image/download?public_id=..&amp;format=..&amp;type=authenticated&amp;..</c>) → public id and format.
+    /// The signature and expiry are not checked: the link only names the photo.
+    /// </summary>
+    public static bool TryParseDownload(string url, string cloudName, out string publicId, out string format)
+    {
+        publicId = "";
+        format = "";
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)
+            || uri.Scheme != Uri.UriSchemeHttps
+            || !string.Equals(uri.Host, "api.cloudinary.com", StringComparison.OrdinalIgnoreCase)
+            || uri.AbsolutePath != $"/v1_1/{cloudName}/image/download")
+            return false;
+
+        var query = HttpUtility.ParseQueryString(uri.Query);
+        if (query["type"] != AuthenticatedType
+            || query["public_id"] is not { Length: > 0 } id
+            || query["format"] is not { Length: > 0 } extension
+            || !extension.All(char.IsAsciiLetterOrDigit))
+            return false;
+
+        publicId = id;
+        format = extension;
+        return true;
+    }
+
+    /// <summary>The unsigned delivery URL we save for a private photo.</summary>
+    public static string StoredUrl(string cloudName, string publicId, string format) =>
+        $"https://res.cloudinary.com/{cloudName}/image/{AuthenticatedType}/{string.Join('/', publicId.Split('/').Select(Uri.EscapeDataString))}.{format}";
 
     [GeneratedRegex("/s--[^/]+--/")]
     private static partial Regex SignatureSegment();

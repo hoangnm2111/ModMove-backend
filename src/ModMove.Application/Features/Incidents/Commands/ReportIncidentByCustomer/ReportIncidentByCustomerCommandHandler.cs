@@ -16,6 +16,7 @@ internal sealed class ReportIncidentByCustomerCommandHandler(
     IRepository<InTransitIncident> incidents,
     IDriverProfileRepository driverProfiles,
     INotificationService notifications,
+    IFileStorage storage,
     IUnitOfWork unitOfWork) : ICommandHandler<ReportIncidentByCustomerCommand, IncidentCreatedResponse>
 {
     public async Task<IncidentCreatedResponse> Handle(ReportIncidentByCustomerCommand request, CancellationToken cancellationToken)
@@ -26,7 +27,8 @@ internal sealed class ReportIncidentByCustomerCommandHandler(
 
         // ORDER_NOT_YOURS and INCIDENT_NOT_ALLOWED come from the order.
         var incident = order.ReportIncidentByCustomer(
-            customer.Id, request.IncidentType, request.Description.Trim(), request.PhotoUrls, request.Latitude, request.Longitude);
+            customer.Id, request.IncidentType, request.Description.Trim(),
+            request.PhotoUrls?.Select(storage.ToStoredUrl).ToList(), request.Latitude, request.Longitude);
         incidents.Add(incident);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 

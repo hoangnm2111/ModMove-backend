@@ -1,13 +1,14 @@
 using Dapper;
 using ModMove.Application.Common;
 using ModMove.Application.Common.Exceptions;
+using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
 using ModMove.Domain.Entities;
 
 namespace ModMove.Application.Features.Refunds.Queries.GetAdminRefundDetail;
 
-internal sealed class GetAdminRefundDetailQueryHandler(ISqlConnectionFactory connectionFactory)
+internal sealed class GetAdminRefundDetailQueryHandler(ISqlConnectionFactory connectionFactory, IFileStorage storage)
     : IQueryHandler<GetAdminRefundDetailQuery, AdminRefundDetailResponse>
 {
     private const string Sql = """
@@ -57,7 +58,7 @@ internal sealed class GetAdminRefundDetailQueryHandler(ISqlConnectionFactory con
             row.Id, row.OrderId, row.OrderCode, row.OrderStatus,
             row.OrderTotalFee, row.PaymentMethod, row.PaymentStatus,
             row.IncidentId, row.SourceType, row.RefundStatus,
-            row.ReasonCode, row.Reason, SqlHelpers.ParseJsonList(row.EvidenceUrlsJson),
+            row.ReasonCode, row.Reason, SqlHelpers.ParseJsonList(row.EvidenceUrlsJson).Select(storage.CreateViewUrl).ToList(),
             row.RequestedAmount, row.ProposedAmount, row.ProposalReason,
             row.ProposedById, row.ProposedByName, row.ApprovedById, row.ApprovedByName,
             row.DecisionNote, row.InfoRequestNote, row.CustomerReply,

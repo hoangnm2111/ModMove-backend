@@ -1,12 +1,13 @@
 using Dapper;
 using ModMove.Application.Common;
 using ModMove.Application.Common.Exceptions;
+using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
 
 namespace ModMove.Application.Features.Incidents.Queries.GetIncidentById;
 
-internal sealed class GetIncidentByIdQueryHandler(ISqlConnectionFactory connectionFactory)
+internal sealed class GetIncidentByIdQueryHandler(ISqlConnectionFactory connectionFactory, IFileStorage storage)
     : IQueryHandler<GetIncidentByIdQuery, IncidentDetailResponse>
 {
     private const string IncidentSql = """
@@ -84,7 +85,7 @@ internal sealed class GetIncidentByIdQueryHandler(ISqlConnectionFactory connecti
             ? new IncidentCargoDetails(
                 row.CargoType, row.CargoQuantity ?? 0, row.CargoWeightKg ?? 0,
                 row.CargoLengthCm ?? 0, row.CargoWidthCm ?? 0, row.CargoHeightCm ?? 0,
-                row.CargoSpecialNotes, SqlHelpers.ParseJsonList(row.CargoPhotoUrlsJson),
+                row.CargoSpecialNotes, SqlHelpers.ParseJsonList(row.CargoPhotoUrlsJson).Select(storage.CreateViewUrl).ToList(),
                 row.CargoTypeName)
             : null;
 
@@ -111,8 +112,8 @@ internal sealed class GetIncidentByIdQueryHandler(ISqlConnectionFactory connecti
 
         var proof = row.ProofStatus is not null
             ? new IncidentProofEvidence(
-                SqlHelpers.ParseJsonList(row.PickupPhotoUrlsJson),
-                row.DeliveryPhotoUrl,
+                SqlHelpers.ParseJsonList(row.PickupPhotoUrlsJson).Select(storage.CreateViewUrl).ToList(),
+                row.DeliveryPhotoUrl is null ? null : storage.CreateViewUrl(row.DeliveryPhotoUrl),
                 SqlHelpers.ToUtc(row.DeliveryCompletionTime),
                 row.ProofStatus)
             : null;
@@ -120,7 +121,7 @@ internal sealed class GetIncidentByIdQueryHandler(ISqlConnectionFactory connecti
         var refund = refundRow is not null
             ? new IncidentRefundDetails(
                 refundRow.Id, refundRow.SourceType, refundRow.Reason,
-                SqlHelpers.ParseJsonList(refundRow.EvidenceUrlsJson),
+                SqlHelpers.ParseJsonList(refundRow.EvidenceUrlsJson).Select(storage.CreateViewUrl).ToList(),
                 refundRow.RequestedAmount, refundRow.ProposedAmount,
                 refundRow.ProposalReason, refundRow.ProposedById,
                 refundRow.InfoRequestNote, refundRow.CustomerReply,
@@ -130,7 +131,7 @@ internal sealed class GetIncidentByIdQueryHandler(ISqlConnectionFactory connecti
         return new IncidentDetailResponse(
             row.Id, row.OrderId, row.OrderCode, row.OrderStatus,
             row.IncidentType, row.Description,
-            SqlHelpers.ParseJsonList(row.PhotoUrlsJson),
+            SqlHelpers.ParseJsonList(row.PhotoUrlsJson).Select(storage.CreateViewUrl).ToList(),
             row.Latitude, row.Longitude,
             row.ResolutionStatus, row.ResolutionDecision, row.ResolutionNote,
             row.ReportedById, row.ReporterName, row.ReporterRole,

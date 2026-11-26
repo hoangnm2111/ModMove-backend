@@ -160,6 +160,20 @@ public class GetNearbyOrdersTests
     }
 
     [Fact]
+    public async Task GetNearbyOrders_signs_private_photos_DEF011()
+    {
+        var app = CreateApp();
+        app.Sql.Results.Enqueue(DriverRow());
+        var orders = OrdersTable();
+        AddCandidate(orders, photoUrlsJson: FakeFileStorage.MixedPhotosJson);
+        app.Sql.Results.Enqueue(orders);
+
+        var result = await app.Sender.Send(new GetNearbyOrdersQuery());
+
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, Assert.Single(result).CargoPhotoUrls);
+    }
+
+    [Fact]
     public async Task Returns_eligible_orders_within_radius_sorted_nearest_first_B5_GB08_GB14()
     {
         var app = CreateApp();

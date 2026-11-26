@@ -13,6 +13,7 @@ internal sealed class SubmitDriverApplicationCommandHandler(
     IDriverProfileRepository driverProfiles,
     IRepository<VehicleType> vehicleTypes,
     ISqlConnectionFactory connectionFactory,
+    IFileStorage storage,
     IUnitOfWork unitOfWork,
     TimeProvider clock) : ICommandHandler<SubmitDriverApplicationCommand, long>
 {
@@ -35,7 +36,7 @@ internal sealed class SubmitDriverApplicationCommandHandler(
         await DriverApplicationSubmissionHelper.EnsureNoDuplicatesAsync(
             connectionFactory, user.Id, plate, cancellationToken);
 
-        var urls = request.DocumentUrls.Select(u => u.Trim()).ToList();
+        var urls = request.DocumentUrls.Select(u => storage.ToStoredUrl(u.Trim())).ToList();
         var isNewProfile = profile is null;
 
         if (profile is null)

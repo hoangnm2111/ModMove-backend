@@ -9,7 +9,8 @@ using ModMove.Application.Features.Orders.Queries;
 
 namespace ModMove.Application.Features.Incidents.Queries.GetMyIncidents;
 
-internal sealed class GetMyIncidentsQueryHandler(ISqlConnectionFactory connectionFactory, ICurrentUserService currentUser)
+internal sealed class GetMyIncidentsQueryHandler(
+    ISqlConnectionFactory connectionFactory, ICurrentUserService currentUser, IFileStorage storage)
     : IQueryHandler<GetMyIncidentsQuery, PagedResult<MyIncidentResponse>>
 {
     // Joined with the order so only incidents of the caller's orders come back (IDOR, C10).
@@ -55,7 +56,7 @@ internal sealed class GetMyIncidentsQueryHandler(ISqlConnectionFactory connectio
         var items = rows.Select(r => new MyIncidentResponse(
             r.Id, r.OrderId, r.OrderCode, r.IncidentType,
             r.ReporterRole == "Dispatcher" ? "Điều phối viên đang xử lý sự cố trên đơn của bạn." : r.Description,
-            r.PhotoUrls is null || r.ReporterRole == "Dispatcher" ? [] : JsonSerializer.Deserialize<List<string>>(r.PhotoUrls) ?? [],
+            r.PhotoUrls is null || r.ReporterRole == "Dispatcher" ? [] : (JsonSerializer.Deserialize<List<string>>(r.PhotoUrls) ?? []).Select(storage.CreateViewUrl).ToList(),
             r.ReportedBy == customerId, r.ResolutionStatus, r.ResolutionDecision, r.ResolutionNote,
             CustomerAccess.Utc(r.CreatedAt), r.ResolvedAt is { } resolved ? CustomerAccess.Utc(resolved) : null)).ToList();
         return new PagedResult<MyIncidentResponse>(items, request.Page, request.PageSize, total);

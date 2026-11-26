@@ -29,7 +29,7 @@ public interface IFileStorage
     bool IsOwnedUrl(string url);
 
     /// <summary>
-    /// NFR 2.3: a driver's documents (ID card, licence, vehicle papers) are stored as private ("authenticated") photos.
+    /// NFR 2.3 (A-05): driver documents and order photos are stored as private ("authenticated") photos.
     /// The URL returned identifies the photo but does not open it; <see cref="CreateViewUrl"/> makes a short-lived link.
     /// </summary>
     Task<string> UploadPrivateImageAsync(Stream content, string fileName, string folder, CancellationToken cancellationToken) =>
@@ -37,6 +37,9 @@ public interface IFileStorage
 
     /// <summary>A link that opens a private photo for a few minutes (<c>DocumentViewLinkLifetime</c>); any other URL comes back unchanged.</summary>
     string CreateViewUrl(string storedUrl) => storedUrl;
+
+    /// <summary>What to save for a URL a client sends back: a <see cref="CreateViewUrl"/> link (even an expired one) loses its signature; any other URL comes back unchanged.</summary>
+    string ToStoredUrl(string url) => url;
 }
 
 /// <summary>Gmail SMTP: OTP codes and notification emails.</summary>

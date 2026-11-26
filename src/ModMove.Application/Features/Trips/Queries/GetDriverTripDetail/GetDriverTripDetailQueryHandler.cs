@@ -13,7 +13,8 @@ namespace ModMove.Application.Features.Trips.Queries.GetDriverTripDetail;
 internal sealed class GetDriverTripDetailQueryHandler(
     ISqlConnectionFactory connectionFactory,
     ICurrentUserService currentUser,
-    IPlatformSettings settings) : IQueryHandler<GetDriverTripDetailQuery, DriverTripDetailResponse>
+    IPlatformSettings settings,
+    IFileStorage storage) : IQueryHandler<GetDriverTripDetailQuery, DriverTripDetailResponse>
 {
     public async Task<DriverTripDetailResponse> Handle(
         GetDriverTripDetailQuery request, CancellationToken cancellationToken)
@@ -26,7 +27,7 @@ internal sealed class GetDriverTripDetailQueryHandler(
 
         var commissionRate = await settings.GetDecimalAsync(SettingKeys.CommissionRate, cancellationToken);
         return await DriverTripDetailReader.LoadByOrderIdAsync(
-                   connection, request.OrderId, driverProfileId, userId, commissionRate, cancellationToken)
+                   connection, request.OrderId, driverProfileId, userId, commissionRate, storage, cancellationToken)
                ?? throw new NotFoundException("Order", request.OrderId);
     }
 }
@@ -34,7 +35,8 @@ internal sealed class GetDriverTripDetailQueryHandler(
 internal sealed class GetActiveDriverTripQueryHandler(
     ISqlConnectionFactory connectionFactory,
     ICurrentUserService currentUser,
-    IPlatformSettings settings) : IQueryHandler<GetActiveDriverTripQuery, DriverTripDetailResponse?>
+    IPlatformSettings settings,
+    IFileStorage storage) : IQueryHandler<GetActiveDriverTripQuery, DriverTripDetailResponse?>
 {
     private const string ActiveOrderIdSql = """
         SELECT o.id
@@ -61,7 +63,7 @@ internal sealed class GetActiveDriverTripQueryHandler(
 
         var commissionRate = await settings.GetDecimalAsync(SettingKeys.CommissionRate, cancellationToken);
         return await DriverTripDetailReader.LoadByOrderIdAsync(
-            connection, orderId, driverProfileId, userId, commissionRate, cancellationToken);
+            connection, orderId, driverProfileId, userId, commissionRate, storage, cancellationToken);
     }
 }
 
@@ -182,6 +184,7 @@ internal static class DriverTripDetailReader
         long driverProfileId,
         long driverUserId,
         decimal currentCommissionRate,
+        IFileStorage storage,
         CancellationToken cancellationToken)
     {
         var parameters = new { OrderId = orderId, DriverProfileId = driverProfileId };
@@ -262,17 +265,17 @@ internal static class DriverTripDetailReader
                 c.LengthCm,
                 c.WidthCm,
                 c.HeightCm,
-                SqlHelpers.ParseJsonList(c.PhotoUrls),
+                SqlHelpers.ParseJsonList(c.PhotoUrls).Select(storage.CreateViewUrl).ToList(),
                 c.SpecialNotes),
             p is null
                 ? null
                 : new DriverTripProofResponse(
-                    SqlHelpers.ParseJsonList(p.PickupPhotoUrls),
+                    SqlHelpers.ParseJsonList(p.PickupPhotoUrls).Select(storage.CreateViewUrl).ToList(),
                     p.ProofStatus,
                     p.PickupSubmissionCount,
                     Math.Max(0, BusinessRules.MaxPickupSubmissions - p.PickupSubmissionCount),
                     p.RejectionReason,
-                    p.DeliveryPhotoUrl,
+                    p.DeliveryPhotoUrl is null ? null : storage.CreateViewUrl(p.DeliveryPhotoUrl),
                     SqlHelpers.ToUtc(p.DeliveryCompletionTime)),
             history.Select(h => new DriverTripHistoryResponse(
                 h.FromStatus, h.ToStatus, h.ChangedByRole, h.Note, SqlHelpers.ToUtc(h.ChangedAt))).ToList(),
@@ -281,7 +284,7 @@ internal static class DriverTripDetailReader
                 i.IncidentType,
                 // DECISIONS 8.3: if the customer reported the incident, their words may be about the driver; show generic text.
                 i.ReportedBy == driverUserId ? i.Description : "Có sự cố trên đơn này, Điều phối viên đang xử lý.",
-                i.ReportedBy == driverUserId ? SqlHelpers.ParseJsonList(i.PhotoUrls) : [],
+                i.ReportedBy == driverUserId ? SqlHelpers.ParseJsonList(i.PhotoUrls).Select(storage.CreateViewUrl).ToList() : [],
                 i.ReportedBy == driverUserId,
                 i.ResolutionStatus,
                 i.ResolutionDecision,

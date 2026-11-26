@@ -15,6 +15,7 @@ internal sealed class CreateOrderCommandHandler(
     IShippingOrderRepository orders,
     OrderPricing pricing,
     IMasterDataRepository masterData,
+    IFileStorage storage,
     IUnitOfWork unitOfWork,
     TimeProvider clock,
     INotificationService? notifications = null,
@@ -51,7 +52,7 @@ internal sealed class CreateOrderCommandHandler(
             request.PaymentMethod, request.PayerRole,
             CargoDetail.Create(
                 cargoType.Code, cargo.Quantity, cargo.WeightKg, cargo.LengthCm, cargo.WidthCm, cargo.HeightCm,
-                cargo.PhotoUrls, cargo.SpecialNotes?.Trim()),
+                cargo.PhotoUrls.Select(storage.ToStoredUrl).ToList(), cargo.SpecialNotes?.Trim()),
             warrantyAcceptedAt: now,
             senderName: string.IsNullOrWhiteSpace(request.SenderName) ? customer.FullName : request.SenderName,
             senderPhone: string.IsNullOrWhiteSpace(request.SenderPhone) ? customer.PhoneNumber : request.SenderPhone,

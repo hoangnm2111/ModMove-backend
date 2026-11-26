@@ -13,6 +13,7 @@ internal sealed class ReplyToInfoRequestCommandHandler(
     IRefundRepository refunds,
     IShippingOrderRepository orders,
     INotificationService notifications,
+    IFileStorage storage,
     IUnitOfWork unitOfWork) : ICommandHandler<ReplyToInfoRequestCommand>
 {
     public async Task Handle(ReplyToInfoRequestCommand request, CancellationToken cancellationToken)
@@ -24,7 +25,7 @@ internal sealed class ReplyToInfoRequestCommandHandler(
             ?? throw new NotFoundException(nameof(ShippingOrder), refund.OrderId);
 
         order.EnsureCustomer(customer.Id);
-        refund.ReplyToInfoRequest(request.Reply.Trim(), request.PhotoUrls); // NO_INFO_REQUEST, TOO_MANY_PHOTOS
+        refund.ReplyToInfoRequest(request.Reply.Trim(), request.PhotoUrls?.Select(storage.ToStoredUrl).ToList()); // NO_INFO_REQUEST, TOO_MANY_PHOTOS
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         await notifications.NotifyDispatchersAsync("REFUND_INFO_REPLIED", $"Khách đã trả lời, đơn {order.OrderCode}", refund, cancellationToken);

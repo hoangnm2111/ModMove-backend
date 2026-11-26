@@ -16,6 +16,7 @@ internal sealed class SubmitComplaintCommandHandler(
     IMasterDataRepository masterData,
     IPaymentTransactionRepository payments,
     INotificationService notifications,
+    IFileStorage storage,
     IUnitOfWork unitOfWork,
     TimeProvider clock) : ICommandHandler<SubmitComplaintCommand, RefundCreatedResponse>
 {
@@ -30,7 +31,8 @@ internal sealed class SubmitComplaintCommandHandler(
 
         // ORDER_NOT_YOURS, COMPLAINT_WINDOW_CLOSED, REFUND_AMOUNT_INVALID, REFUND_TOTAL_EXCEEDED come from the order.
         var refund = order.FileComplaint(
-            customer.Id, choice.ReasonText(request.Reason), request.EvidenceUrls, request.RequestedAmount, clock.GetUtcNow(), choice.Code);
+            customer.Id, choice.ReasonText(request.Reason), request.EvidenceUrls?.Select(storage.ToStoredUrl).ToList(),
+            request.RequestedAmount, clock.GetUtcNow(), choice.Code);
         if (await refunds.HasOpenComplaintAsync(order.Id, cancellationToken))
             throw new ConflictException("This order already has an open complaint.");
         order.EnsureRefundFits(request.RequestedAmount, await refunds.GetClaimedTotalForOrderAsync(order.Id, cancellationToken));
