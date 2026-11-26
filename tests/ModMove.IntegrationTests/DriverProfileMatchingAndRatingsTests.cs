@@ -140,6 +140,24 @@ public class DriverProfileMatchingAndRatingsTests
     }
 
     [Fact]
+    public async Task GetNearbyOrderDetail_signs_private_photos_DEF011()
+    {
+        var driver = User.Create("Nguyễn Văn Tài", "0912000001", "driver@x.vn", "h:x", UserRole.Driver, emailVerified: true);
+        var app = TestApp.SignedInAs(driver);
+        app.Settings.Add(PlatformSetting.Create(SettingKeys.MatchingRadiusKm, "5", TestApp.Start));
+        app.Settings.Add(PlatformSetting.Create(SettingKeys.RequiredDeposit, "200000", TestApp.Start));
+        app.Settings.Add(PlatformSetting.Create(SettingKeys.CommissionRate, "0.10", TestApp.Start));
+        var order = CandidateOrderTable(orderStatus: "Pending", driverProfileId: null, createdAt: TestApp.Start.UtcDateTime);
+        order.Rows[0]["CargoPhotoUrlsJson"] = FakeFileStorage.MixedPhotosJson;
+        app.Sql.Results.Enqueue(MatchingDriverTable(depositBalance: 250_000m));
+        app.Sql.Results.Enqueue(order);
+
+        var detail = await app.Sender.Send(new GetNearbyOrderDetailQuery(101));
+
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, detail.CargoPhotoUrls);
+    }
+
+    [Fact]
     public async Task GetNearbyOrderDetail_evaluates_eligibility_and_rejects_taken_cancelled_or_expired_orders_DRV09()
     {
         var driver = User.Create("Nguyễn Văn Tài", "0912000001", "driver@x.vn", "h:x", UserRole.Driver, emailVerified: true);

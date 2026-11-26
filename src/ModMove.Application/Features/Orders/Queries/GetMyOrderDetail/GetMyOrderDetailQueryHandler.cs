@@ -9,7 +9,8 @@ using ModMove.Application.Common.Messaging;
 namespace ModMove.Application.Features.Orders.Queries.GetMyOrderDetail;
 
 internal sealed class GetMyOrderDetailQueryHandler(
-    ISqlConnectionFactory connectionFactory, ICurrentUserService currentUser, TimeProvider time)
+    ISqlConnectionFactory connectionFactory, ICurrentUserService currentUser, TimeProvider time,
+    IFileStorage storage)
     : IQueryHandler<GetMyOrderDetailQuery, OrderDetailResponse>
 {
     private const string OrderSql = """
@@ -93,11 +94,12 @@ internal sealed class GetMyOrderDetailQueryHandler(
             o.PaymentMethod, o.PayerRole, o.PaymentStatus, CustomerAccess.Utc(o.CreatedAt),
             new CargoResponse(
                 c.CargoType, c.Quantity, c.WeightKg, c.LengthCm, c.WidthCm, c.HeightCm,
-                JsonSerializer.Deserialize<List<string>>(c.PhotoUrls) ?? [], c.SpecialNotes, c.CargoTypeName),
+                (JsonSerializer.Deserialize<List<string>>(c.PhotoUrls) ?? []).Select(storage.CreateViewUrl).ToList(), c.SpecialNotes, c.CargoTypeName),
             o.DriverName is null ? null : new DriverResponse(o.DriverName, o.DriverPhone ?? "", o.LicensePlate),
             p is null ? null : new ProofResponse(
-                p.PickupPhotoUrls is null ? [] : JsonSerializer.Deserialize<List<string>>(p.PickupPhotoUrls) ?? [],
-                p.ProofStatus, p.PickupSubmissionCount, p.RejectionReason, p.DeliveryPhotoUrl,
+                p.PickupPhotoUrls is null ? [] : (JsonSerializer.Deserialize<List<string>>(p.PickupPhotoUrls) ?? []).Select(storage.CreateViewUrl).ToList(),
+                p.ProofStatus, p.PickupSubmissionCount, p.RejectionReason,
+                p.DeliveryPhotoUrl is null ? null : storage.CreateViewUrl(p.DeliveryPhotoUrl),
                 p.DeliveryCompletionTime is { } delivered ? CustomerAccess.Utc(delivered) : null),
             history.Select(h => new StatusHistoryResponse(h.FromStatus, h.ToStatus, h.ChangedByRole, h.Note, CustomerAccess.Utc(h.ChangedAt))).ToList(),
             // A cancelled order cannot be paid any more, even while its last link is still alive.

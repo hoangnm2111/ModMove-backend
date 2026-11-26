@@ -78,6 +78,38 @@ public class DriverOnboardingSubmissionTests
     private static SubmitDriverApplicationCommand Command(string plate = "51C-111.22", decimal weight = 900m, long typeId = 1) =>
         new(typeId, plate, weight, Docs);
 
+    // ---------- DEF-011: a signed link sent back is saved without its signature ----------
+
+    [Fact]
+    public async Task SubmitDriverApplication_stores_the_unsigned_url_of_a_signed_photo_DEF011()
+    {
+        var app = new App();
+        app.NoDuplicates();
+
+        await app.DriverSender.Send(Command() with { DocumentUrls = [FakeFileStorage.SignedPhoto, .. Docs.Skip(1)] });
+
+        var profile = Assert.Single(app.Profiles.Items);
+        Assert.Equal(FakeFileStorage.PrivatePhoto, profile.LicenseFrontUrl);
+        Assert.Equal(FakeFileStorage.PrivatePhoto, Assert.Single(profile.Applications).DocumentUrls[0]);
+    }
+
+    [Fact]
+    public async Task ResubmitDriverApplication_stores_the_unsigned_url_of_a_signed_photo_DEF011()
+    {
+        var app = new App();
+        app.NoDuplicates();
+        await app.DriverSender.Send(Command());
+        var profile = app.Profiles.Items[0];
+        profile.Applications.Single().Reject(app.Admin.Id, ["Ảnh mờ"], TestApp.Start);
+        profile.Reject();
+
+        await app.DriverSender.Send(new ResubmitDriverApplicationCommand(
+            [new(DriverApplicationItemKeys.LicenseFront, FakeFileStorage.SignedPhoto)]));
+
+        Assert.Equal(FakeFileStorage.PrivatePhoto, profile.LicenseFrontUrl);
+        Assert.Equal(FakeFileStorage.PrivatePhoto, profile.Applications.Single(a => a.VersionNumber == 2).DocumentUrls[0]);
+    }
+
     // ---------- UC-DRV-03: first submission ----------
 
     [Fact]

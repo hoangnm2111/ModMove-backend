@@ -54,6 +54,7 @@ public class MyOrdersQueryTests
             .AddLogging()
             .AddApplication()
             .AddSingleton<ISqlConnectionFactory>(Sql)
+            .AddSingleton<IFileStorage>(new FakeFileStorage())
             .AddSingleton<ICurrentUserService>(new FakeCurrentUser(CustomerId))
             .AddSingleton<TimeProvider>(Time)
             .BuildServiceProvider()
@@ -114,6 +115,21 @@ public class MyOrdersQueryTests
     private static DataTable HistoryRows() => Table(
         ("FromStatus", typeof(string), null), ("ToStatus", typeof(string), "Pending"), ("ChangedByRole", typeof(string), "Customer"),
         ("Note", typeof(string), null), ("ChangedAt", typeof(DateTime), Created));
+
+    [Fact]
+    public async Task GetMyOrderDetail_signs_private_photos_DEF011()
+    {
+        var db = new Db { Proof = ProofRows() };
+        db.Cargo.Rows[0]["PhotoUrls"] = FakeFileStorage.MixedPhotosJson;
+        db.Proof.Rows[0]["PickupPhotoUrls"] = FakeFileStorage.MixedPhotosJson;
+        db.Proof.Rows[0]["DeliveryPhotoUrl"] = FakeFileStorage.PrivatePhoto;
+
+        var order = await db.Sender().Send(new GetMyOrderDetailQuery(1));
+
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, order.Cargo.PhotoUrls);
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, order.Proof!.PickupPhotoUrls);
+        Assert.Equal(FakeFileStorage.SignedPhoto, order.Proof.DeliveryPhotoUrl);
+    }
 
     [Fact]
     public async Task List_reads_only_the_callers_orders()

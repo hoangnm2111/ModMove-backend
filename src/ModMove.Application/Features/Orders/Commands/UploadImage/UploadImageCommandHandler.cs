@@ -14,7 +14,8 @@ internal sealed class UploadImageCommandHandler(
     {
         var user = await currentUser.LoadUserAsync(users, cancellationToken);
 
-        var url = await storage.UploadImageAsync(request.Content, request.FileName, $"modmove/customers/{user.Id}", cancellationToken);
-        return new UploadImageResponse(url);
+        // SRS IV.2.3: order photos are private; the signed link lets the client show the thumbnail (A-05).
+        var url = await storage.UploadPrivateImageAsync(request.Content, request.FileName, $"modmove/customers/{user.Id}", cancellationToken);
+        return new UploadImageResponse(storage.CreateViewUrl(url));
     }
 }

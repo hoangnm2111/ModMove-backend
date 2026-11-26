@@ -17,14 +17,16 @@ public class UploadImageTests
         new(new MemoryStream(bytes), "photo", contentType, length ?? bytes.Length);
 
     [Fact]
-    public async Task Jpg_is_uploaded_to_the_customer_folder()
+    public async Task Customer_upload_is_private_and_returns_a_signed_link_DEF011()
     {
         var app = TestApp.SignedInAs(Customer());
 
         var result = await app.Sender.Send(Upload(Jpg, "image/jpeg"));
 
-        Assert.StartsWith("https://res.cloudinary.com/demo/", result.Url);
-        Assert.Equal("modmove/customers/1", app.Files.Uploaded.Single().Folder);
+        Assert.StartsWith("https://res.cloudinary.com/demo/image/authenticated/", result.Url);
+        Assert.EndsWith("?signed=10min", result.Url);
+        Assert.Equal("modmove/customers/1", app.Files.UploadedPrivate.Single().Folder);
+        Assert.Empty(app.Files.Uploaded);
     }
 
     [Fact]
@@ -34,7 +36,7 @@ public class UploadImageTests
 
         await app.Sender.Send(Upload(Png, "image/png"));
 
-        Assert.Single(app.Files.Uploaded);
+        Assert.Single(app.Files.UploadedPrivate);
     }
 
     [Fact]
@@ -43,7 +45,7 @@ public class UploadImageTests
         var app = TestApp.SignedInAs(Customer());
 
         await Assert.ThrowsAsync<ValidationException>(() => app.Sender.Send(Upload(Jpg, "image/jpeg", length: 5_242_881)));
-        Assert.Empty(app.Files.Uploaded);
+        Assert.Empty(app.Files.UploadedPrivate);
     }
 
     [Fact]
@@ -60,7 +62,7 @@ public class UploadImageTests
         var app = TestApp.SignedInAs(Customer());
 
         await Assert.ThrowsAsync<ValidationException>(() => app.Sender.Send(Upload([0x4D, 0x5A, 0x90, 0x00], "image/jpeg")));
-        Assert.Empty(app.Files.Uploaded);
+        Assert.Empty(app.Files.UploadedPrivate);
     }
 
     [Fact]

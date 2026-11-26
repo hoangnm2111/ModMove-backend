@@ -19,6 +19,7 @@ internal sealed class DeliverTripCommandHandler(
     IIncidentRepository incidents,
     IPaymentTransactionRepository payments,
     INotificationService notifications,
+    IFileStorage storage,
     IUnitOfWork unitOfWork,
     TimeProvider clock) : ICommandHandler<DeliverTripCommand>
 {
@@ -57,7 +58,7 @@ internal sealed class DeliverTripCommandHandler(
             }
         }
 
-        order.Deliver(request.DeliveryPhotoUrl, driver.Id, now);
+        order.Deliver(storage.ToStoredUrl(request.DeliveryPhotoUrl), driver.Id, now);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
         await notifications.PublishOrderStatusAsync(order, driver.Id, cancellationToken);

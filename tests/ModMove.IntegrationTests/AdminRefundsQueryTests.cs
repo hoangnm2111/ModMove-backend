@@ -3,6 +3,7 @@ using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using ModMove.Application;
 using ModMove.Application.Common.Exceptions;
+using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Features.Incidents.Queries.GetIncidentById;
 using ModMove.Application.Features.Refunds.Queries.GetAdminRefundDetail;
@@ -22,6 +23,7 @@ public class AdminRefundsQueryTests
         public string? PayoutAccountNumber { get; set; }
         public string? PayoutFailureReason { get; set; }
         public DateTime? PayoutInfoUpdatedAt { get; set; }
+        public string? EvidenceUrlsJson { get; set; }
         public List<(string Sql, IReadOnlyDictionary<string, object?> Parameters)> Executed { get; } = [];
 
         public Db()
@@ -82,7 +84,7 @@ public class AdminRefundsQueryTests
             ("RefundStatus", typeof(string), Status),
             ("ReasonCode", typeof(string), "CHANGED_PLAN"),
             ("Reason", typeof(string), "Đổi ý"),
-            ("EvidenceUrlsJson", typeof(string), null),
+            ("EvidenceUrlsJson", typeof(string), EvidenceUrlsJson),
             ("RequestedAmount", typeof(decimal), 180_000m),
             ("ProposedAmount", typeof(decimal), 180_000m),
             ("ProposalReason", typeof(string), null),
@@ -116,6 +118,7 @@ public class AdminRefundsQueryTests
             .AddLogging()
             .AddApplication()
             .AddSingleton<ISqlConnectionFactory>(Sql)
+            .AddSingleton<IFileStorage>(new FakeFileStorage())
             .BuildServiceProvider()
             .GetRequiredService<ISender>();
     }
@@ -144,6 +147,16 @@ public class AdminRefundsQueryTests
         Assert.Equal(failureReason, item.PayoutFailureReason);
         var json = System.Text.Json.JsonSerializer.Serialize(page);
         Assert.DoesNotContain("0123456789", json);
+    }
+
+    [Fact]
+    public async Task GetAdminRefundDetail_signs_private_photos_DEF011()
+    {
+        var db = new Db { EvidenceUrlsJson = FakeFileStorage.MixedPhotosJson };
+
+        var detail = await db.Sender().Send(new GetAdminRefundDetailQuery(4));
+
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, detail.EvidenceUrls);
     }
 
     [Fact]
@@ -197,6 +210,7 @@ public class AdminRefundsQueryTests
             .AddLogging()
             .AddApplication()
             .AddSingleton<ISqlConnectionFactory>(sql)
+            .AddSingleton<IFileStorage>(new FakeFileStorage())
             .BuildServiceProvider()
             .GetRequiredService<ISender>();
 

@@ -3,6 +3,7 @@ using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using ModMove.Application;
 using ModMove.Application.Common.Exceptions;
+using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Features.Incidents.Queries.GetIncidentById;
 
@@ -15,6 +16,7 @@ public class GetIncidentByIdTests
         .AddLogging()
         .AddApplication()
         .AddSingleton<ISqlConnectionFactory>(sql)
+        .AddSingleton<IFileStorage>(new FakeFileStorage())
         .BuildServiceProvider()
         .GetRequiredService<ISender>();
 
@@ -112,6 +114,29 @@ public class GetIncidentByIdTests
         table.Columns.Add("RefundStatus", typeof(string));
         table.Columns.Add("CreatedAt", typeof(DateTime));
         return table;
+    }
+
+    [Fact]
+    public async Task GetIncidentById_signs_private_photos_DEF011()
+    {
+        const string json = FakeFileStorage.MixedPhotosJson;
+        var sql = new FakeSql
+        {
+            CustomQuery = (text, _) =>
+                text.Contains("FROM in_transit_incidents")
+                    ? FakeSql.Row(("Id", 1L), ("PhotoUrlsJson", json), ("CargoType", "FURNITURE"), ("CargoPhotoUrlsJson", json),
+                        ("ProofStatus", "Verified"), ("PickupPhotoUrlsJson", json), ("DeliveryPhotoUrl", FakeFileStorage.PrivatePhoto))
+                : text.Contains("FROM refunds") ? FakeSql.Row(("Id", 2L), ("EvidenceUrlsJson", json))
+                : new DataTable(),
+        };
+
+        var detail = await SenderWith(sql).Send(new GetIncidentByIdQuery(1));
+
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, detail.PhotoUrls);
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, detail.Order.Cargo!.PhotoUrls);
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, detail.Proof!.PickupPhotoUrls);
+        Assert.Equal(FakeFileStorage.SignedPhoto, detail.Proof.DeliveryPhotoUrl);
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, detail.Refund!.EvidenceUrls);
     }
 
     [Fact]

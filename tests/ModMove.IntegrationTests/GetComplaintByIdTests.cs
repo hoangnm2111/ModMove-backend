@@ -3,6 +3,7 @@ using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using ModMove.Application;
 using ModMove.Application.Common.Exceptions;
+using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Features.Refunds.Queries.GetComplaintById;
 
@@ -15,6 +16,7 @@ public class GetComplaintByIdTests
         .AddLogging()
         .AddApplication()
         .AddSingleton<ISqlConnectionFactory>(sql)
+        .AddSingleton<IFileStorage>(new FakeFileStorage())
         .BuildServiceProvider()
         .GetRequiredService<ISender>();
 
@@ -124,6 +126,26 @@ public class GetComplaintByIdTests
             () => SenderWith(sql).Send(new GetComplaintByIdQuery(999)));
 
         Assert.Contains("Refund", ex.Message);
+    }
+
+    [Fact]
+    public async Task GetComplaintById_signs_private_photos_DEF011()
+    {
+        const string json = FakeFileStorage.MixedPhotosJson;
+        var sql = new FakeSql
+        {
+            CustomQuery = (text, _) => text.Contains("FROM refunds")
+                ? FakeSql.Row(("Id", 1L), ("EvidenceUrlsJson", json), ("CargoType", "FURNITURE"), ("CargoPhotoUrlsJson", json),
+                    ("ProofStatus", "Verified"), ("PickupPhotoUrlsJson", json), ("DeliveryPhotoUrl", FakeFileStorage.PrivatePhoto))
+                : new DataTable(),
+        };
+
+        var detail = await SenderWith(sql).Send(new GetComplaintByIdQuery(1));
+
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, detail.EvidenceUrls);
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, detail.Order.Cargo!.PhotoUrls);
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, detail.VerificationEvidence!.PickupPhotoUrls);
+        Assert.Equal(FakeFileStorage.SignedPhoto, detail.VerificationEvidence.DeliveryPhotoUrl);
     }
 
     [Fact]

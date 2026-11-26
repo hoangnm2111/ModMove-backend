@@ -23,6 +23,7 @@ public class MyRefundsQueryTests
         public string Status { get; set; } = "Requested";
         public bool Found { get; set; } = true;
         public string? DecisionReason { get; set; }
+        public string EvidenceUrls { get; set; } = """["https://res.cloudinary.com/demo/a.jpg"]""";
         public string? PayoutAccountNumber { get; set; }
         public string? PayoutFailureReason { get; set; }
         public string? PayerBankCode { get; set; } = "970436";
@@ -61,7 +62,7 @@ public class MyRefundsQueryTests
                     ("PayoutAccountHolder", typeof(string), PayoutAccountNumber is null ? null : "NGUYEN VAN A"),
                     ("PayoutFailureReason", typeof(string), PayoutFailureReason),
                     ("BankReferenceCode", typeof(string), "FT26293998877"),
-                    ("EvidenceUrls", typeof(string), """["https://res.cloudinary.com/demo/a.jpg"]"""),
+                    ("EvidenceUrls", typeof(string), EvidenceUrls),
                     ("RequestedAmount", typeof(decimal), 100_000m), ("ProposedAmount", typeof(decimal), 80_000m),
                     ("InfoRequestNote", typeof(string), "Chụp thêm ảnh"), ("CustomerReply", typeof(string), null),
                     ("DecidedAt", typeof(DateTime), null), ("ProcessedAt", typeof(DateTime), null),
@@ -76,6 +77,7 @@ public class MyRefundsQueryTests
             .AddLogging()
             .AddApplication()
             .AddSingleton<ISqlConnectionFactory>(Sql)
+            .AddSingleton<IFileStorage>(new FakeFileStorage())
             .AddSingleton<ICurrentUserService>(new FakeCurrentUser(CustomerId))
             .BuildServiceProvider()
             .GetRequiredService<ISender>();
@@ -117,6 +119,16 @@ public class MyRefundsQueryTests
 
         Assert.Null(requested.ApprovedAmount);
         Assert.Equal(80_000m, approved.ApprovedAmount);
+    }
+
+    [Fact]
+    public async Task GetMyRefundDetail_signs_private_photos_DEF011()
+    {
+        var db = new Db { EvidenceUrls = FakeFileStorage.MixedPhotosJson };
+
+        var refund = await db.Sender().Send(new GetMyRefundDetailQuery(4));
+
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, refund.EvidenceUrls);
     }
 
     [Fact]

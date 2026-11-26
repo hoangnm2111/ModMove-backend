@@ -28,7 +28,7 @@ internal sealed class CreateDispatcherCommandHandler(
 
         // GB-01 / UC-ADM-07 Step 4a (MSG18): duplicate email or phone number → 409 Conflict.
         if (await users.IsEmailOrPhoneTakenAsync(email, phone, cancellationToken))
-            throw new ConflictException("This email or phone number is already registered.");
+            throw await AuthRules.AlreadyRegisteredAsync(users, email, cancellationToken);
 
         var dispatcher = User.Create(
             fullName,

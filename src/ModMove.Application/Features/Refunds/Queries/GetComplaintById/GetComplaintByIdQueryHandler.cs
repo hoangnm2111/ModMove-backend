@@ -1,13 +1,14 @@
 using Dapper;
 using ModMove.Application.Common;
 using ModMove.Application.Common.Exceptions;
+using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
 using ModMove.Domain.Enums;
 
 namespace ModMove.Application.Features.Refunds.Queries.GetComplaintById;
 
-internal sealed class GetComplaintByIdQueryHandler(ISqlConnectionFactory connectionFactory)
+internal sealed class GetComplaintByIdQueryHandler(ISqlConnectionFactory connectionFactory, IFileStorage storage)
     : IQueryHandler<GetComplaintByIdQuery, ComplaintDetailResponse>
 {
     private const string ComplaintSql = """
@@ -95,7 +96,7 @@ internal sealed class GetComplaintByIdQueryHandler(ISqlConnectionFactory connect
             ? new ComplaintCargoDetails(
                 row.CargoType, row.CargoQuantity ?? 0, row.CargoWeightKg ?? 0,
                 row.CargoLengthCm ?? 0, row.CargoWidthCm ?? 0, row.CargoHeightCm ?? 0,
-                row.CargoSpecialNotes, SqlHelpers.ParseJsonList(row.CargoPhotoUrlsJson),
+                row.CargoSpecialNotes, SqlHelpers.ParseJsonList(row.CargoPhotoUrlsJson).Select(storage.CreateViewUrl).ToList(),
                 row.CargoTypeName)
             : null;
 
@@ -118,8 +119,8 @@ internal sealed class GetComplaintByIdQueryHandler(ISqlConnectionFactory connect
 
         var evidence = row.ProofStatus is not null
             ? new ComplaintVerificationEvidence(
-                SqlHelpers.ParseJsonList(row.PickupPhotoUrlsJson),
-                row.DeliveryPhotoUrl,
+                SqlHelpers.ParseJsonList(row.PickupPhotoUrlsJson).Select(storage.CreateViewUrl).ToList(),
+                row.DeliveryPhotoUrl is null ? null : storage.CreateViewUrl(row.DeliveryPhotoUrl),
                 SqlHelpers.ToUtc(row.DeliveryCompletionTime),
                 row.ProofStatus)
             : null;
@@ -142,7 +143,7 @@ internal sealed class GetComplaintByIdQueryHandler(ISqlConnectionFactory connect
 
         return new ComplaintDetailResponse(
             row.Id, row.OrderId, row.OrderCode, row.OrderStatus,
-            row.Reason, SqlHelpers.ParseJsonList(row.EvidenceUrlsJson),
+            row.Reason, SqlHelpers.ParseJsonList(row.EvidenceUrlsJson).Select(storage.CreateViewUrl).ToList(),
             row.RequestedAmount, row.ProposedAmount, row.ProposalReason,
             row.ProposedById, row.ProposedByName,
             row.InfoRequestNote, row.CustomerReply,

@@ -16,6 +16,7 @@ public class ErrorContractTests
         { new ForbiddenAccessException(), 403, "FORBIDDEN" },
         { new NotFoundException("Order", 1), 404, "NOT_FOUND" },
         { new ConflictException(), 409, "CONFLICT" },
+        { new ConflictException("taken", "EMAIL_TAKEN"), 409, "EMAIL_TAKEN" },
         { new DomainException("rule"), 422, "BUSINESS_RULE" },
         { new DomainException("rule", "MSG67"), 422, "MSG67" },
         { new InvalidOperationException("boom"), 500, "SERVER_ERROR" },

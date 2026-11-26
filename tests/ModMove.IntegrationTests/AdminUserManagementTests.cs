@@ -473,15 +473,17 @@ public class AdminUserManagementTests
     }
 
     [Theory]
-    [InlineData("0911111111", "unique@modmove.vn")]       // duplicate phone
-    [InlineData("0977888999", "customer@modmove.vn")]     // duplicate email
-    [InlineData("0977888999", "CUSTOMER@MODMOVE.VN")]     // duplicate email (case-insensitive)
+    [InlineData("0911111111", "unique@modmove.vn", "PHONE_TAKEN")]       // duplicate phone
+    [InlineData("0977888999", "customer@modmove.vn", "EMAIL_TAKEN")]     // duplicate email
+    [InlineData("0977888999", "CUSTOMER@MODMOVE.VN", "EMAIL_TAKEN")]     // duplicate email (case-insensitive)
     public async Task CreateDispatcher_with_duplicate_email_or_phone_throws_ConflictException_GB01(
-        string phone, string email)
+        string phone, string email, string code)
     {
         var app = new AdminUsersApp();
 
-        await Assert.ThrowsAsync<ConflictException>(() =>
+        var error = await Assert.ThrowsAsync<ConflictException>(() =>
             app.Sender.Send(new CreateDispatcherCommand("Trùng Lặp", phone, email, "Disp@12345")));
+
+        Assert.Equal(code, error.Code); // MSG18 on that field
     }
 }

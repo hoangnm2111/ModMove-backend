@@ -13,10 +13,11 @@ internal sealed class UploadDriverImageCommandHandler(
     public async Task<DriverUploadResponse> Handle(UploadDriverImageCommand request, CancellationToken cancellationToken)
     {
         var user = await currentUser.LoadUserAsync(users, cancellationToken);
-        var url = request.Purpose == DriverUploadPurpose.Document
-            ? await storage.UploadPrivateImageAsync(request.Content, request.FileName, $"modmove/drivers/{user.Id}/documents", cancellationToken)
-            : await storage.UploadImageAsync(request.Content, request.FileName, $"modmove/drivers/{user.Id}", cancellationToken);
-        return new DriverUploadResponse(url);
+        var isDocument = request.Purpose == DriverUploadPurpose.Document;
+        var folder = isDocument ? $"modmove/drivers/{user.Id}/documents" : $"modmove/drivers/{user.Id}";
+        var url = await storage.UploadPrivateImageAsync(request.Content, request.FileName, folder, cancellationToken);
+        // A-05: a trip photo comes back as a signed link to show the thumbnail; a document URL only identifies the photo.
+        return new DriverUploadResponse(isDocument ? url : storage.CreateViewUrl(url));
     }
 }
 

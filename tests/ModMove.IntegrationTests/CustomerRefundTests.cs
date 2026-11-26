@@ -26,6 +26,45 @@ public class CustomerRefundTests
         return incident;
     }
 
+    // ---- DEF-011: the view signature a client sends back is not saved ----
+
+    [Fact]
+    public async Task SubmitComplaint_stores_the_unsigned_url_of_a_signed_photo_DEF011()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+
+        await s.App.Sender.Send(Complaint(order, photos: [FakeFileStorage.SignedPhoto]));
+
+        Assert.Equal([FakeFileStorage.PrivatePhoto], Assert.Single(s.App.Refunds.Items).EvidenceUrls!);
+    }
+
+    [Fact]
+    public async Task RequestIncidentRefund_stores_the_unsigned_url_of_a_signed_photo_DEF011()
+    {
+        var s = new TripSetup();
+        var incident = AddIncident(s, s.PickedUp());
+
+        await s.App.Sender.Send(new RequestIncidentRefundCommand(
+            incident.Id, "Trễ 3 giờ", [FakeFileStorage.SignedPhoto], 50_000, TestPayout.Valid));
+
+        Assert.Equal([FakeFileStorage.PrivatePhoto], Assert.Single(s.App.Refunds.Items).EvidenceUrls!);
+    }
+
+    [Fact]
+    public async Task ReplyToInfoRequest_stores_the_unsigned_url_of_a_signed_photo_DEF011()
+    {
+        var s = new TripSetup();
+        var order = s.Delivered();
+        await s.App.Sender.Send(Complaint(order));
+        var refund = s.App.Refunds.Items[0];
+        refund.RequestMoreInfo("Chụp thêm thùng hàng");
+
+        await s.App.Sender.Send(new ReplyToInfoRequestCommand(refund.Id, "Ảnh đây", [FakeFileStorage.SignedPhoto]));
+
+        Assert.Equal([Photo, FakeFileStorage.PrivatePhoto], refund.EvidenceUrls!);
+    }
+
     // ---- Submit complaint (UC-CUS-21, 22) ----
 
     [Fact]

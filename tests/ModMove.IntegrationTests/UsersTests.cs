@@ -36,7 +36,8 @@ public class UsersTests
         var other = User.Create("Binh", "0922222222", "binh@x.vn", "h:x", UserRole.Driver, emailVerified: true);
         var app = SignedIn(user, other);
 
-        await Assert.ThrowsAsync<ConflictException>(() => app.Sender.Send(new UpdateMyProfileCommand("An", "0922222222")));
+        var error = await Assert.ThrowsAsync<ConflictException>(() => app.Sender.Send(new UpdateMyProfileCommand("An", "0922222222")));
+        Assert.Equal("PHONE_TAKEN", error.Code);
         Assert.Equal("0900000001", user.PhoneNumber);
     }
 

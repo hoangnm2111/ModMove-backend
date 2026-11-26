@@ -16,6 +16,7 @@ internal sealed class ResubmitDriverApplicationCommandHandler(
     IDriverProfileRepository driverProfiles,
     IRepository<VehicleType> vehicleTypes,
     ISqlConnectionFactory connectionFactory,
+    IFileStorage storage,
     IUnitOfWork unitOfWork,
     TimeProvider clock) : ICommandHandler<ResubmitDriverApplicationCommand, long>
 {
@@ -58,7 +59,7 @@ internal sealed class ResubmitDriverApplicationCommandHandler(
 
             submittedDocKeys.Add(normalizedKey);
             if (DriverApplicationItemKeys.DocumentIndexByKey.TryGetValue(normalizedKey, out var index))
-                urls[index] = item.Url.Trim();
+                urls[index] = storage.ToStoredUrl(item.Url.Trim());
         }
 
         if (rejectedKeys is { Count: > 0 })

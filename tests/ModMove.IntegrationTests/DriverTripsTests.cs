@@ -87,8 +87,10 @@ public class DriverTripsTests
         var uploaded = await s.App.Sender.Send(
             new UploadDriverImageCommand(new MemoryStream(JpgBytes), "pickup.jpg", "image/jpeg", JpgBytes.Length));
 
-        Assert.StartsWith("https://res.cloudinary.com/demo/", uploaded.Url);
-        Assert.Equal($"modmove/drivers/{s.Driver.Id}", s.App.Files.Uploaded.Single().Folder);
+        Assert.StartsWith("https://res.cloudinary.com/demo/image/authenticated/", uploaded.Url);
+        Assert.EndsWith("?signed=10min", uploaded.Url); // DEF-011: the app shows the thumbnail through this link
+        Assert.Equal($"modmove/drivers/{s.Driver.Id}", s.App.Files.UploadedPrivate.Single().Folder);
+        Assert.Empty(s.App.Files.Uploaded);
 
         await Assert.ThrowsAsync<ValidationException>(() => s.App.Sender.Send(
             new UploadDriverImageCommand(new MemoryStream([0x4D, 0x5A, 0x90, 0x00]), "bad.jpg", "image/jpeg", 4)));
@@ -103,6 +105,7 @@ public class DriverTripsTests
             new MemoryStream(JpgBytes), "cccd.jpg", "image/jpeg", JpgBytes.Length, DriverUploadPurpose.Document));
 
         Assert.Contains("/image/authenticated/", uploaded.Url);
+        Assert.DoesNotContain("?signed", uploaded.Url); // documents keep their behaviour: the URL only identifies the photo
         Assert.Equal($"modmove/drivers/{s.Driver.Id}/documents", s.App.Files.UploadedPrivate.Single().Folder);
         Assert.Empty(s.App.Files.Uploaded);
         Assert.True(s.App.Files.IsOwnedUrl(uploaded.Url)); // still accepted by submit / resubmit
@@ -142,6 +145,32 @@ public class DriverTripsTests
         var order2 = unapproved.AcceptedOrder();
         var notApproved = await Assert.ThrowsAsync<DomainException>(() => unapproved.App.Sender.Send(new ConfirmArrivalCommand(order2.Id)));
         Assert.Equal("DRIVER_NOT_APPROVED", notApproved.Code);
+    }
+
+    [Fact]
+    public async Task ConfirmPickup_stores_the_unsigned_url_of_a_signed_photo_DEF011()
+    {
+        var s = new Setup();
+        var order = s.AcceptedOrder();
+        order.ConfirmArrival(s.Driver.Id, TestApp.Start);
+
+        await s.App.Sender.Send(new ConfirmPickupCommand(order.Id, [FakeFileStorage.SignedPhoto, Photo2]));
+
+        Assert.Equal([FakeFileStorage.PrivatePhoto, Photo2], order.Proof!.PickupPhotoUrls!);
+    }
+
+    [Fact]
+    public async Task DeliverTrip_stores_the_unsigned_url_of_a_signed_photo_DEF011()
+    {
+        var s = new Setup();
+        var order = s.AcceptedOrder();
+        order.ConfirmArrival(s.Driver.Id, TestApp.Start);
+        order.ConfirmPickup([Photo1, Photo2], s.Driver.Id, TestApp.Start);
+        order.ApprovePickupEvidence(s.Customer.Id, TestApp.Start);
+
+        await s.App.Sender.Send(new DeliverTripCommand(order.Id, FakeFileStorage.SignedPhoto));
+
+        Assert.Equal(FakeFileStorage.PrivatePhoto, order.Proof!.DeliveryPhotoUrl);
     }
 
     [Fact]
@@ -444,6 +473,27 @@ public class DriverTripsTests
         s.App.Sql.Results.Enqueue(DriverContextTable(s.Profile.Id));
         s.App.Sql.Results.Enqueue(orderTable.Clone());
         await Assert.ThrowsAsync<NotFoundException>(() => s.App.Sender.Send(new GetDriverTripDetailQuery(999)));
+    }
+
+    [Fact]
+    public async Task GetDriverTripDetail_signs_private_photos_DEF011()
+    {
+        var s = new Setup();
+        const string json = FakeFileStorage.MixedPhotosJson;
+        s.App.Sql.CustomQuery = (sql, _) =>
+            sql.Contains("FROM cargo_details") ? FakeSql.Row(("PhotoUrls", json))
+            : sql.Contains("FROM proof_of_deliveries") ? FakeSql.Row(("PickupPhotoUrls", json), ("DeliveryPhotoUrl", FakeFileStorage.PrivatePhoto))
+            : sql.Contains("FROM order_status_histories") ? new DataTable()
+            : sql.Contains("FROM in_transit_incidents") ? FakeSql.Row(("ReportedBy", s.Driver.Id), ("PhotoUrls", json))
+            : sql.Contains("FROM users") ? DriverContextTable(s.Profile.Id)
+            : FakeSql.Row(("Id", 1L), ("OrderStatus", "InTransit"));
+
+        var detail = await s.App.Sender.Send(new GetDriverTripDetailQuery(1));
+
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, detail.Cargo.PhotoUrls);
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, detail.Proof!.PickupPhotoUrls);
+        Assert.Equal(FakeFileStorage.SignedPhoto, detail.Proof.DeliveryPhotoUrl);
+        Assert.Equal(FakeFileStorage.MixedPhotosViewed, Assert.Single(detail.Incidents).PhotoUrls);
     }
 
     private static DataTable DriverContextTable(long driverProfileId)

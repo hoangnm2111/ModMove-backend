@@ -119,16 +119,19 @@ public class AuthFlowTests
     }
 
     [Theory]
-    [InlineData("an@example.com", "0999999999")] // same email, different case
-    [InlineData("other@example.com", "0912345678")] // same phone
-    public async Task Email_and_phone_of_a_verified_account_stay_taken_GB01(string email, string phone)
+    [InlineData("an@example.com", "0999999999", "EMAIL_TAKEN")] // same email, different case
+    [InlineData("other@example.com", "0912345678", "PHONE_TAKEN")] // same phone
+    [InlineData("an@example.com", "0912345678", "EMAIL_TAKEN")] // both: the email is reported
+    public async Task Email_and_phone_of_a_verified_account_stay_taken_GB01(string email, string phone, string code)
     {
         var app = await VerifiedAsync();
         var user = app.Users.Items[0];
         var password = user.PasswordHash;
 
-        await Assert.ThrowsAsync<ConflictException>(() =>
+        var error = await Assert.ThrowsAsync<ConflictException>(() =>
             app.Sender.Send(RegisterCommand.From(Valid with { Email = email, PhoneNumber = phone, Password = "newsecret123" }, UserRole.Customer)));
+
+        Assert.Equal(code, error.Code); // MSG18 on that field
 
         Assert.Equal(password, user.PasswordHash);
         Assert.Equal("0912345678", user.PhoneNumber);
@@ -426,8 +429,9 @@ public class AuthFlowTests
         await app.Sender.Send(RegisterCommand.From(other, UserRole.Customer));
         await app.Sender.Send(new VerifyEmailCommand(other.Email, app.Email.LastCode(), other.Password));
 
-        await Assert.ThrowsAsync<ConflictException>(() => app.Sender.Send(new VerifyEmailCommand(Valid.Email, anCode, Valid.Password)));
+        var error = await Assert.ThrowsAsync<ConflictException>(() => app.Sender.Send(new VerifyEmailCommand(Valid.Email, anCode, Valid.Password)));
 
+        Assert.Equal("PHONE_TAKEN", error.Code);
         Assert.Equal("other@example.com", Assert.Single(app.Users.Items).Email);
     }
 
@@ -690,9 +694,10 @@ public class AuthFlowTests
         var app = await RegisteredAsync();
         app.Users.Add(User.Create("Other", "0988888888", "an@example.com", "h:x", UserRole.Customer, emailVerified: true)); // saved meanwhile
 
-        await Assert.ThrowsAsync<ConflictException>(() =>
+        var error = await Assert.ThrowsAsync<ConflictException>(() =>
             app.Sender.Send(new VerifyEmailCommand(Valid.Email, app.Email.LastCode(), Valid.Password)));
 
+        Assert.Equal("EMAIL_TAKEN", error.Code);
         Assert.Equal("Other", Assert.Single(app.Users.Items).FullName);
     }
 

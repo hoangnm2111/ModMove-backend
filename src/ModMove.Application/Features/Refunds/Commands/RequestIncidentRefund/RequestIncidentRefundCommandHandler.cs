@@ -16,6 +16,7 @@ internal sealed class RequestIncidentRefundCommandHandler(
     IMasterDataRepository masterData,
     IPaymentTransactionRepository payments,
     INotificationService notifications,
+    IFileStorage storage,
     IUnitOfWork unitOfWork,
     TimeProvider clock) : ICommandHandler<RequestIncidentRefundCommand, RefundCreatedResponse>
 {
@@ -29,7 +30,8 @@ internal sealed class RequestIncidentRefundCommandHandler(
 
         // ORDER_NOT_YOURS, REFUND_AMOUNT_INVALID, REFUND_NOT_ALLOWED and REFUND_TOTAL_EXCEEDED come from the order.
         var refund = order.RequestIncidentRefund(
-            customer.Id, incident.Id, request.Reason.Trim(), request.EvidenceUrls, request.RequestedAmount);
+            customer.Id, incident.Id, request.Reason.Trim(),
+            request.EvidenceUrls?.Select(storage.ToStoredUrl).ToList(), request.RequestedAmount);
         if (await refunds.HasOpenRefundForIncidentAsync(incident.Id, cancellationToken))
             throw new ConflictException("This incident already has an open refund request.");
         order.EnsureRefundFits(request.RequestedAmount, await refunds.GetClaimedTotalForOrderAsync(order.Id, cancellationToken));
