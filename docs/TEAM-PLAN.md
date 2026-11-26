@@ -51,7 +51,7 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 - [x] MapVina (`IMapService`: Search v2 + Directions v2, DECISIONS 3.4; trước đây Google Maps) và `FareCalculator` (B1)
 - [x] `POST api/public/fareestimate`: loại xe, tải trọng và lọt thùng theo món lớn nhất (GB-10, 4.2: dùng `VehicleType.CanCarry`), phí bốc xếp, coupon (GB-21) với mã lỗi riêng `COUPON_NOT_FOUND`, `COUPON_INACTIVE`, `COUPON_EXPIRED`, `COUPON_LIMIT_REACHED`, `COUPON_MIN_ORDER_NOT_MET`
 - [x] Cloudinary (`IFileStorage`) + `POST api/customer/uploads` (JPG/PNG ≤ 5 MB, GB-06); ảnh hàng chỉ nhận URL thuộc domain Cloudinary của nhóm
-- [x] Tạo đơn (GST-17): cam kết không hàng cấm (4.3), 1–5 ảnh, mã đơn `MMyyyyMMddNNN` giờ VN, coupon `used_count++` (B11), **chỉ tiền mặt** ở Phase 1; **không có sửa đơn** (4.1)
+- [x] Tạo đơn (GST-06): cam kết không hàng cấm (4.3), 1–5 ảnh, mã đơn `MMyyyyMMddNNN` giờ VN, coupon `used_count++` (B11), **chỉ tiền mặt** ở Phase 1; **không có sửa đơn** (4.1)
 - [x] Danh sách, tìm, chi tiết, lịch sử đơn của khách (CUS-08..10, 20)
 
 **Phase 2**
@@ -66,12 +66,12 @@ Ai làm gì, ranh giới thư mục, thứ tự làm và checklist từng ngư�
 
 **Phase 3**
 - [x] REST theo dõi đơn: vị trí cuối và ETA (CUS-13)
-- [x] Danh mục `api/public/lookups/...`, mã loại hàng và mã lý do khi tạo đơn, hủy, khiếu nại; danh sách coupon cho khách (GST-10, 14, CUS-21, 29)
+- [x] Danh mục `api/public/lookups/...`, mã loại hàng và mã lý do khi tạo đơn, hủy, khiếu nại; danh sách coupon cho khách (GST-05, CUS-21, 29)
 - [x] Khách thấy lý do quyết định hoàn tiền (CUS-23); tài xế nhận `INCIDENT_REPORTED`, `RATING_RECEIVED`
 - [x] JOB-GPS-01 (xóa GPS log quá 30 ngày): `GpsLogCleanupJob` chạy mỗi 24 giờ; job của Hoàng kế thừa `PeriodicCommandJob`
-- [ ] JOB-AUTH-01 (xóa refresh token đã hết hạn, giữ token xoay vòng còn hạn để vẫn bắt được token dùng lại, 9.1): `RefreshTokenCleanupJob` chạy mỗi 24 giờ; migration `AddQueryIndexes` thêm index cho đơn theo ngày, rút tiền, PayOS `Pending`, FCM token và `refresh_tokens.expires_at`
+- [x] JOB-AUTH-01 (xóa refresh token đã hết hạn, giữ token xoay vòng còn hạn để vẫn bắt được token dùng lại, 9.1): `RefreshTokenCleanupJob` chạy mỗi 24 giờ; migration `AddQueryIndexes` thêm index cho đơn theo ngày, rút tiền, PayOS `Pending`, FCM token và `refresh_tokens.expires_at`
 - [x] Tài khoản nhận hoàn tiền (R-01): khai kèm khiếu nại/hoàn sự cố, `PUT api/customer/refunds/{id}/payout-account`, khách xem số đã che, `GET api/public/lookups/banks`, nhắc khi hủy đơn đã trả (`REFUND_BANK_INFO_REQUIRED`), gợi ý tài khoản PayOS (`useSuggested`, `suggestedPayoutAccount`)
-- [ ] Bảng mã lỗi cho frontend trong `api/README.md` đủ cho mọi endpoint (9.4)
+- [x] Bảng mã lỗi cho frontend trong `api/README.md` đủ cho mọi endpoint (9.4)
 
 ## 5. Hoàng: Admin / Driver / Payments
 

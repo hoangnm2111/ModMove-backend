@@ -33,7 +33,7 @@ public sealed class OrdersController : ApiControllerBase
     public Task<OrderTrackingResponse> GetTracking(long id, CancellationToken cancellationToken) =>
         Sender.Send(new GetOrderTrackingQuery(id), cancellationToken);
 
-    /// <summary>Book a cash or PayOS order (UC-GST-17). Price is computed again server-side; a different expectedTotalFee → 422 FARE_CHANGED.</summary>
+    /// <summary>Book a cash or PayOS order (UC-GST-06). Price is computed again server-side; a different expectedTotalFee → 422 FARE_CHANGED.</summary>
     [HttpPost]
     public async Task<IActionResult> Create(CreateOrderCommand command, CancellationToken cancellationToken)
     {
