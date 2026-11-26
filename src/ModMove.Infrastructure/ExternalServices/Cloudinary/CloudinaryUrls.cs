@@ -27,7 +27,11 @@ internal static partial class CloudinaryUrls
         if (!match.Success || !string.Equals(match.Groups["cloud"].Value, cloudName, StringComparison.Ordinal))
             return false;
 
-        publicId = Uri.UnescapeDataString(match.Groups["id"].Value);
+        var id = Uri.UnescapeDataString(match.Groups["id"].Value);
+        if (!SafePublicId().IsMatch(id))
+            return false;
+
+        publicId = id;
         format = match.Groups["format"].Value;
         return true;
     }
@@ -49,7 +53,8 @@ internal static partial class CloudinaryUrls
 
         var query = HttpUtility.ParseQueryString(uri.Query);
         if (query["type"] != AuthenticatedType
-            || query["public_id"] is not { Length: > 0 } id
+            || query["public_id"] is not { } id
+            || !SafePublicId().IsMatch(id)
             || query["format"] is not { Length: > 0 } extension
             || !extension.All(char.IsAsciiLetterOrDigit))
             return false;
@@ -61,7 +66,12 @@ internal static partial class CloudinaryUrls
 
     /// <summary>The unsigned delivery URL we save for a private photo.</summary>
     public static string StoredUrl(string cloudName, string publicId, string format) =>
-        $"https://res.cloudinary.com/{cloudName}/image/{AuthenticatedType}/{string.Join('/', publicId.Split('/').Select(Uri.EscapeDataString))}.{format}";
+        $"https://res.cloudinary.com/{cloudName}/image/{AuthenticatedType}/{publicId}.{format}";
+
+    // The id comes from a URL a client sent and ends up in a saved URL and a signed request: no "..", "&" or escapes.
+    // shortcut: matches the ids our uploads get (folders + random name); widen if the upload preset starts using file names.
+    [GeneratedRegex(@"^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*\z")]
+    private static partial Regex SafePublicId();
 
     [GeneratedRegex("/s--[^/]+--/")]
     private static partial Regex SignatureSegment();

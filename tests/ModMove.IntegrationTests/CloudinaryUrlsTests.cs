@@ -73,6 +73,27 @@ public class CloudinaryUrlsTests
     }
 
     [Theory]
+    [InlineData("..%2F..%2F..%2Fother%2Fimage%2Fupload%2Fevil")] // would resolve to another cloud
+    [InlineData("modmove%2F.%2Fabc")]
+    [InlineData("zzz%26invalidate%3Dtrue")]                      // would be signed as an extra parameter
+    [InlineData("abc&public_id=def")]
+    [InlineData("((((")]                                         // grows when escaped, past the column size
+    [InlineData("abc%0A")]
+    public void A_download_link_with_a_crafted_public_id_is_not_owned(string publicId)
+    {
+        var url = $"https://api.cloudinary.com/v1_1/demo/image/download?public_id={publicId}&format=jpg&type=authenticated";
+
+        Assert.False(Demo.IsOwnedUrl(url));
+        Assert.Equal(url, Demo.ToStoredUrl(url));
+    }
+
+    [Theory]
+    [InlineData("https://res.cloudinary.com/demo/image/authenticated/zzz%26invalidate%3Dtrue.jpg")]
+    [InlineData("https://res.cloudinary.com/demo/image/authenticated/v1/a%3Fb.jpg")]
+    public void A_delivery_url_with_a_crafted_public_id_is_never_signed(string url) =>
+        Assert.Equal(url, Demo.CreateViewUrl(url));
+
+    [Theory]
     [InlineData("https://res.cloudinary.com/demo/image/upload/v1/modmove/customers/3/abc.jpg")]
     [InlineData("https://res.cloudinary.com/other/image/authenticated/s--Ab12_x--/v1/a.jpg")]
     [InlineData("not a url")]
