@@ -5,6 +5,7 @@ using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
 using ModMove.Domain.Constants;
+using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 using ModMove.Domain.Services;
 
@@ -17,7 +18,7 @@ internal sealed class GetNearbyOrdersQueryHandler(
     TimeProvider clock,
     IFileStorage storage) : IQueryHandler<GetNearbyOrdersQuery, IReadOnlyList<NearbyOrderDto>>
 {
-    private const string DriverContextSql = """
+    private const string DriverContextSql = $"""
         SELECT u.account_status AS AccountStatus,
                dp.id AS DriverProfileId,
                dp.approval_status AS ApprovalStatus,
@@ -32,7 +33,7 @@ internal sealed class GetNearbyOrdersQueryHandler(
                (SELECT ao.id
                 FROM shipping_orders ao
                 WHERE ao.driver_profile_id = dp.id
-                  AND ao.order_status IN ('Accepted', 'Arrived', 'PickedUp', 'InTransit')
+                  AND ao.order_status IN ({SqlHelpers.WithDriverStatusSql})
                 ORDER BY ao.id DESC
                 LIMIT 1) AS ActiveOrderId
         FROM users u
@@ -76,6 +77,8 @@ internal sealed class GetNearbyOrdersQueryHandler(
         LEFT JOIN master_data_items m ON m.category = 'CARGO_TYPE' AND m.code = cd.cargo_type
         WHERE o.order_status = 'Pending'
           AND o.vehicle_type_id = @VehicleTypeId
+          AND o.pickup_latitude BETWEEN @MinLat AND @MaxLat
+          AND o.pickup_longitude BETWEEN @MinLon AND @MaxLon
           AND (
               (o.payment_method = 'Cash' AND o.created_at > @MatchValidAfter)
               OR (o.payment_method = 'PayOS' AND o.payment_status = 'Paid' AND o.paid_at IS NOT NULL AND o.paid_at > @MatchValidAfter)
@@ -113,16 +116,28 @@ internal sealed class GetNearbyOrdersQueryHandler(
             return [];
         }
 
-        var radiusKm = (double)await settings.GetDecimalAsync(SettingKeys.MatchingRadiusKm, cancellationToken);
+        // GB-16: wallet status and base deposit do not depend on individual orders, so return early before querying orders.
         var requiredDeposit = await settings.GetDecimalAsync(SettingKeys.RequiredDeposit, cancellationToken);
+        if (driver.WalletStatus != nameof(WalletStatus.Active) || driver.DepositBalance < requiredDeposit)
+            return [];
+
+        var radiusKm = (double)await settings.GetDecimalAsync(SettingKeys.MatchingRadiusKm, cancellationToken);
         var commissionRate = await settings.GetDecimalAsync(SettingKeys.CommissionRate, cancellationToken);
-        var walletActive = driver.WalletStatus == nameof(WalletStatus.Active);
+        var (minLat, maxLat, minLon, maxLon) = GeoDistance.BoundingBox(driverLat, driverLon, radiusKm);
 
         var matchValidAfter = (now - BusinessRules.MatchingTimeout).UtcDateTime;
         var candidates = await connection.QueryAsync<CandidateOrderRow>(
             new CommandDefinition(
                 CandidateOrdersSql,
-                new { VehicleTypeId = driverVehicleTypeId, MatchValidAfter = matchValidAfter },
+                new
+                {
+                    VehicleTypeId = driverVehicleTypeId,
+                    MatchValidAfter = matchValidAfter,
+                    MinLat = minLat,
+                    MaxLat = maxLat,
+                    MinLon = minLon,
+                    MaxLon = maxLon,
+                },
                 cancellationToken: cancellationToken));
 
         var matches = new List<(double RawDistanceKm, NearbyOrderDto Dto)>();
@@ -158,11 +173,11 @@ internal sealed class GetNearbyOrdersQueryHandler(
             }
 
             // GB-14, DECISIONS M1: commission = round(rate * total_fee), driver earns total_fee - commission.
-            var commission = Math.Round(commissionRate * row.TotalFee, 0, MidpointRounding.AwayFromZero);
+            var commission = ShippingOrder.CommissionFor(commissionRate, row.TotalFee);
             var driverEarning = row.TotalFee - commission;
 
-            // GB-16: all orders require an Active wallet with DepositBalance >= REQUIRED_DEPOSIT; cash orders also require >= this order's commission.
-            if (!walletActive || driver.DepositBalance < requiredDeposit || (isCash && driver.DepositBalance < commission))
+            // GB-16: cash orders also require DepositBalance >= this order's commission.
+            if (isCash && driver.DepositBalance < commission)
                 continue;
 
             var distKm = GeoDistance.HaversineKm(driverLat, driverLon, row.PickupLatitude, row.PickupLongitude);

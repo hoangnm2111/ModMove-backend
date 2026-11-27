@@ -6,6 +6,7 @@ using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
 using ModMove.Domain.Constants;
+using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 
 namespace ModMove.Application.Features.Trips.Queries.GetDriverTripDetail;
@@ -38,11 +39,11 @@ internal sealed class GetActiveDriverTripQueryHandler(
     IPlatformSettings settings,
     IFileStorage storage) : IQueryHandler<GetActiveDriverTripQuery, DriverTripDetailResponse?>
 {
-    private const string ActiveOrderIdSql = """
+    private const string ActiveOrderIdSql = $"""
         SELECT o.id
         FROM shipping_orders o
         WHERE o.driver_profile_id = @DriverProfileId
-          AND o.order_status IN ('Accepted', 'Arrived', 'PickedUp', 'InTransit')
+          AND o.order_status IN ({SqlHelpers.WithDriverStatusSql})
         ORDER BY o.id DESC
         LIMIT 1
         """;
@@ -178,6 +179,13 @@ internal static class DriverTripDetailReader
         ORDER BY created_at DESC, id DESC
         """;
 
+    private const string DetailBatchSql = $"""
+        {CargoSql};
+        {ProofSql};
+        {HistorySql};
+        {IncidentsSql};
+        """;
+
     public static async Task<DriverTripDetailResponse?> LoadByOrderIdAsync(
         IDbConnection connection,
         long orderId,
@@ -193,14 +201,12 @@ internal static class DriverTripDetailReader
         if (o is null)
             return null;
 
-        var c = await connection.QuerySingleAsync<CargoRow>(
-            new CommandDefinition(CargoSql, parameters, cancellationToken: cancellationToken));
-        var p = await connection.QuerySingleOrDefaultAsync<ProofRow>(
-            new CommandDefinition(ProofSql, parameters, cancellationToken: cancellationToken));
-        var history = await connection.QueryAsync<HistoryRow>(
-            new CommandDefinition(HistorySql, parameters, cancellationToken: cancellationToken));
-        var incidents = await connection.QueryAsync<IncidentRow>(
-            new CommandDefinition(IncidentsSql, parameters, cancellationToken: cancellationToken));
+        using var grid = await connection.QueryMultipleAsync(
+            new CommandDefinition(DetailBatchSql, parameters, cancellationToken: cancellationToken));
+        var c = await grid.ReadSingleAsync<CargoRow>();
+        var p = await grid.ReadSingleOrDefaultAsync<ProofRow>();
+        var history = (await grid.ReadAsync<HistoryRow>()).ToList();
+        var incidents = (await grid.ReadAsync<IncidentRow>()).ToList();
 
         // DECISIONS 7.2: when reassigned after pickup, the replacement driver navigates to the handover vehicle location.
         GeoPoint? handoverPoint = null;
@@ -213,7 +219,7 @@ internal static class DriverTripDetailReader
         }
 
         var rate = o.CommissionRate ?? currentCommissionRate;
-        var commission = o.CommissionAmount ?? Math.Round(rate * o.TotalFee, 0, MidpointRounding.AwayFromZero);
+        var commission = o.CommissionAmount ?? ShippingOrder.CommissionFor(rate, o.TotalFee);
         var driverEarning = o.TotalFee - commission;
         var cashToCollect = o.PaymentMethod == nameof(PaymentMethod.Cash)
             && o.PaymentStatus != nameof(PaymentStatus.Paid)

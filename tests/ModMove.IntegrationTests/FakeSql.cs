@@ -86,6 +86,30 @@ internal sealed class FakeSql : ISqlConnectionFactory
         {
             sql.LastSql = CommandText;
             sql.LastParameters = DbParameterCollection.Cast<DbParameter>().ToDictionary(p => p.ParameterName, p => p.Value);
+
+            var statements = CommandText.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (statements.Length > 1)
+            {
+                var ds = new DataSet();
+                for (var i = 0; i < statements.Length; i++)
+                {
+                    DataTable source;
+                    if (sql.Results.Count > 0)
+                        source = sql.Results.Dequeue();
+                    else if (sql.CustomQuery is not null && sql.CustomQuery(statements[i], sql.LastParameters) is { } custom)
+                        source = custom;
+                    else
+                        source = sql.Result;
+
+                    var table = source.Copy();
+                    if (table.Columns.Count == 0)
+                        table.Columns.Add("_empty", typeof(int));
+                    table.TableName = $"T{i}";
+                    ds.Tables.Add(table);
+                }
+                return ds.CreateDataReader();
+            }
+
             if (sql.Results.Count > 0)
                 return sql.Results.Dequeue().CreateDataReader();
             if (sql.CustomQuery is not null)

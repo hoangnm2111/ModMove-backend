@@ -149,6 +149,13 @@ internal sealed class GetDispatcherOrderByIdQueryHandler(ISqlConnectionFactory c
         ORDER BY r.id DESC;
         """;
 
+    private const string DetailBatchSql = $"""
+        {HistorySql}
+        {PaymentsSql}
+        {IncidentsSql}
+        {RefundsSql}
+        """;
+
     public async Task<DispatcherOrderDetailResponse> Handle(
         GetDispatcherOrderByIdQuery request, CancellationToken cancellationToken)
     {
@@ -159,17 +166,12 @@ internal sealed class GetDispatcherOrderByIdQueryHandler(ISqlConnectionFactory c
             new CommandDefinition(OrderSql, parameters, cancellationToken: cancellationToken))
             ?? throw new NotFoundException(nameof(ShippingOrder), request.Id);
 
-        var historyRows = await connection.QueryAsync<HistoryRow>(
-            new CommandDefinition(HistorySql, parameters, cancellationToken: cancellationToken));
-
-        var paymentRows = await connection.QueryAsync<PaymentRow>(
-            new CommandDefinition(PaymentsSql, parameters, cancellationToken: cancellationToken));
-
-        var incidentRows = await connection.QueryAsync<IncidentRow>(
-            new CommandDefinition(IncidentsSql, parameters, cancellationToken: cancellationToken));
-
-        var refundRows = await connection.QueryAsync<RefundItemRow>(
-            new CommandDefinition(RefundsSql, parameters, cancellationToken: cancellationToken));
+        using var grid = await connection.QueryMultipleAsync(
+            new CommandDefinition(DetailBatchSql, parameters, cancellationToken: cancellationToken));
+        var historyRows = (await grid.ReadAsync<HistoryRow>()).ToList();
+        var paymentRows = (await grid.ReadAsync<PaymentRow>()).ToList();
+        var incidentRows = (await grid.ReadAsync<IncidentRow>()).ToList();
+        var refundRows = (await grid.ReadAsync<RefundItemRow>()).ToList();
 
         var customer = new DispatcherOrderCustomerDetails(
             row.CustomerId, row.CustomerFullName, row.CustomerPhone, row.CustomerEmail);

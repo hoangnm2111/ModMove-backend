@@ -37,7 +37,7 @@ internal sealed class GetReplacementDriversQueryHandler(
         WHERE i.id = @IncidentId;
         """;
 
-    private const string CandidateDriversSql = """
+    private const string CandidateDriversSql = $"""
         SELECT
             dp.id AS DriverProfileId,
             u.id AS UserId,
@@ -69,7 +69,7 @@ internal sealed class GetReplacementDriversQueryHandler(
               SELECT 1
               FROM shipping_orders ao
               WHERE ao.driver_profile_id = dp.id
-                AND ao.order_status IN ('Accepted', 'Arrived', 'PickedUp', 'InTransit')
+                AND ao.order_status IN ({SqlHelpers.WithDriverStatusSql})
           );
         """;
 
@@ -90,7 +90,7 @@ internal sealed class GetReplacementDriversQueryHandler(
         if (isCash)
         {
             var commissionRate = await settings.GetDecimalAsync(SettingKeys.CommissionRate, cancellationToken);
-            requiredCommission = Math.Round(commissionRate * ctx.TotalFee, 0, MidpointRounding.AwayFromZero);
+            requiredCommission = ShippingOrder.CommissionFor(commissionRate, ctx.TotalFee);
         }
 
         var freshSince = (clock.GetUtcNow() - BusinessRules.GpsDisconnectAfter).UtcDateTime;
