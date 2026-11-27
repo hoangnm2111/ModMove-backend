@@ -5,6 +5,7 @@ using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
 using ModMove.Application.Common.Models;
 using ModMove.Application.Features.Orders;
+using ModMove.Domain.Entities;
 
 namespace ModMove.Application.Features.Trips.Queries.GetDriverTrips;
 
@@ -98,7 +99,7 @@ internal sealed class GetDriverTripsQueryHandler(
 
         var items = rows.Select(r =>
         {
-            var commission = r.CommissionAmount ?? Math.Round(commissionRate * r.TotalFee, 0, MidpointRounding.AwayFromZero);
+            var commission = r.CommissionAmount ?? ShippingOrder.CommissionFor(commissionRate, r.TotalFee);
             var driverEarning = r.TotalFee - commission;
             return new DriverTripSummaryResponse(
                 r.Id,

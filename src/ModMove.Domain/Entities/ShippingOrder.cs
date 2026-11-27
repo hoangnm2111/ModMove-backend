@@ -472,7 +472,13 @@ public sealed class ShippingOrder : BaseAuditableEntity, IAggregateRoot
     /// before that, for the GB-16 deposit check when a driver takes a cash order.
     /// </summary>
     public decimal CommissionFor(decimal commissionRate) =>
-        Math.Round(commissionRate * TotalFee, 0, MidpointRounding.AwayFromZero);
+        CommissionFor(commissionRate, TotalFee);
+
+    /// <summary>
+    /// DECISIONS M1/M2: shared commission formula for both entity completion and read queries so rounding stays in one place.
+    /// </summary>
+    public static decimal CommissionFor(decimal commissionRate, decimal totalFee) =>
+        Math.Round(commissionRate * totalFee, 0, MidpointRounding.AwayFromZero);
 
     /// <summary>What the driver earns for this order (DECISIONS M1): total_fee minus the commission.</summary>
     public decimal DriverEarning => TotalFee - (CommissionAmount ?? 0);

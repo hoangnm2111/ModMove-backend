@@ -6,6 +6,7 @@ using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
 using ModMove.Domain.Constants;
+using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 
 namespace ModMove.Application.Features.Trips.Queries.GetDriverTripDetail;
@@ -213,7 +214,7 @@ internal static class DriverTripDetailReader
         }
 
         var rate = o.CommissionRate ?? currentCommissionRate;
-        var commission = o.CommissionAmount ?? Math.Round(rate * o.TotalFee, 0, MidpointRounding.AwayFromZero);
+        var commission = o.CommissionAmount ?? ShippingOrder.CommissionFor(rate, o.TotalFee);
         var driverEarning = o.TotalFee - commission;
         var cashToCollect = o.PaymentMethod == nameof(PaymentMethod.Cash)
             && o.PaymentStatus != nameof(PaymentStatus.Paid)

@@ -90,7 +90,7 @@ internal sealed class GetReplacementDriversQueryHandler(
         if (isCash)
         {
             var commissionRate = await settings.GetDecimalAsync(SettingKeys.CommissionRate, cancellationToken);
-            requiredCommission = Math.Round(commissionRate * ctx.TotalFee, 0, MidpointRounding.AwayFromZero);
+            requiredCommission = ShippingOrder.CommissionFor(commissionRate, ctx.TotalFee);
         }
 
         var freshSince = (clock.GetUtcNow() - BusinessRules.GpsDisconnectAfter).UtcDateTime;

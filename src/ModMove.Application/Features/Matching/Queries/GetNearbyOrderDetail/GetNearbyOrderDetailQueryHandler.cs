@@ -143,7 +143,7 @@ internal sealed class GetNearbyOrderDetailQueryHandler(
         var requiredDeposit = await settings.GetDecimalAsync(SettingKeys.RequiredDeposit, cancellationToken);
         var commissionRate = await settings.GetDecimalAsync(SettingKeys.CommissionRate, cancellationToken);
 
-        var commission = Math.Round(commissionRate * order.TotalFee, 0, MidpointRounding.AwayFromZero);
+        var commission = ShippingOrder.CommissionFor(commissionRate, order.TotalFee);
         var driverEarning = order.TotalFee - commission;
 
         decimal? roundedDistanceKm = null;

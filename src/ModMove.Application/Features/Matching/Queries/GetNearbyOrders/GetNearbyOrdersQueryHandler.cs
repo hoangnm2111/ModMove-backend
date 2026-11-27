@@ -5,6 +5,7 @@ using ModMove.Application.Common.Interfaces;
 using ModMove.Application.Common.Interfaces.Persistence;
 using ModMove.Application.Common.Messaging;
 using ModMove.Domain.Constants;
+using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 using ModMove.Domain.Services;
 
@@ -158,7 +159,7 @@ internal sealed class GetNearbyOrdersQueryHandler(
             }
 
             // GB-14, DECISIONS M1: commission = round(rate * total_fee), driver earns total_fee - commission.
-            var commission = Math.Round(commissionRate * row.TotalFee, 0, MidpointRounding.AwayFromZero);
+            var commission = ShippingOrder.CommissionFor(commissionRate, row.TotalFee);
             var driverEarning = row.TotalFee - commission;
 
             // GB-16: all orders require an Active wallet with DepositBalance >= REQUIRED_DEPOSIT; cash orders also require >= this order's commission.
