@@ -230,6 +230,12 @@ public class GetNearbyOrdersTests
 
         var single = Assert.Single(result);
         Assert.Equal(201L, single.OrderId);
+        Assert.Contains("pickup_latitude BETWEEN @MinLat AND @MaxLat", app.Sql.LastSql);
+        Assert.Contains("pickup_longitude BETWEEN @MinLon AND @MaxLon", app.Sql.LastSql);
+        Assert.True((decimal)app.Sql.LastParameters["MinLat"]! < 21.0285m);
+        Assert.True((decimal)app.Sql.LastParameters["MaxLat"]! > 21.0285m);
+        Assert.True((decimal)app.Sql.LastParameters["MinLon"]! < 105.8542m);
+        Assert.True((decimal)app.Sql.LastParameters["MaxLon"]! > 105.8542m);
     }
 
     [Fact]
@@ -308,20 +314,10 @@ public class GetNearbyOrdersTests
         var app = CreateApp(requiredDeposit: 200_000m);
         app.Sql.Results.Enqueue(DriverRow(depositBalance: 199_999m));
 
-        var orders = OrdersTable();
-        AddCandidate(orders, orderId: 601L, paymentMethod: "Cash", totalFee: 300_000m);
-        AddCandidate(
-            orders,
-            orderId: 602L,
-            paymentMethod: "PayOS",
-            paymentStatus: "Paid",
-            paidAt: Now.AddMinutes(-1).UtcDateTime,
-            totalFee: 300_000m);
-        app.Sql.Results.Enqueue(orders);
-
         var result = await app.Sender.Send(new GetNearbyOrdersQuery());
 
         Assert.Empty(result);
+        Assert.Contains("FROM users u", app.Sql.LastSql);
     }
 
     [Fact]
@@ -350,20 +346,10 @@ public class GetNearbyOrdersTests
         var app = CreateApp();
         app.Sql.Results.Enqueue(DriverRow(walletStatus: "Frozen", depositBalance: 500_000m));
 
-        var orders = OrdersTable();
-        AddCandidate(orders, orderId: 801L, paymentMethod: "Cash", totalFee: 300_000m);
-        AddCandidate(
-            orders,
-            orderId: 802L,
-            paymentMethod: "PayOS",
-            paymentStatus: "Paid",
-            paidAt: Now.AddMinutes(-1).UtcDateTime,
-            totalFee: 300_000m);
-        app.Sql.Results.Enqueue(orders);
-
         var result = await app.Sender.Send(new GetNearbyOrdersQuery());
 
         Assert.Empty(result);
+        Assert.Contains("FROM users u", app.Sql.LastSql);
     }
 
     [Fact]
