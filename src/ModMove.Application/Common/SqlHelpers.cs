@@ -3,6 +3,9 @@ namespace ModMove.Application.Common;
 /// <summary>Small helpers shared by the Dapper query handlers.</summary>
 internal static class SqlHelpers
 {
+    /// <summary>SQL IN-list matching <see cref="Domain.Constants.OrderStatusGroups.WithDriver"/>.</summary>
+    public const string WithDriverStatusSql = "'Accepted', 'Arrived', 'PickedUp', 'InTransit'";
+
     /// <summary>
     /// MySQL returns DATETIME without a zone; the database holds UTC, so mark it as UTC to serialize as ISO 8601 UTC.
     /// </summary>

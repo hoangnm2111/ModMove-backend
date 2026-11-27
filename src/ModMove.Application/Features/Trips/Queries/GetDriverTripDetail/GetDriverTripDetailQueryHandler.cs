@@ -39,11 +39,11 @@ internal sealed class GetActiveDriverTripQueryHandler(
     IPlatformSettings settings,
     IFileStorage storage) : IQueryHandler<GetActiveDriverTripQuery, DriverTripDetailResponse?>
 {
-    private const string ActiveOrderIdSql = """
+    private const string ActiveOrderIdSql = $"""
         SELECT o.id
         FROM shipping_orders o
         WHERE o.driver_profile_id = @DriverProfileId
-          AND o.order_status IN ('Accepted', 'Arrived', 'PickedUp', 'InTransit')
+          AND o.order_status IN ({SqlHelpers.WithDriverStatusSql})
         ORDER BY o.id DESC
         LIMIT 1
         """;

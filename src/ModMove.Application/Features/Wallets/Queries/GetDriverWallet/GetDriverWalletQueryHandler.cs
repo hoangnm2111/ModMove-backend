@@ -14,7 +14,7 @@ internal sealed class GetDriverWalletQueryHandler(
     ICurrentUserService currentUser,
     IPlatformSettings settings) : IQueryHandler<GetDriverWalletQuery, DriverWalletResponse>
 {
-    private const string Sql = """
+    private const string Sql = $"""
         SELECT w.id AS WalletId,
                w.wallet_status AS WalletStatus,
                w.deposit_balance AS DepositBalance,
@@ -30,7 +30,7 @@ internal sealed class GetDriverWalletQueryHandler(
                    SELECT ao.id
                    FROM shipping_orders ao
                    WHERE ao.driver_profile_id = w.driver_profile_id
-                     AND ao.order_status IN ('Accepted', 'Arrived', 'PickedUp', 'InTransit')
+                     AND ao.order_status IN ({SqlHelpers.WithDriverStatusSql})
                    LIMIT 1
                ) AS ActiveOrderId
         FROM driver_wallets w

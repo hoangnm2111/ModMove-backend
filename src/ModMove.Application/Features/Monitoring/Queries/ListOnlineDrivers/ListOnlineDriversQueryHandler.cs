@@ -10,7 +10,7 @@ internal sealed class ListOnlineDriversQueryHandler(
     ISqlConnectionFactory connectionFactory,
     TimeProvider clock) : IQueryHandler<ListOnlineDriversQuery, IReadOnlyList<OnlineDriverMapItemResponse>>
 {
-    private const string Sql = """
+    private const string Sql = $"""
         SELECT dp.id AS DriverProfileId,
                u.id AS UserId,
                u.full_name AS FullName,
@@ -33,7 +33,7 @@ internal sealed class ListOnlineDriversQueryHandler(
                    SELECT o2.id
                    FROM shipping_orders o2
                    WHERE o2.driver_profile_id = dp.id
-                     AND o2.order_status IN ('Accepted', 'Arrived', 'PickedUp', 'InTransit')
+                     AND o2.order_status IN ({SqlHelpers.WithDriverStatusSql})
                    ORDER BY o2.id DESC
                    LIMIT 1
                )

@@ -19,7 +19,7 @@ internal sealed class GetNearbyOrderDetailQueryHandler(
     TimeProvider clock,
     IFileStorage storage) : IQueryHandler<GetNearbyOrderDetailQuery, NearbyOrderDetailResponse>
 {
-    private const string DriverContextSql = """
+    private const string DriverContextSql = $"""
         SELECT u.account_status AS AccountStatus,
                dp.id AS DriverProfileId,
                dp.approval_status AS ApprovalStatus,
@@ -34,7 +34,7 @@ internal sealed class GetNearbyOrderDetailQueryHandler(
                (SELECT ao.id
                 FROM shipping_orders ao
                 WHERE ao.driver_profile_id = dp.id
-                  AND ao.order_status IN ('Accepted', 'Arrived', 'PickedUp', 'InTransit')
+                  AND ao.order_status IN ({SqlHelpers.WithDriverStatusSql})
                 ORDER BY ao.id DESC
                 LIMIT 1) AS ActiveOrderId
         FROM users u

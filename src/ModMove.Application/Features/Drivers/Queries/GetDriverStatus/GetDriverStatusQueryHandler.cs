@@ -16,7 +16,7 @@ internal sealed class GetDriverStatusQueryHandler(
 {
     // One row per user. The account status comes with it, so a locked or deleted driver whose token is still valid is
     // refused (B8) without a second round trip. LEFT JOINs: a driver who never applied has no profile, vehicle or wallet.
-    private const string Sql = """
+    private const string Sql = $"""
         SELECT u.account_status AS AccountStatus,
                dp.id AS DriverProfileId,
                dp.approval_status AS ApprovalStatus,
@@ -32,7 +32,7 @@ internal sealed class GetDriverStatusQueryHandler(
                (SELECT o.id
                 FROM shipping_orders o
                 WHERE o.driver_profile_id = dp.id
-                  AND o.order_status IN ('Accepted', 'Arrived', 'PickedUp', 'InTransit')
+                  AND o.order_status IN ({SqlHelpers.WithDriverStatusSql})
                 ORDER BY o.id DESC
                 LIMIT 1) AS ActiveOrderId
         FROM users u

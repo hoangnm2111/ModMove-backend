@@ -1,11 +1,10 @@
-using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Migrations.Operations;
+using ModMove.Domain.Constants;
 using ModMove.Domain.Entities;
 using ModMove.Domain.Enums;
 using ModMove.Infrastructure.Persistence;
 using ModMove.Infrastructure.Persistence.Migrations;
-using ModMove.Infrastructure.Persistence.Repositories;
 
 namespace ModMove.IntegrationTests;
 
@@ -49,10 +48,7 @@ public class PersistenceModelTests
     [Fact]
     public void Commission_rate_is_locked_from_accepted_until_delivered_C8()
     {
-        var inProgress = (OrderStatus[])typeof(ShippingOrderRepository)
-            .GetField("InProgress", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
-
-        Assert.Equal([OrderStatus.Accepted, OrderStatus.Arrived, OrderStatus.PickedUp, OrderStatus.InTransit], inProgress);
+        Assert.Equal([OrderStatus.Accepted, OrderStatus.Arrived, OrderStatus.PickedUp, OrderStatus.InTransit], OrderStatusGroups.WithDriver);
     }
 
     [Fact]
