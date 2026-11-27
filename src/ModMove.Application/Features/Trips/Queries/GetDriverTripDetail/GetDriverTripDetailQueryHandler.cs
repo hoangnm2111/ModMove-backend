@@ -179,6 +179,13 @@ internal static class DriverTripDetailReader
         ORDER BY created_at DESC, id DESC
         """;
 
+    private const string DetailBatchSql = $"""
+        {CargoSql};
+        {ProofSql};
+        {HistorySql};
+        {IncidentsSql};
+        """;
+
     public static async Task<DriverTripDetailResponse?> LoadByOrderIdAsync(
         IDbConnection connection,
         long orderId,
@@ -194,14 +201,12 @@ internal static class DriverTripDetailReader
         if (o is null)
             return null;
 
-        var c = await connection.QuerySingleAsync<CargoRow>(
-            new CommandDefinition(CargoSql, parameters, cancellationToken: cancellationToken));
-        var p = await connection.QuerySingleOrDefaultAsync<ProofRow>(
-            new CommandDefinition(ProofSql, parameters, cancellationToken: cancellationToken));
-        var history = await connection.QueryAsync<HistoryRow>(
-            new CommandDefinition(HistorySql, parameters, cancellationToken: cancellationToken));
-        var incidents = await connection.QueryAsync<IncidentRow>(
-            new CommandDefinition(IncidentsSql, parameters, cancellationToken: cancellationToken));
+        using var grid = await connection.QueryMultipleAsync(
+            new CommandDefinition(DetailBatchSql, parameters, cancellationToken: cancellationToken));
+        var c = await grid.ReadSingleAsync<CargoRow>();
+        var p = await grid.ReadSingleOrDefaultAsync<ProofRow>();
+        var history = (await grid.ReadAsync<HistoryRow>()).ToList();
+        var incidents = (await grid.ReadAsync<IncidentRow>()).ToList();
 
         // DECISIONS 7.2: when reassigned after pickup, the replacement driver navigates to the handover vehicle location.
         GeoPoint? handoverPoint = null;
